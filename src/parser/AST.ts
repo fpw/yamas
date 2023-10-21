@@ -1,3 +1,29 @@
+/**
+ *
+ * Program: Statement | Statement Program
+ *
+ * Statement: OriginStatement | LabelDef | AssignStatement | ExpressionStatement | Comment | Text | StatementSeparator
+ * OriginStatement: *Expression
+ * LabelDef: Symbol,
+ * AssignStatement: Symbol=Expression
+ * ExpressionStatement: Expression
+ * Comment: /.*
+ * Text: TEXT ...
+ * StatementSeparator: ;|\n|EOF
+ *
+ * Expression: ParenExpr | BinaryOp | UnparsedSequence | Element
+ * ParenExpr: (Expression)? | [Expression]?
+ * BinaryOp: Element Op Expression
+ * UnparsedSequence: <.*>
+ *
+ * Element: UnaryOp | Integer | Symbol | ASCII | .
+ * UnaryOp: -Element
+ * Integer: [0-9]+
+ * Symbol: [A-Z][A-Z0-9]+
+ * ASCII: ".
+ *
+ */
+
 export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%" | " ";
 export type UnaryOpChr = "-";
 
@@ -6,7 +32,7 @@ export interface Program {
     stmts: Statement[];
 }
 
-export type Statement = OriginStatement | LabelDef | AssignStatement | StatementSeparator | ExpressionStatement | Comment;
+export type Statement = OriginStatement | LabelDef | AssignStatement | StatementSeparator | ExpressionStatement | TextStatement | Comment;
 export type Expression = ParenExpr | BinaryOp | UnparsedSequence | AstElement;
 
 // *200
@@ -34,6 +60,12 @@ export interface StatementSeparator {
     separator: ";" | "\n";
 }
 
+export interface TextStatement {
+    type: "text";
+    delim: string;
+    text: string;
+}
+
 // /Comment
 export interface Comment {
     type: "comment";
@@ -59,7 +91,7 @@ export interface BinaryOp {
     rhs: Expression;
 }
 
-export type AstElement = UnaryOp | Integer | AstSymbol | CLCValue;
+export type AstElement = UnaryOp | Integer | ASCIIChar | AstSymbol | CLCValue;
 
 // -2
 export interface UnaryOp {
@@ -78,6 +110,11 @@ export interface Integer {
     // unparsed because interpretation depends on environment (i.e. DECIMAL or OCTAL)
     type: "integer";
     int: string;
+}
+
+export interface ASCIIChar {
+    type: "ascii";
+    char: string;
 }
 
 export interface AstSymbol {

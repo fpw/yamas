@@ -72,7 +72,7 @@ export class SymbolTable {
         const normName = this.normalizeName(data.name);
         const sym = this.lookup(normName);
         if (sym) {
-            if (sym.type == SymbolType.Param && data.type == SymbolType.Param) {
+            if ((sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) && data.type == SymbolType.Param) {
                 sym.value = data.value;
                 return sym;
             } else {

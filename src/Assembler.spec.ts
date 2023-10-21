@@ -11,7 +11,7 @@ describe("Assemling simple examples", () => {
             INDEX, 	0
             N,		0
 
-            DEFINE MOVE A B <CLA; TAD A; DCA B; TAD B>
+            IFZERO N680-1 <NOP>
 
             PAGE 2
 

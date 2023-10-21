@@ -1,4 +1,4 @@
-import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr } from "./AST";
+import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement } from "./AST";
 import { Token, TokenType, SymbolToken } from "../lexer/Token";
 import { Lexer } from "../lexer/Lexer";
 
@@ -30,27 +30,37 @@ export class Parser {
     private parseStatement(): Statement | undefined {
         const tok = this.lexer.next(false);
 
+        const asExpr = () => {
+            this.lexer.unget(tok);
+            return {
+                type: "exprStmt",
+                expr: this.parseExpr(),
+            } as ExpressionStatement;
+        };
+
         switch (tok.type) {
             case TokenType.Char:
                 switch (tok.char) {
+                    case "$":
+                        return undefined;
                     case "*":
                         return this.parseOriginStatement(tok);
                     case ";":
                         return {type: "separator", separator: tok.char};
+                    case "-":
                     case ".":
-                        this.lexer.unget(tok);
-                        return {
-                            type: "exprStmt",
-                            expr: this.parseExpr(),
-                        };
+                        return asExpr();
                 }
                 break;
-            case TokenType.Integer:
-                this.lexer.unget(tok);
+            case TokenType.Text:
                 return {
-                    type: "exprStmt",
-                    expr: this.parseExpr(),
+                    type: "text",
+                    delim: tok.delim,
+                    text: tok.text,
                 };
+            case TokenType.ASCII:
+            case TokenType.Integer:
+                return asExpr();
             case TokenType.Symbol:
                 switch (this.lexer.peekNext()) {
                     case ",":
@@ -58,11 +68,7 @@ export class Parser {
                     case "=":
                         return this.parseParameterDef(tok);
                     default:
-                        this.lexer.unget(tok);
-                        return {
-                            type: "exprStmt",
-                            expr: this.parseExpr(),
-                        };
+                        return asExpr();
                 }
             case TokenType.Comment:
                 return {type: "comment", comment: tok.comment};
@@ -185,10 +191,12 @@ export class Parser {
         switch (tok.type) {
             case TokenType.Blank:
             case TokenType.Integer:
+            case TokenType.ASCII:
             case TokenType.Symbol:
             case TokenType.RawSequence:
                 return false;
             case TokenType.Comment:
+            case TokenType.Text:
             case TokenType.EOF:
             case TokenType.EOL:
                 return true;
@@ -223,6 +231,11 @@ export class Parser {
                 operator: "-",
                 next: this.parseElement(),
             }
+        } else if (tok.type == TokenType.ASCII) {
+            return {
+                type: "ascii",
+                char: tok.char,
+            };
         } else {
             throw Error(`Element expected, got ${JSON.stringify(tok)}`);
         }

@@ -20,14 +20,12 @@ export class Assembler {
         "EXPUNGE",  "FIXTAB",
         "TEXT",
         "PAUSE",
+        "IFDEF", "IFNDEF", "IFNZRO", "IFZERO",
         "DEFINE",
     ];
 
     public constructor() {
-        for (const pseudo of this.pseudos) {
-            this.syms.definePseudo(pseudo);
-        }
-
+        this.pseudos.forEach(p => this.syms.definePseudo(p));
         this.syms.definePermanent("I", 0);
         this.syms.definePermanent("Z", 0);
 
@@ -98,6 +96,9 @@ export class Assembler {
 
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
+                case "text":
+                    // TODO
+                    break;
                 case "exprStmt":
                     this.handleExprStmt(ctx, stmt);
                     break;
@@ -149,6 +150,9 @@ export class Assembler {
                     throw Error("Right-hand side undefined when assigning origin");
                 }
                 ctx.clc = org;
+                break;
+            case "text":
+                // TODO
                 break;
             case "exprStmt":
                 if (!this.isPseudoExpr(stmt.expr)) {
@@ -218,6 +222,8 @@ export class Assembler {
                     throw Error("Invalid digit");
                 }
                 return Number.parseInt(expr.int, ctx.radix) & 0o7777;
+            case "ascii":
+                return expr.char.charCodeAt(0) & 0o7777;
             case "symbol":
                 return this.syms.lookup(expr.sym)?.value;
             case "clc":

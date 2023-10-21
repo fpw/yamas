@@ -1,4 +1,4 @@
-import { Token, TokenType, SymbolToken } from "./Token";
+import { Token, TokenType } from "./Token";
 
 export class Lexer {
     private inputs: {name: string, lines: string[]}[] = [];
@@ -37,7 +37,7 @@ export class Lexer {
             };
         }
 
-        const line = lines[this.inputLine];
+        let line = lines[this.inputLine];
         if (this.inputCol >= line.length) {
             this.inputCol = 0;
             this.inputLine++;
@@ -65,13 +65,33 @@ export class Lexer {
         } else if (start.match(/[A-Z]/)) {
             let symbol = "";
             for (let i = this.inputCol; i < line.length; i++) {
-                if (line[i].match(/[A-Z]/)) {
+                if (line[i].match(/[A-Z0-9]/)) {
                     symbol += line[i];
                 } else {
                     break;
                 }
             }
             this.inputCol += symbol.length;
+            if (symbol == "TEXT") {
+                this.inputCol++;
+                const delim = line[this.inputCol];
+                let text = "";
+                this.inputCol++;
+                for (let i = this.inputCol; i < line.length; i++) {
+                    this.inputCol++;
+                    if (line[i] == delim) {
+                        break;
+                    }
+                    text += line[i];
+                }
+                return {
+                    type: TokenType.Text,
+                    delim: delim,
+                    text: text,
+                    endCol: base.startCol + text.length + 3,
+                    ...base,
+                };
+            }
             return {
                 type: TokenType.Symbol,
                 symbol: symbol,
@@ -110,18 +130,40 @@ export class Lexer {
         } else if (start == "<") {
             let seq = "";
             this.inputCol++;
-            for (let i = this.inputCol; i < line.length; i++) {
-                if (line[i] == ">") {
-                    break;
+            let remain = 1;
+            while (remain > 0) {
+                for (let i = this.inputCol; i < line.length; i++) {
+                    this.inputCol++;
+                    if (line[i] == ">") {
+                        remain--;
+                        if (remain == 0) {
+                            continue;
+                        }
+                    } else if (line[i] == "<") {
+                        remain++;
+                    }
+                    seq += line[i];
                 }
-                seq += line[i];
+                if (remain > 0) {
+                    this.inputLine++;
+                    line = this.inputs[this.inputIdx].lines[this.inputLine];
+                    this.inputCol = 0;
+                }
             }
-            this.inputCol += seq.length + 1; // also skip >
             return {
                 type: TokenType.RawSequence,
                 body: seq,
                 endCol: base.startCol + seq.length + 1,
-                ...base
+                ...base,
+            };
+        } else if (start == "\"") {
+            const chr = line[this.inputCol + 1];
+            this.inputCol += 2;
+            return {
+                type: TokenType.ASCII,
+                char: line[this.inputCol + 1],
+                endCol: base.startCol + 2,
+                ...base,
             };
         } else {
             this.inputCol++;

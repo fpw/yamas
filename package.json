@@ -1,11 +1,11 @@
 {
-  "name": "jamas8",
-  "description": "Jumbled Algorithmic Macro Assembler System: A PDP-8 assembler.",
+  "name": "yamas",
+  "description": "Yet Another Macro Assembler: A PDP-8 assembler.",
   "version": "0.0.1",
   "author": "Folke Will <folko@solhost.org>",
   "license": "AGPL-3.0-or-later",
   "scripts": {
-    "start": "tsx src/jamas8.ts",
+    "start": "tsx src/yamas.ts",
     "lint": "tsc && eslint .",
     "test": "vitest run"
   },

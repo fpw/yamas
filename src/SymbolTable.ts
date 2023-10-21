@@ -9,7 +9,7 @@ export enum SymbolType {
 export interface DefinedSymbol {
     type: SymbolType;
     name: string;
-    value?: number;
+    value: number;
 }
 
 export class SymbolTable {
@@ -37,6 +37,7 @@ export class SymbolTable {
         this.defineSymbol({
             type: SymbolType.Pseudo,
             name: name,
+            value: 0,
         });
     }
 
@@ -70,7 +71,7 @@ export class SymbolTable {
 
     private defineSymbol(data: DefinedSymbol): DefinedSymbol {
         const normName = this.normalizeName(data.name);
-        const sym = this.lookup(normName);
+        const sym = this.tryLookup(normName);
         if (sym) {
             if ((sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) && data.type == SymbolType.Param) {
                 sym.value = data.value;
@@ -88,13 +89,22 @@ export class SymbolTable {
         return newSym;
     }
 
-    public lookup(name: string): DefinedSymbol | undefined {
+    public tryLookup(name: string): DefinedSymbol | undefined {
         const normName = this.normalizeName(name);
         for (const sym of this.symbols) {
             if (sym.name == normName) {
                 return sym;
             }
         }
+        return undefined;
+    }
+
+    public lookup(name: string): DefinedSymbol {
+        const sym = this.tryLookup(name);
+        if (sym === undefined) {
+            throw Error(`Symbol ${name} not defined`);
+        }
+        return sym;
     }
 
     private normalizeName(name: string) {

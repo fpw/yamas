@@ -11,7 +11,8 @@
  * Text: TEXT ...
  * StatementSeparator: ;|\n|EOF
  *
- * Expression: ParenExpr | BinaryOp | UnparsedSequence | Element
+ * Expression: SymbolGroup | ParenExpr | BinaryOp | UnparsedSequence | Element (but not symbol -> will be SymbolGroup with empty exprs instead)
+ * SymbolGroup: Symbol [Expression]
  * ParenExpr: (Expression)? | [Expression]?
  * BinaryOp: Element Op Expression
  * UnparsedSequence: <.*>
@@ -24,7 +25,7 @@
  *
  */
 
-export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%" | " ";
+export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
 export type UnaryOpChr = "-";
 
 export interface Program {
@@ -33,7 +34,7 @@ export interface Program {
 }
 
 export type Statement = OriginStatement | LabelDef | AssignStatement | StatementSeparator | ExpressionStatement | TextStatement | Comment;
-export type Expression = ParenExpr | BinaryOp | UnparsedSequence | AstElement;
+export type Expression = SymbolGroup | ParenExpr | BinaryOp | UnparsedSequence | AstElement;
 
 // *200
 export interface OriginStatement {
@@ -60,6 +61,7 @@ export interface StatementSeparator {
     separator: ";" | "\n";
 }
 
+// TEXT x...x
 export interface TextStatement {
     type: "text";
     delim: string;
@@ -71,6 +73,13 @@ export interface Comment {
     type: "comment";
     comment: string;
 }
+
+// Symbol<blank>[Expression]
+export interface SymbolGroup {
+    type: "group";
+    first: AstSymbol;
+    exprs: Expression[];
+};
 
 export interface ExpressionStatement {
     type: "exprStmt";

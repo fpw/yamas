@@ -1,4 +1,4 @@
-import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement } from "./AST";
+import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement, SymbolGroup } from "./AST";
 import { Token, TokenType, SymbolToken } from "../lexer/Token";
 import { Lexer } from "../lexer/Lexer";
 
@@ -113,13 +113,48 @@ export class Parser {
     }
 
     private parseExpr(): Expression {
+        const exprs: Expression[] = [];
+
+        while (true) {
+            const tok = this.lexer.next(false);
+            if (this.isEndOfExpr(tok)) {
+                this.lexer.unget(tok);
+                break;
+            }
+            this.lexer.unget(tok);
+            const expr = this.parseExprNoGroup();
+            exprs.push(expr);
+        }
+
+        if (exprs.length == 0) {
+            throw Error("Expression expected");
+        }
+
+        const firstElem = exprs[0];
+        if (firstElem.type == "symbol") {
+            const group: SymbolGroup = {
+                type: "group",
+                first: firstElem,
+                exprs: exprs.splice(1),
+            };
+            return group;
+        } else {
+            if (exprs.length == 1) {
+                return exprs[0];
+            } else {
+                throw Error("Logic error");
+            }
+        }
+    }
+
+    private parseExprNoGroup(): Expression {
         const first = this.lexer.next(false);
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 return {
                     type: "paren",
                     paren: first.char,
-                    expr: this.parseExpr(),
+                    expr: this.parseExprNoGroup(),
                 }
             }
         } else if (first.type == TokenType.RawSequence) {
@@ -130,58 +165,44 @@ export class Parser {
         }
         this.lexer.unget(first);
 
-        const elem = this.parseElement();
+        const firstElem = this.parseElement();
+        const nextTok = this.lexer.next(true);
 
-        // no spaces allowed around operators, except operator is space
-        let next = this.lexer.next(true);
-
-        if (this.isEndOfExpr(next)) {
-            this.lexer.unget(next);
-            return elem;
+        if (this.isEndOfExpr(nextTok)) {
+            this.lexer.unget(nextTok);
+            return firstElem;
         }
 
         let opr: BinaryOpChr;
-        switch (next.type) {
+        switch (nextTok.type) {
             case TokenType.Char:
-                switch (next.char) {
+                switch (nextTok.char) {
                     case "+":
                     case "-":
                     case "^":
                     case "%":
                     case "!":
                     case "&":
-                        opr = next.char;
+                        opr = nextTok.char;
                         break;
                     case ")":
                     case "]":
-                        opr = " ";
-                        break;
+                        return firstElem;
                     default:
-                        throw Error(`Unexpected operator in expression: '${next.char}'`);
+                        throw Error(`Unexpected operator in expression: '${nextTok.char}'`);
                 }
                 break;
             case TokenType.Blank:
-                opr = " ";
-                break;
+                return firstElem;
             default:
-                throw Error(`Unexpected token in operator: ${JSON.stringify(next)}`);
-        }
-
-        if (opr == " ") {
-            // check if there is actually more
-            next = this.lexer.next(false);
-            if (this.isEndOfExpr(next)) {
-                this.lexer.unget(next);
-                return elem;
-            }
-            this.lexer.unget(next);
+                throw Error(`Unexpected token in operator: ${JSON.stringify(nextTok)}`);
         }
 
         const expr: BinaryOp = {
             type: "binop",
-            lhs: elem,
+            lhs: firstElem,
             operator: opr,
-            rhs: this.parseExpr(),
+            rhs: this.parseExprNoGroup(),
         }
 
         return expr;

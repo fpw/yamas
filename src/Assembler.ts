@@ -1,8 +1,8 @@
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
-import { DefinedSymbol, SymbolTable, SymbolType } from "./SymbolTable";
+import { SymbolTable, SymbolType } from "./SymbolTable";
 import { Lexer } from "./lexer/Lexer";
-import { BinaryOp, Expression, ExpressionStatement, Program, Statement } from "./parser/AST";
+import { BinaryOp, Expression, ExpressionStatement, Program, Statement, SymbolGroup, UnparsedSequence } from "./parser/AST";
 import { Parser } from "./parser/Parser";
 import { PreludeEAE } from "./prelude/EAE";
 import { PreludeFamily8 } from "./prelude/Family8";
@@ -26,7 +26,7 @@ export class Assembler {
 
     public constructor() {
         this.pseudos.forEach(p => this.syms.definePseudo(p));
-        this.syms.definePermanent("I", 0);
+        this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
 
         this.loadPrelude();
@@ -73,15 +73,14 @@ export class Assembler {
             switch (stmt.type) {
                 case "param":
                     const paramVal = this.eval(ctx, stmt.val);
-                    if (paramVal === undefined) {
-                        throw Error(`Right-hand side undefined when assigning parameter ${stmt.sym.sym}`);
-                    }
                     this.syms.defineParameter(stmt.sym.sym, paramVal);
                     break;
                 case "label":
                     this.syms.defineLabel(stmt.sym.sym, ctx.clc);
                     break;
                 case "exprStmt":
+                    // need to handle pseudos because they can change the radix or CLC,
+                    // affecting expression parsing for symbol definitions
                     if (this.isPseudoExpr(stmt.expr)) {
                         this.handlePseudo(ctx, stmt.expr);
                     }
@@ -115,26 +114,29 @@ export class Assembler {
             this.handleLoadMRI(ctx, stmt.expr);
         } else {
             const val = this.eval(ctx, stmt.expr);
-            if (val === undefined) {
-                throw Error("Failed to evaluate expression: undefined value");
-            }
-
             this.output(ctx.field, ctx.clc, val);
         }
     }
 
-    private handleLoadMRI(ctx: Context, expr: BinaryOp) {
-        const mri = this.getFirstExprSymbol(expr);
-        if (!mri || mri.value === undefined) {
-            throw Error("MRI with undefined MRI op");
+    private handleLoadMRI(ctx: Context, expr: SymbolGroup) {
+        const mri = this.syms.lookup(expr.first.sym);
+        let mriVal = mri.value;
+        let dst = 0;
+
+        for (const ex of expr.exprs) {
+            if (ex.type == "symbol") {
+                const sym = this.syms.lookup(ex.sym);
+                if (sym.type == SymbolType.Permanent) {
+                    mriVal |= sym.value;
+                } else {
+                    dst |= sym.value;
+                }
+            } else {
+                dst |= this.eval(ctx, ex);
+            }
         }
 
-        const val = this.eval(ctx, expr.rhs);
-        if (val === undefined) {
-            throw Error("Undefined MRI operands");
-        }
-        const ind = this.getPageMode(expr.rhs);
-        const effVal = this.genMRI(ctx, val, ind) | mri.value;
+        const effVal = this.genMRI(ctx, mriVal, dst);
         this.output(ctx.field, ctx.clc, effVal);
     }
 
@@ -145,11 +147,7 @@ export class Assembler {
     private updateCLC(ctx: Context, stmt: Statement) {
         switch (stmt.type) {
             case "origin":
-                const org = this.eval(ctx, stmt.val);
-                if (org === undefined) {
-                    throw Error("Right-hand side undefined when assigning origin");
-                }
-                ctx.clc = org;
+                ctx.clc = this.eval(ctx, stmt.val);;
                 break;
             case "text":
                 // TODO
@@ -162,13 +160,10 @@ export class Assembler {
         }
     }
 
-    private handlePseudo(ctx: Context, expr: Expression) {
-        const sym = this.getFirstExprSymbol(expr);
-        if (!sym) {
-            throw Error("Logic error: Pseudo not starting with pseudo");
-        }
+    private handlePseudo(ctx: Context, expr: SymbolGroup) {
+        const name = this.syms.lookup(expr.first.sym).name;
 
-        switch (this.syms.lookup(sym.name)?.name) {
+        switch (name) {
             case "DECIMA":
                 ctx.radix = 10;
                 break;
@@ -179,69 +174,75 @@ export class Assembler {
                 this.syms.fix();
                 break;
             case "FIELD":
-                if (expr.type == "binop" && expr.operator == " ") {
-                    const field = this.eval(ctx, expr.rhs);
-                    if (field === undefined || field < 0 || field > 7) {
+                if (expr.exprs.length == 1) {
+                    const field = this.eval(ctx, expr.exprs[0]);
+                    if (field < 0 || field > 7) {
                         throw Error(`Invalid field ${field}`);
                     }
                     ctx.field = field;
                 } else {
-                    throw Error("Field without parameters");
+                    throw Error("Expected one parameter for FIELD");
                 }
                 break;
             case "PAGE":
-                if (expr.type == "binop" && expr.operator == " ") {
-                    const page = this.eval(ctx, expr.rhs);
-                    if (page === undefined || page < 0 || page > 31) {
+                if (expr.exprs.length == 0) {
+                    ctx.clc = (this.getPage(ctx.clc) + 1) * 0o200;
+                } else if (expr.exprs.length == 1) {
+                    const page = this.eval(ctx, expr.exprs[0]);
+                    if (page < 0 || page > 31) {
                         throw Error(`Invalid page ${page}`);
                     }
                     ctx.clc = page * 0o200;
                 } else {
-                    ctx.clc = (this.getPage(ctx.clc) + 1) * 0o200;
+                    throw Error("Expected zero or one parameter for PAGE");
                 }
                 break;
             case "EXPUNG":
                 this.syms.expunge();
                 break;
             case "DEFINE":
-                if (expr.type != "binop" || expr.operator != " ") {
-                    throw Error("Invalid DEFINE syntax");
-                }
                 this.handleDefine(ctx, expr);
+                break;
+            case "IFNZRO":
+            case "IFZERO":
+            case "IFDEF":
+            case "IFNDEF":
+                this.handleCondition(ctx, expr);
                 break;
         }
     }
 
-    private handleDefine(ctx: Context, expr: BinaryOp) {
+    private handleDefine(ctx: Context, expr: SymbolGroup) {
     }
 
-    private eval(ctx: Context, expr: Expression): number | undefined {
+    private handleCondition(ctx: Context, expr: SymbolGroup) {
+        const sym = this.syms.lookup(expr.first.sym);
+
+
+        let cond: boolean;
+        let seq: UnparsedSequence;
+    }
+
+    private eval(ctx: Context, expr: Expression): number {
         switch (expr.type) {
             case "integer":
                 if (ctx.radix == 8 && !expr.int.match(/^[0-7]+$/)) {
-                    throw Error("Invalid digit");
+                    throw Error("Invalid digit in OCTAL");
                 }
                 return Number.parseInt(expr.int, ctx.radix) & 0o7777;
             case "ascii":
                 return expr.char.charCodeAt(0) & 0o7777;
             case "symbol":
-                return this.syms.lookup(expr.sym)?.value;
+                return this.syms.lookup(expr.sym).value;
             case "clc":
                 return ctx.clc;
             case "unary":
-                if (expr.operator == "-") {
-                    const val = this.eval(ctx, expr.next);
-                    if (val === undefined) {
-                        throw Error("Undefined unary operand");
-                    }
-                    return -val;
+                if (expr.operator != "-") {
+                    throw Error("Unexpected unary operator");
                 }
-                break;
+                return -this.eval(ctx, expr.next);
             case "paren":
                 const val = this.eval(ctx, expr.expr);
-                if (val === undefined) {
-                    throw Error("Undefined literal value");
-                }
                 if (expr.paren == "(") {
                     const curPage = this.getPage(ctx.clc);
                     const link = this.linkTable.enter(ctx.field, curPage, val);
@@ -252,18 +253,23 @@ export class Assembler {
                 } else {
                     throw Error(`Invalid parentheses: "${expr.paren}"`);
                 }
+            case "group":
+                let groupVal = this.eval(ctx, expr.first);
+                for (const ex of expr.exprs) {
+                    const exVal = this.eval(ctx, ex);
+                    groupVal |= exVal;
+                }
+                return groupVal;
             case "binop":
                 return this.evalBinOp(ctx, expr);
+            case "unparsed":
+                throw Error("Trying to evaluate unparsed list");
         }
     }
 
-    private evalBinOp(ctx: Context, expr: BinaryOp): number | undefined {
+    private evalBinOp(ctx: Context, expr: BinaryOp): number {
         const lhs = this.eval(ctx, expr.lhs);
         const rhs = this.eval(ctx, expr.rhs);
-
-        if (lhs === undefined || rhs === undefined) {
-            return undefined;
-        }
 
         switch (expr.operator) {
             case "+":   return (lhs + rhs) & 0o7777;
@@ -272,44 +278,25 @@ export class Assembler {
             case "%":   return (lhs / rhs) & 0o7777;
             case "!":   return lhs | rhs;
             case "&":   return lhs & rhs;
-            case " ":   return lhs | rhs;
         }
     }
 
-    private getPageMode(expr: Expression): "I" | "Z" | undefined {
-        if (expr.type == "symbol" && (expr.sym == "I" || expr.sym == "Z")) {
-            return expr.sym;
-        } else if (expr.type == "binop") {
-            const lhs = this.getPageMode(expr.lhs);
-            const rhs = this.getPageMode(expr.lhs);
-            if (lhs == "I" && rhs == "Z") {
-                throw Error("Can't generate both I and Z indirection");
-            }
-            return lhs ?? rhs;
-        } else {
-            return undefined;
+    private isPseudoExpr(expr: Expression): expr is SymbolGroup {
+        if (expr.type != "group") {
+            return false;
         }
+        const sym = this.syms.lookup(expr.first.sym);
+        return sym.type == SymbolType.Pseudo;
     }
 
-    private isPseudoExpr(expr: Expression): boolean {
-        const sym = this.getFirstExprSymbol(expr);
-        if (!sym || sym.type != SymbolType.Pseudo) {
+    private isMRIExpr(expr: Expression): expr is SymbolGroup {
+        // An MRI expression needs to start with an MRI op followed by a space -> group
+        if (expr.type != "group") {
             return false;
         }
 
-        return true;
-    }
-
-    private isMRIExpr(expr: Expression): expr is BinaryOp {
-        // An MRI expression needs to start with an MRI op followed by a space
-        // and at least one more operand -> binop with space
-
-        if (expr.type != "binop" || expr.operator != " ") {
-            return false;
-        }
-
-        const sym = this.getFirstExprSymbol(expr);
-        if (!sym || sym.type != SymbolType.Fixed || sym.value === undefined) {
+        const sym = this.syms.lookup(expr.first.sym);
+        if (sym.type != SymbolType.Fixed) {
             return false;
         }
 
@@ -317,58 +304,30 @@ export class Assembler {
         return ((sym.value & 0o777) == 0) && (sym.value <= 0o5000);
     }
 
-    private getFirstExprSymbol(expr: Expression): DefinedSymbol | undefined {
-        let sym: string | undefined;
-        switch (expr.type) {
-            case "binop":
-                if (expr.lhs.type == "symbol") {
-                    sym = expr.lhs.sym;
-                }
-                break;
-            case "symbol":
-                sym = expr.sym;
-                break;
-        }
-
-        if (!sym) {
-            return undefined;
-        }
-
-        if (sym) {
-            return this.syms.lookup(sym);
-        }
-    }
-
-    private genMRI(ctx: Context, dst: number, mode: "I" | "Z" | undefined): number {
+    private genMRI(ctx: Context, mri: number, dst: number, ): number {
         const IND   = 0b000100000000;
         const CUR   = 0b000010000000;
 
-        let val = dst & 0b1111111;
-        if (mode == "I") {
-            val |= IND;
-        }
+        const val = mri | (dst & 0b1111111);
 
         const curPage = this.getPage(ctx.clc);
         const dstPage = this.getPage(dst);
         if (curPage == dstPage) {
-            if (mode == "Z" && curPage != 0) {
-                throw Error("Invalid Z indirection");
-            }
             return val | CUR;
         } else if (dstPage == 0) {
             return val;
         } else if (this.linkTable.has(ctx.field, 0, dst)) {
-            if (mode == "I") {
+            if (mri & IND) {
                 throw Error("Double indirection on zero page");
             }
             const indAddr = this.linkTable.enter(ctx.field, 0, dst);
-            return (indAddr & 0b1111111) | IND;
+            return mri | (indAddr & 0b1111111) | IND;
         } else {
-            if (mode == "I") {
+            if (mri & IND) {
                 throw Error("Double indirection on current page");
             }
             const indAddr = this.linkTable.enter(ctx.field, curPage, dst);
-            return (indAddr & 0b1111111) | IND | CUR;
+            return mri | (indAddr & 0b1111111) | IND | CUR;
         }
     }
 

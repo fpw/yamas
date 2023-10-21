@@ -11,7 +11,7 @@ describe("Assemling simple examples", () => {
             INDEX, 	0
             N,		0
 
-            IFZERO N680-1 <NOP>
+            IFNDEF COND <A=8>
 
             PAGE 2
 
@@ -34,8 +34,6 @@ describe("Assemling simple examples", () => {
 });
 
 /**
- * Improvements:
- * ExprArray for spaced expressions like JMP I INTSUM+1 -> [JMP, I, INTSUM+1]
  *
  * Useful tests:
  * TAD = 1000

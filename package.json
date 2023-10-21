@@ -1,0 +1,100 @@
+{
+  "name": "jamas8",
+  "description": "Jumbled Algorithmic Macro Assembler System: A PDP-8 assembler.",
+  "version": "0.0.1",
+  "author": "Folke Will <folko@solhost.org>",
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "start": "tsc",
+    "lint": "tsc && eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.8.0",
+    "@typescript-eslint/parser": "^6.8.0",
+    "eslint": "^8.52.0",
+    "typescript": "^5.2.2",
+    "vitest": "^0.34.6"
+  },
+  "eslintConfig": {
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "extends": [
+      "plugin:@typescript-eslint/strict",
+      "plugin:@typescript-eslint/recommended-requiring-type-checking"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "project": [
+        "./tsconfig.json"
+      ]
+    },
+    "rules": {
+      "@typescript-eslint/brace-style": [
+        "error",
+        "1tbs",
+        {
+          "allowSingleLine": true
+        }
+      ],
+      "@typescript-eslint/comma-spacing": "error",
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/keyword-spacing": "error",
+      "@typescript-eslint/func-call-spacing": "error",
+      "@typescript-eslint/space-before-blocks": "error",
+      "@typescript-eslint/space-before-function-paren": [
+        "error",
+        "never"
+      ],
+      "@typescript-eslint/restrict-template-expressions": "off",
+      "@typescript-eslint/space-infix-ops": "error",
+      "@typescript-eslint/type-annotation-spacing": "error",
+      "@typescript-eslint/indent": [
+        "error",
+        4,
+        {
+          "SwitchCase": 1,
+          "ignoredNodes": [
+            "PropertyDefinition[decorators]",
+            "TSUnionType"
+          ]
+        }
+      ],
+      "jsx-quotes": [
+        "error",
+        "prefer-double"
+      ],
+      "@typescript-eslint/quotes": [
+        "error",
+        "double",
+        {
+          "avoidEscape": true
+        }
+      ],
+      "eqeqeq": "off",
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-unused-vars": "off"
+    },
+    "ignorePatterns": [
+      "public/",
+      "build/",
+      "node_modules/"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

@@ -18,9 +18,8 @@ export class Assembler {
         "DECIMAL",  "OCTAL",
         "DUBL",     "FLTG",
         "EXPUNGE",  "FIXTAB",
-        "TEXT",
-        "PAUSE",
-        "IFDEF", "IFNDEF", "IFNZRO", "IFZERO",
+        "TEXT",     "ZBLOCK",
+        "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
         "DEFINE",
     ];
 
@@ -39,8 +38,9 @@ export class Assembler {
         preLexer.addInput("eae.per", PreludeEAE);
 
         const parser = new Parser(preLexer);
-        const prelude = parser.parseProgram();
-        this.assignSymbols(prelude);
+        const prelude = parser.run();
+        const ctx = this.createContext(false);
+        this.assignSymbols(ctx, prelude);
     }
 
     public addFile(name: string, content: string) {
@@ -49,26 +49,35 @@ export class Assembler {
 
     public run() {
         const parser = new Parser(this.lexer);
-        const ast = parser.parseProgram();
+        let ast;
 
-        this.assignSymbols(ast);
-        console.log(this.syms.dump());
+        try {
+            ast = parser.run();
+        } catch (e) {
+            console.error(this.lexer.getCursorString());
+            throw e;
+        }
 
-        this.assemble(ast);
-        this.outputLinks();
+        const symCtx = this.createContext(false);
+        this.assignSymbols(symCtx, ast);
+        // this.outputSymbols();
+
+        const asmCtx = this.createContext(true);
+        this.assemble(asmCtx, ast);
+
+        // this.outputLinks();
     }
 
-    private createContext(): Context {
+    private createContext(generateCode: boolean): Context {
         return {
             field: 0,
             clc: 0o200,
             radix: 8,
+            generateCode: generateCode,
         };
     }
 
-    private assignSymbols(prog: Program) {
-        const ctx = this.createContext();
-
+    private assignSymbols(ctx: Context, prog: Program) {
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
                 case "param":
@@ -90,13 +99,23 @@ export class Assembler {
         }
     }
 
-    private assemble(prog: Program) {
-        const ctx = this.createContext();
-
+    private assemble(ctx: Context, prog: Program) {
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
                 case "text":
-                    // TODO
+                    let loc = ctx.clc;
+                    for (let i = 0; i < stmt.text.length - 1; i += 2) {
+                        const left = this.to6Bit(stmt.text[i]);
+                        const right = this.to6Bit(stmt.text[i + 1]);
+                        this.output(ctx.field, loc, (left << 6) | right);
+                        loc++;
+                    }
+                    if (stmt.text.length % 2 == 0) {
+                        this.output(ctx.field, loc, 0);
+                    } else {
+                        const left = this.to6Bit(stmt.text[stmt.text.length - 1]);
+                        this.output(ctx.field, loc, left << 6);
+                    }
                     break;
                 case "exprStmt":
                     this.handleExprStmt(ctx, stmt);
@@ -105,6 +124,11 @@ export class Assembler {
 
             this.updateCLC(ctx, stmt);
         }
+    }
+
+    private to6Bit(str: string): number {
+        const val = str.charCodeAt(0);
+        return val & 0o77;
     }
 
     private handleExprStmt(ctx: Context, stmt: ExpressionStatement) {
@@ -136,12 +160,12 @@ export class Assembler {
             }
         }
 
-        const effVal = this.genMRI(ctx, mriVal, dst);
+        const effVal = this.genMRI(ctx, expr, mriVal, dst);
         this.output(ctx.field, ctx.clc, effVal);
     }
 
     private output(field: number, clc: number, value: number) {
-        console.log(`${field}${clc.toString(8)} ${value.toString(8)}`);
+        // console.log(`${field}${clc.toString(8).padStart(4, "0")} ${value.toString(8).padStart(4, "0")}`);
     }
 
     private updateCLC(ctx: Context, stmt: Statement) {
@@ -150,7 +174,11 @@ export class Assembler {
                 ctx.clc = this.eval(ctx, stmt.val);;
                 break;
             case "text":
-                // TODO
+                ctx.clc += Math.ceil(stmt.text.length / 2);
+                if (stmt.text.length % 2 == 0) {
+                    // null terminator. For odd-length strings, part of last symbol.
+                    ctx.clc++;
+                }
                 break;
             case "exprStmt":
                 if (!this.isPseudoExpr(stmt.expr)) {
@@ -177,11 +205,11 @@ export class Assembler {
                 if (expr.exprs.length == 1) {
                     const field = this.eval(ctx, expr.exprs[0]);
                     if (field < 0 || field > 7) {
-                        throw Error(`Invalid field ${field}`);
+                        throw Error(`Invalid field ${field}`, {cause: expr});
                     }
                     ctx.field = field;
                 } else {
-                    throw Error("Expected one parameter for FIELD");
+                    throw Error("Expected one parameter for FIELD", {cause: expr});
                 }
                 break;
             case "PAGE":
@@ -190,11 +218,11 @@ export class Assembler {
                 } else if (expr.exprs.length == 1) {
                     const page = this.eval(ctx, expr.exprs[0]);
                     if (page < 0 || page > 31) {
-                        throw Error(`Invalid page ${page}`);
+                        throw Error(`Invalid page ${page}`, {cause: expr});
                     }
                     ctx.clc = page * 0o200;
                 } else {
-                    throw Error("Expected zero or one parameter for PAGE");
+                    throw Error("Expected zero or one parameter for PAGE", {cause: expr});
                 }
                 break;
             case "EXPUNG":
@@ -203,44 +231,99 @@ export class Assembler {
             case "DEFINE":
                 this.handleDefine(ctx, expr);
                 break;
+            case "ZBLOCK":
+                if (expr.exprs.length == 1) {
+                    const num = this.eval(ctx, expr.exprs[0]);
+                    for (let i = 0; i < num; i++) {
+                        if (ctx.generateCode) {
+                            this.output(ctx.field, ctx.clc, 0);
+                        }
+                        ctx.clc++;
+                    }
+                } else {
+                    throw Error("Expected one parameter for ZBLOCK", {cause: expr});
+                }
+                break;
             case "IFNZRO":
             case "IFZERO":
             case "IFDEF":
             case "IFNDEF":
                 this.handleCondition(ctx, expr);
                 break;
+            case "DUBL":
+            case "FLTG":
+                throw Error("Unimplemented");
         }
     }
 
     private handleDefine(ctx: Context, expr: SymbolGroup) {
+        throw Error("Unimplemented");
     }
 
     private handleCondition(ctx: Context, expr: SymbolGroup) {
-        const sym = this.syms.lookup(expr.first.sym);
+        const op = this.syms.lookup(expr.first.sym).name;
 
+        if (op == "IFDEF" || op == "IFNDEF") {
+            if (expr.exprs.length != 2 || expr.exprs[0].type != "symbol" || expr.exprs[1].type != "unparsed") {
+                throw Error("Invalid syntax: single symbol and body expected", {cause: expr});
+            }
+            const sym = this.syms.tryLookup(expr.exprs[0].sym);
+            if ((sym && op == "IFDEF") || (!sym && op == "IFNDEF")) {
+                this.handleBody(ctx, expr.exprs[1]);
+            }
+        } else if (op == "IFZERO" || op == "IFNZRO") {
+            if (expr.exprs.length != 2 || expr.exprs[1].type != "unparsed") {
+                throw Error("Invalid syntax: single expression and body expected", {cause: expr});
+            }
+            const val = this.eval(ctx, expr.exprs[0]);
+            if ((val != 0 && op == "IFNZRO") || (val == 0 && op == "IFZERO")) {
+                this.handleBody(ctx, expr.exprs[1]);
+            }
+        }
+    }
 
-        let cond: boolean;
-        let seq: UnparsedSequence;
+    private handleBody(ctx: Context, body: UnparsedSequence) {
+        if (!body.parsed) {
+            const lexer = new Lexer();
+            lexer.addInput("condition", body.body);
+
+            const parser = new Parser(lexer);
+            body.parsed = parser.run();
+        }
+
+        if (!ctx.generateCode) {
+            this.assignSymbols(ctx, body.parsed);
+        } else {
+            this.assemble(ctx, body.parsed);
+        }
     }
 
     private eval(ctx: Context, expr: Expression): number {
         switch (expr.type) {
             case "integer":
                 if (ctx.radix == 8 && !expr.int.match(/^[0-7]+$/)) {
-                    throw Error("Invalid digit in OCTAL");
+                    throw Error("Invalid digit in OCTAL", {cause: expr});
                 }
                 return Number.parseInt(expr.int, ctx.radix) & 0o7777;
             case "ascii":
                 return expr.char.charCodeAt(0) & 0o7777;
             case "symbol":
-                return this.syms.lookup(expr.sym).value;
+                const sym = this.syms.tryLookup(expr.sym);
+                if (sym) {
+                    return sym.value;
+                } else if (!ctx.generateCode) {
+                    console.warn(`Access to undefined symbol ${expr.sym}`);
+                    return 0;
+                } else {
+                    throw Error(`Undefined symbol: ${expr.sym}`, {cause: expr});
+                }
             case "clc":
                 return ctx.clc;
             case "unary":
                 if (expr.operator != "-") {
-                    throw Error("Unexpected unary operator");
+                    throw Error("Unexpected unary operator", {cause: expr});
                 }
-                return -this.eval(ctx, expr.next);
+                return (-this.eval(ctx, expr.next)) & 0o7777;
             case "paren":
                 const val = this.eval(ctx, expr.expr);
                 if (expr.paren == "(") {
@@ -251,7 +334,7 @@ export class Assembler {
                     const link = this.linkTable.enter(ctx.field, 0, val);
                     return link;
                 } else {
-                    throw Error(`Invalid parentheses: "${expr.paren}"`);
+                    throw Error(`Invalid parentheses: "${expr.paren}"`, {cause: expr});
                 }
             case "group":
                 let groupVal = this.eval(ctx, expr.first);
@@ -263,7 +346,7 @@ export class Assembler {
             case "binop":
                 return this.evalBinOp(ctx, expr);
             case "unparsed":
-                throw Error("Trying to evaluate unparsed list");
+                throw Error("Trying to evaluate unparsed list", {cause: expr});
         }
     }
 
@@ -285,7 +368,10 @@ export class Assembler {
         if (expr.type != "group") {
             return false;
         }
-        const sym = this.syms.lookup(expr.first.sym);
+        const sym = this.syms.tryLookup(expr.first.sym);
+        if (!sym) {
+            return false;
+        }
         return sym.type == SymbolType.Pseudo;
     }
 
@@ -295,8 +381,8 @@ export class Assembler {
             return false;
         }
 
-        const sym = this.syms.lookup(expr.first.sym);
-        if (sym.type != SymbolType.Fixed) {
+        const sym = this.syms.tryLookup(expr.first.sym);
+        if (!sym || sym.type != SymbolType.Fixed) {
             return false;
         }
 
@@ -304,7 +390,7 @@ export class Assembler {
         return ((sym.value & 0o777) == 0) && (sym.value <= 0o5000);
     }
 
-    private genMRI(ctx: Context, mri: number, dst: number, ): number {
+    private genMRI(ctx: Context, expr: SymbolGroup, mri: number, dst: number, ): number {
         const IND   = 0b000100000000;
         const CUR   = 0b000010000000;
 
@@ -318,13 +404,13 @@ export class Assembler {
             return val;
         } else if (this.linkTable.has(ctx.field, 0, dst)) {
             if (mri & IND) {
-                throw Error("Double indirection on zero page");
+                throw Error("Double indirection on zero page", {cause: expr});
             }
             const indAddr = this.linkTable.enter(ctx.field, 0, dst);
             return mri | (indAddr & 0b1111111) | IND;
         } else {
             if (mri & IND) {
-                throw Error("Double indirection on current page");
+                throw Error("Double indirection on current page", {cause: expr});
             }
             const indAddr = this.linkTable.enter(ctx.field, curPage, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
@@ -333,6 +419,10 @@ export class Assembler {
 
     private getPage(loc: number): number {
         return (loc >> 7) & 31;
+    }
+
+    private outputSymbols() {
+        console.log(this.syms.dump());
     }
 
     private outputLinks() {

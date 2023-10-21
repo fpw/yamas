@@ -10,6 +10,10 @@ export class Lexer {
         this.inputs.push({name, lines: data.split("\n")});
     }
 
+    public getCursorString(): string {
+        return `${this.inputs[this.inputIdx].name}:${this.inputLine + 1}:${this.inputCol + 1}`;
+    }
+
     public next(includeBlank: boolean): Token {
         const base = {
             fileIdx: this.inputIdx,
@@ -145,11 +149,13 @@ export class Lexer {
                     seq += line[i];
                 }
                 if (remain > 0) {
+                    seq += "\n";
                     this.inputLine++;
                     line = this.inputs[this.inputIdx].lines[this.inputLine];
                     this.inputCol = 0;
                 }
             }
+
             return {
                 type: TokenType.RawSequence,
                 body: seq,
@@ -161,7 +167,7 @@ export class Lexer {
             this.inputCol += 2;
             return {
                 type: TokenType.ASCII,
-                char: line[this.inputCol + 1],
+                char: chr,
                 endCol: base.startCol + 2,
                 ...base,
             };

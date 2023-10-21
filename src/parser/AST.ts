@@ -14,7 +14,7 @@
  * Expression: SymbolGroup | ParenExpr | BinaryOp | UnparsedSequence | Element (but not symbol -> will be SymbolGroup with empty exprs instead)
  * SymbolGroup: Symbol [Expression]
  * ParenExpr: (Expression)? | [Expression]?
- * BinaryOp: Element Op Expression
+ * BinaryOp: BinaryOp | AstElement Op AstElement
  * UnparsedSequence: <.*>
  *
  * Element: UnaryOp | Integer | Symbol | ASCII | .
@@ -95,9 +95,9 @@ export interface ParenExpr {
 // A + B
 export interface BinaryOp {
     type: "binop";
-    lhs: AstElement;
+    lhs: BinaryOp | AstElement;
     operator: BinaryOpChr;
-    rhs: Expression;
+    rhs: AstElement;
 }
 
 export type AstElement = UnaryOp | Integer | ASCIIChar | AstSymbol | CLCValue;
@@ -113,6 +113,7 @@ export interface UnaryOp {
 export interface UnparsedSequence {
     type: "unparsed";
     body: string;
+    parsed?: Program;
 }
 
 export interface Integer {

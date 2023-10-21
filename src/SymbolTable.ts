@@ -72,12 +72,16 @@ export class SymbolTable {
     private defineSymbol(data: DefinedSymbol): DefinedSymbol {
         const normName = this.normalizeName(data.name);
         const sym = this.tryLookup(normName);
+
         if (sym) {
-            if ((sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) && data.type == SymbolType.Param) {
+            // check if duplicates are okay
+            const isParamRedefine = (sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) && data.type == SymbolType.Param;
+            const isLabelCheck = (sym.type == SymbolType.Param && data.type == SymbolType.Label && sym.value == data.value);
+            if (isParamRedefine || isLabelCheck) {
                 sym.value = data.value;
                 return sym;
             } else {
-                throw Error(`Duplicate symbol ${normName}`);
+                throw Error(`Duplicate symbol ${normName}, old: ${sym.value}, new: ${data.value}`);
             }
         }
 

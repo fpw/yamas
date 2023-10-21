@@ -11,8 +11,6 @@ describe("Assemling simple examples", () => {
             INDEX, 	0
             N,		0
 
-            IFNDEF COND <A=8>
-
             PAGE 2
 
             INTSUM, 0			/ SAVE PC HERE
@@ -38,5 +36,6 @@ describe("Assemling simple examples", () => {
  * Useful tests:
  * TAD = 1000
  * TAD^2 = 2000
+ * IFNZRO 3-2-1 <GLITCH>
  *
  */

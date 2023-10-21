@@ -2,6 +2,8 @@ import { AstElement, Expression, OriginStatement, AssignStatement, Program, Stat
 import { Token, TokenType, SymbolToken } from "../lexer/Token";
 import { Lexer } from "../lexer/Lexer";
 
+type BinOpFragment = {elem: AstElement, op?: BinaryOpChr};
+
 export class Parser {
     private lexer: Lexer;
 
@@ -9,7 +11,7 @@ export class Parser {
         this.lexer = lexer;
     }
 
-    public parseProgram(): Program {
+    public run(): Program {
         const prog: Program = {
             type: "program",
             stmts: [],
@@ -112,6 +114,16 @@ export class Parser {
         };
     }
 
+    /**
+     * Parse expression parts separated by blanks, then either return a single
+     * expression or an expression group (e.g. [CLA, OSR]).
+     * Note that while Symbols are an AstElement and thus an expression, this function
+     * will never return a single Symbol. Instead, it will return an expression group
+     * with a symbol and an empty operand array.
+     * This makes it a lot easier to figure out if the first part of an expression is a pseudo, an MRI etc.
+     * because all of them will be in an expression group instead of a Symbol, a BinOp or something else.
+     * @returns a symbol group or an expression that's not a single symbol
+     */
     private parseExpr(): Expression {
         const exprs: Expression[] = [];
 
@@ -122,7 +134,7 @@ export class Parser {
                 break;
             }
             this.lexer.unget(tok);
-            const expr = this.parseExprNoGroup();
+            const expr = this.parseExpressionPart();
             exprs.push(expr);
         }
 
@@ -147,14 +159,21 @@ export class Parser {
         }
     }
 
-    private parseExprNoGroup(): Expression {
+    /**
+     * Parse a an expression - symbols will be return as such.
+     * This function will never return an expression group.
+     * On a blank, it will stop parsing and expect the caller to call it again
+     * for the next symbol.
+     * @returns The next part of an expression
+     */
+    private parseExpressionPart(): Expression {
         const first = this.lexer.next(false);
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 return {
                     type: "paren",
                     paren: first.char,
-                    expr: this.parseExprNoGroup(),
+                    expr: this.parseExpressionPart(),
                 }
             }
         } else if (first.type == TokenType.RawSequence) {
@@ -165,15 +184,36 @@ export class Parser {
         }
         this.lexer.unget(first);
 
+        // all expressions are left-associative, so collect parts and fold
+        const parts: BinOpFragment[] = [];
+        while (true) {
+            const part = this.parseElementAndOperator();
+            parts.push(part);
+            if (!part.op) {
+                break;
+            }
+        }
+
+        if (parts.length == 1) {
+            return parts[0].elem;
+        }
+
+        return this.foldExpressionParts(parts);
+    }
+
+    /**
+     * Parse the next element of an expression and the next operator, if any.
+     * @returns The next element of an expression and the operator behind it, if any.
+     */
+    private parseElementAndOperator(): BinOpFragment {
         const firstElem = this.parseElement();
         const nextTok = this.lexer.next(true);
 
         if (this.isEndOfExpr(nextTok)) {
             this.lexer.unget(nextTok);
-            return firstElem;
+            return {elem: firstElem};
         }
 
-        let opr: BinaryOpChr;
         switch (nextTok.type) {
             case TokenType.Char:
                 switch (nextTok.char) {
@@ -183,29 +223,50 @@ export class Parser {
                     case "%":
                     case "!":
                     case "&":
-                        opr = nextTok.char;
-                        break;
+                        return {elem: firstElem, op: nextTok.char};
                     case ")":
                     case "]":
-                        return firstElem;
+                        return {elem: firstElem};
                     default:
                         throw Error(`Unexpected operator in expression: '${nextTok.char}'`);
                 }
-                break;
             case TokenType.Blank:
-                return firstElem;
+                return {elem: firstElem};
             default:
                 throw Error(`Unexpected token in operator: ${JSON.stringify(nextTok)}`);
         }
+    }
 
-        const expr: BinaryOp = {
-            type: "binop",
-            lhs: firstElem,
-            operator: opr,
-            rhs: this.parseExprNoGroup(),
+    private foldExpressionParts(parts: BinOpFragment[]): BinaryOp {
+        if (parts.length < 2) {
+            throw Error("Unexpected end of expression");
         }
 
-        return expr;
+        if (!parts[0].op) {
+            throw Error("No operator in first expression part");
+        }
+
+        let binOp: BinaryOp = {
+            type: "binop",
+            lhs: parts[0].elem,
+            operator: parts[0].op,
+            rhs: parts[1].elem,
+        };
+
+        for (let i = 1; i < parts.length - 1; i++) {
+            const next = parts[i];
+            if (!next.op) {
+                throw Error("No operator in expression part");
+            }
+            binOp = {
+                type: "binop",
+                lhs: binOp,
+                operator: next.op,
+                rhs: parts[i + 1].elem,
+            };
+        }
+
+        return binOp;
     }
 
     private isEndOfExpr(tok: Token): boolean {

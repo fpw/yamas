@@ -10,6 +10,7 @@ export const PreludeIO = `
     CDF=6201
     CIF=6202
     / HIGH SPEED TAPE READER
+    RSF=6011
     RRB=6012
     RFC=6014
     / HIGH SPEED TAPE PUNCH

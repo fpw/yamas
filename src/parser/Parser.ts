@@ -230,10 +230,13 @@ export class Parser {
                     default:
                         throw Error(`Unexpected operator in expression: '${nextTok.char}'`);
                 }
-            case TokenType.Blank:
+            case TokenType.Comment:
+            case TokenType.RawSequence:
+            case TokenType.ASCII:
+                this.lexer.unget(nextTok);
                 return {elem: firstElem};
             default:
-                throw Error(`Unexpected token in operator: ${JSON.stringify(nextTok)}`);
+                return {elem: firstElem};
         }
     }
 

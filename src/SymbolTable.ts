@@ -17,7 +17,7 @@ export class SymbolTable {
 
     public dump(): string {
         let str = "";
-        for (const sym of this.symbols) {
+        for (const sym of this.symbols.sort((a, b) => a.name.localeCompare(b.name))) {
             if (sym.type == SymbolType.Label || sym.type == SymbolType.Param) {
                 str += `${sym.name} = ${sym.value?.toString(8)}\n`;
             }
@@ -76,7 +76,7 @@ export class SymbolTable {
         if (sym) {
             // check if duplicates are okay
             const isParamRedefine = (sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) && data.type == SymbolType.Param;
-            const isLabelCheck = (sym.type == SymbolType.Param && data.type == SymbolType.Label && sym.value == data.value);
+            const isLabelCheck = (sym.type == SymbolType.Param || sym.type == SymbolType.Label) && (data.type == SymbolType.Label && sym.value == data.value);
             if (isParamRedefine || isLabelCheck) {
                 sym.value = data.value;
                 return sym;

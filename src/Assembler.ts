@@ -14,10 +14,11 @@ export class Assembler {
     private linkTable = new LinkTable();
 
     private readonly pseudos = [
-        "PAGE",     "FIELD",
+        "NOPUNCH",  "ENPUNCH",
         "DECIMAL",  "OCTAL",
-        "DUBL",     "FLTG",
         "EXPUNGE",  "FIXTAB",
+        "PAGE",     "FIELD",
+        "DUBL",     "FLTG",
         "TEXT",     "ZBLOCK",
         "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
         "DEFINE",
@@ -60,12 +61,12 @@ export class Assembler {
 
         const symCtx = this.createContext(false);
         this.assignSymbols(symCtx, ast);
-        // this.outputSymbols();
 
         const asmCtx = this.createContext(true);
         this.assemble(asmCtx, ast);
 
-        // this.outputLinks();
+        // this.outputSymbols();
+        this.outputLinks();
     }
 
     private createContext(generateCode: boolean): Context {
@@ -79,22 +80,7 @@ export class Assembler {
 
     private assignSymbols(ctx: Context, prog: Program) {
         for (const stmt of prog.stmts) {
-            switch (stmt.type) {
-                case "param":
-                    const paramVal = this.eval(ctx, stmt.val);
-                    this.syms.defineParameter(stmt.sym.sym, paramVal);
-                    break;
-                case "label":
-                    this.syms.defineLabel(stmt.sym.sym, ctx.clc);
-                    break;
-                case "exprStmt":
-                    // need to handle pseudos because they can change the radix or CLC,
-                    // affecting expression parsing for symbol definitions
-                    if (this.isPseudoExpr(stmt.expr)) {
-                        this.handlePseudo(ctx, stmt.expr);
-                    }
-                    break;
-            }
+            this.updateSymbols(ctx, stmt);
             this.updateCLC(ctx, stmt);
         }
     }
@@ -122,7 +108,29 @@ export class Assembler {
                     break;
             }
 
+            // symbols need to be updated here as well because it's possible to use
+            // undefined symbols on the right hand side of A=B in pass 1
+            this.updateSymbols(ctx, stmt);
             this.updateCLC(ctx, stmt);
+        }
+    }
+
+    private updateSymbols(ctx: Context, stmt: Statement) {
+        switch (stmt.type) {
+            case "param":
+                const paramVal = this.eval(ctx, stmt.val);
+                this.syms.defineParameter(stmt.sym.sym, paramVal);
+                break;
+            case "label":
+                this.syms.defineLabel(stmt.sym.sym, ctx.clc);
+                break;
+            case "exprStmt":
+                // need to handle pseudos because they can change the radix or CLC,
+                // affecting expression parsing for symbol definitions
+                if (this.isPseudoExpr(stmt.expr)) {
+                    this.handlePseudo(ctx, stmt.expr);
+                }
+                break;
         }
     }
 
@@ -133,7 +141,7 @@ export class Assembler {
 
     private handleExprStmt(ctx: Context, stmt: ExpressionStatement) {
         if (this.isPseudoExpr(stmt.expr)) {
-            this.handlePseudo(ctx, stmt.expr);
+            // this is handled by updateSymbols which is called in both symbol and assembly phases
         } else if (this.isMRIExpr(stmt.expr)) {
             this.handleLoadMRI(ctx, stmt.expr);
         } else {
@@ -285,7 +293,7 @@ export class Assembler {
     private handleBody(ctx: Context, body: UnparsedSequence) {
         if (!body.parsed) {
             const lexer = new Lexer();
-            lexer.addInput("condition", body.body);
+            lexer.addInput("body.tmp", body.body);
 
             const parser = new Parser(lexer);
             body.parsed = parser.run();
@@ -312,7 +320,7 @@ export class Assembler {
                 if (sym) {
                     return sym.value;
                 } else if (!ctx.generateCode) {
-                    console.warn(`Access to undefined symbol ${expr.sym}`);
+                    console.warn(`Access to undefined symbol ${expr.sym}, setting 0 to fix in pass 2`);
                     return 0;
                 } else {
                     throw Error(`Undefined symbol: ${expr.sym}`, {cause: expr});

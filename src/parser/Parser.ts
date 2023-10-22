@@ -1,8 +1,8 @@
-import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement, SymbolGroup } from "./AST";
-import { Token, TokenType, SymbolToken } from "../lexer/Token";
+import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement, SymbolGroup, AstNodeType } from "./AST";
+import { Token, TokenType, SymbolToken, CharToken, tokenToString } from "../lexer/Token";
 import { Lexer } from "../lexer/Lexer";
 
-type BinOpFragment = {elem: AstElement, op?: BinaryOpChr};
+type BinOpFragment = {elem: AstElement, op?: CharToken};
 
 export class Parser {
     private lexer: Lexer;
@@ -13,7 +13,7 @@ export class Parser {
 
     public run(): Program {
         const prog: Program = {
-            type: "program",
+            type: AstNodeType.Program,
             stmts: [],
         };
 
@@ -35,7 +35,7 @@ export class Parser {
         const asExpr = () => {
             this.lexer.unget(tok);
             return {
-                type: "exprStmt",
+                type: AstNodeType.ExpressionStmt,
                 expr: this.parseExpr(),
             } as ExpressionStatement;
         };
@@ -45,16 +45,15 @@ export class Parser {
                 switch (tok.char) {
                     case "$": return undefined;
                     case "*": return this.parseOriginStatement(tok);
-                    case ";": return {type: "separator", separator: tok.char};
+                    case ";": return {type: AstNodeType.Separator, separator: tok.char, token: tok};
                     case "-": return asExpr();
                     case ".": return asExpr();
                 }
                 break;
             case TokenType.Text:
                 return {
-                    type: "text",
-                    delim: tok.delim,
-                    text: tok.text,
+                    type: AstNodeType.Text,
+                    token: tok,
                 };
             case TokenType.ASCII:
             case TokenType.Integer:
@@ -63,48 +62,51 @@ export class Parser {
                 const next = this.lexer.next();
                 if (next.type == TokenType.Char) {
                     if (next.char == ",") {
-                        return this.parseLabelDef(tok);
+                        return this.parseLabelDef(tok, next);
                     } else if (next.char == "=") {
-                        return this.parseParameterDef(tok);
+                        return this.parseParameterDef(tok, next);
                     }
                 }
                 this.lexer.unget(next);
                 return asExpr();
             case TokenType.Comment:
-                return {type: "comment", comment: tok.comment};
+                return {type: AstNodeType.Comment, token: tok};
             case TokenType.EOL:
-                return {type: "separator", separator: "\n"};
+                return {type: AstNodeType.Separator, separator: "\n", token: tok};
             case TokenType.EOF:
                 return undefined;
         }
-        throw new Error(`Statement expected, got ${JSON.stringify(tok)}`);
+        throw new Error(`Statement expected, got ${tokenToString(tok)}`, {cause: tok});
     }
 
-    private parseOriginStatement(sym: Token): OriginStatement {
+    private parseOriginStatement(sym: CharToken): OriginStatement {
         return {
-            type: "origin",
+            type: AstNodeType.Origin,
+            token: sym,
             val: this.parseExpr(),
         };
     }
 
-    private parseLabelDef(sym: SymbolToken): LabelDef {
+    private parseLabelDef(sym: SymbolToken, chr: CharToken): LabelDef {
         return {
-            type: "label",
+            type: AstNodeType.Label,
             sym: {
-                type: "symbol",
-                sym: sym.symbol
+                type: AstNodeType.Symbol,
+                token: sym,
             },
+            token: chr,
         };
     }
 
-    private parseParameterDef(sym: SymbolToken): AssignStatement {
+    private parseParameterDef(sym: SymbolToken, chr: CharToken): AssignStatement {
         return {
-            type: "param",
+            type: AstNodeType.Assignment,
             sym: {
-                type: "symbol",
-                sym: sym.symbol
+                type: AstNodeType.Symbol,
+                token: sym,
             },
             val: this.parseExpr(),
+            token: chr,
         };
     }
 
@@ -133,13 +135,13 @@ export class Parser {
         }
 
         if (exprs.length == 0) {
-            throw Error("Expression expected");
+            throw Error("Expression expected", {cause: this.lexer.getCursor()});
         }
 
         const firstElem = exprs[0];
-        if (firstElem.type == "symbol") {
+        if (firstElem.type == AstNodeType.Symbol) {
             const group: SymbolGroup = {
-                type: "group",
+                type: AstNodeType.SymbolGroup,
                 first: firstElem,
                 exprs: exprs.splice(1),
             };
@@ -148,7 +150,7 @@ export class Parser {
             if (exprs.length == 1) {
                 return exprs[0];
             } else {
-                throw Error("Logic error");
+                throw Error("Logic error: Group not started by symbol", {cause: firstElem});
             }
         }
     }
@@ -165,15 +167,16 @@ export class Parser {
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 return {
-                    type: "paren",
+                    type: AstNodeType.ParenExpr,
                     paren: first.char,
                     expr: this.parseExpressionPart(),
+                    token: first,
                 }
             }
         } else if (first.type == TokenType.RawSequence) {
             return {
-                type: "unparsed",
-                body: first.body,
+                type: AstNodeType.UnparsedSequence,
+                token: first,
             };
         }
         this.lexer.unget(first);
@@ -217,12 +220,12 @@ export class Parser {
                     case "%":
                     case "!":
                     case "&":
-                        return {elem: firstElem, op: nextTok.char};
+                        return {elem: firstElem, op: nextTok};
                     case ")":
                     case "]":
                         return {elem: firstElem};
                     default:
-                        throw Error(`Unexpected operator in expression: '${nextTok.char}'`);
+                        throw Error(`Unexpected operator in expression: '${nextTok.char}'`, {cause: nextTok});
                 }
             case TokenType.Comment:
             case TokenType.RawSequence:
@@ -236,30 +239,32 @@ export class Parser {
 
     private foldExpressionParts(parts: BinOpFragment[]): BinaryOp {
         if (parts.length < 2) {
-            throw Error("Unexpected end of expression");
+            throw Error("Unexpected end of expression", {cause: parts[0].elem});
         }
 
         if (!parts[0].op) {
-            throw Error("No operator in first expression part");
+            throw Error("No operator in first expression part", {cause: parts[0].elem});
         }
 
         let binOp: BinaryOp = {
-            type: "binop",
+            type: AstNodeType.BinaryOp,
             lhs: parts[0].elem,
-            operator: parts[0].op,
+            operator: parts[0].op.char as BinaryOpChr,
             rhs: parts[1].elem,
+            token: parts[0].op,
         };
 
         for (let i = 1; i < parts.length - 1; i++) {
             const next = parts[i];
             if (!next.op) {
-                throw Error("No operator in expression part");
+                throw Error("No operator in expression part", {cause: next.elem});
             }
             binOp = {
-                type: "binop",
+                type: AstNodeType.BinaryOp,
                 lhs: binOp,
-                operator: next.op,
+                operator: next.op.char as BinaryOpChr,
                 rhs: parts[i + 1].elem,
+                token: next.op,
             };
         }
 
@@ -292,31 +297,33 @@ export class Parser {
 
         if (tok.type == TokenType.Integer) {
             return {
-                type: "integer",
-                int: tok.value,
+                type: AstNodeType.Integer,
+                token: tok,
             };
         } else if (tok.type == TokenType.Symbol) {
             return {
-                type: "symbol",
-                sym: tok.symbol,
+                type: AstNodeType.Symbol,
+                token: tok,
             };
         } else if (tok.type == TokenType.Char && tok.char == ".") {
             return {
-                type: "clc",
+                type: AstNodeType.CLCValue,
+                token: tok,
             };
         } else if (tok.type == TokenType.Char && tok.char == "-") {
             return {
-                type: "unary",
+                type: AstNodeType.UnaryOp,
                 operator: "-",
                 next: this.parseElement(),
+                token: tok,
             }
         } else if (tok.type == TokenType.ASCII) {
             return {
-                type: "ascii",
-                char: tok.char,
+                type: AstNodeType.ASCIIChar,
+                token: tok,
             };
         } else {
-            throw Error(`Element expected, got ${JSON.stringify(tok)}`);
+            throw Error(`Element expected, got ${tokenToString(tok)}`, {cause: tok});
         }
     }
 }

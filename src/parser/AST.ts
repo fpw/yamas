@@ -25,112 +25,152 @@
  *
  */
 
-export interface Program {
-    type: "program";
-    stmts: Statement[];
+import { ASCIIToken, CharToken, CommentToken, EOLToken, IntegerToken, RawSequenceToken, SymbolToken, TextToken } from "../lexer/Token";
+
+export enum AstNodeType {
+    // Program
+    Program,
+
+    // Statement
+    Origin,
+    Label,
+    Assignment,
+    Separator,
+    ExpressionStmt,
+    Text,
+    Comment,
+
+    // Expression
+    SymbolGroup,
+    ParenExpr,
+    BinaryOp,
+    UnparsedSequence,
+
+    // Element
+    UnaryOp,
+    Integer,
+    ASCIIChar,
+    Symbol,
+    CLCValue,
 }
 
 export type Statement = OriginStatement | LabelDef | AssignStatement | StatementSeparator | ExpressionStatement | TextStatement | Comment;
 export type Expression = SymbolGroup | ParenExpr | BinaryOp | UnparsedSequence | AstElement;
 export type AstElement = UnaryOp | Integer | ASCIIChar | AstSymbol | CLCValue;
 
+export interface AstNode {
+    type: AstNodeType;
+}
+
+export interface Program extends AstNode {
+    type: AstNodeType.Program;
+    stmts: Statement[];
+}
+
 // *200
-export interface OriginStatement {
-    type: "origin";
+export interface OriginStatement extends AstNode {
+    type: AstNodeType.Origin;
     val: Expression;
+    token: CharToken; // on *
 }
 
 // BEGIN, ...
 export interface LabelDef {
-    type: "label";
+    type: AstNodeType.Label;
     sym: AstSymbol;
+    token: CharToken; // on ,
 }
 
 // A=B
-export interface AssignStatement {
-    type: "param";
+export interface AssignStatement extends AstNode {
+    type: AstNodeType.Assignment;
     sym: AstSymbol;
     val: Expression;
+    token: CharToken; // on =
 }
 
 // ;
-export interface StatementSeparator {
-    type: "separator";
+export interface StatementSeparator extends AstNode {
+    type: AstNodeType.Separator;
     separator: ";" | "\n";
+    token: EOLToken | CharToken;
 }
 
 // TEXT x...x
-export interface TextStatement {
-    type: "text";
-    delim: string;
-    text: string;
+export interface TextStatement extends AstNode {
+    type: AstNodeType.Text;
+    token: TextToken;
 }
 
 // /Comment
-export interface Comment {
-    type: "comment";
-    comment: string;
+export interface Comment extends AstNode {
+    type: AstNodeType.Comment;
+    token: CommentToken;
 }
 
 // Symbol<blank>[Expression]
-export interface SymbolGroup {
-    type: "group";
+export interface SymbolGroup extends AstNode {
+    type: AstNodeType.SymbolGroup;
     first: AstSymbol;
     exprs: Expression[];
 };
 
-export interface ExpressionStatement {
-    type: "exprStmt";
+export interface ExpressionStatement extends AstNode {
+    type: AstNodeType.ExpressionStmt;
     expr: Expression;
 }
 
-export interface ParenExpr {
-    type: "paren";
+export interface ParenExpr extends AstNode {
+    type: AstNodeType.ParenExpr;
     paren: "(" | "[";
     expr: Expression;
+    token: CharToken;
 }
 
 // A + B
 export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
-export interface BinaryOp {
-    type: "binop";
+export interface BinaryOp extends AstNode {
+    type: AstNodeType.BinaryOp;
     lhs: BinaryOp | AstElement;
     operator: BinaryOpChr;
     rhs: AstElement;
+    token: CharToken; // on op
 }
 
 // -2
 export type UnaryOpChr = "-";
-export interface UnaryOp {
-    type: "unary";
+export interface UnaryOp extends AstNode {
+    type: AstNodeType.UnaryOp;
     operator: UnaryOpChr;
     next: AstElement;
+    token: CharToken;
 }
 
 // < ... >
-export interface UnparsedSequence {
-    type: "unparsed";
-    body: string;
+export interface UnparsedSequence extends AstNode {
+    type: AstNodeType.UnparsedSequence;
     parsed?: Program;
+    token: RawSequenceToken;
 }
 
-export interface Integer {
+export interface Integer extends AstNode {
     // unparsed because interpretation depends on environment (i.e. DECIMAL or OCTAL)
-    type: "integer";
-    int: string;
+    type: AstNodeType.Integer;
+    token: IntegerToken;
 }
 
-export interface ASCIIChar {
-    type: "ascii";
-    char: string;
+export interface ASCIIChar extends AstNode {
+    type: AstNodeType.ASCIIChar;
+    token: ASCIIToken;
 }
 
-export interface AstSymbol {
-    type: "symbol";
-    sym: string;
+export interface AstSymbol extends AstNode {
+    type: AstNodeType.Symbol;
+    token: SymbolToken;
 }
 
 // .
-export interface CLCValue {
-    type: "clc";
+export interface CLCValue extends AstNode {
+    type: AstNodeType.CLCValue;
+    token: CharToken;
 }

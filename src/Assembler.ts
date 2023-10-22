@@ -2,7 +2,7 @@ import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
 import { SymbolTable, SymbolType } from "./SymbolTable";
 import { Lexer } from "./lexer/Lexer";
-import { BinaryOp, Expression, ExpressionStatement, Program, Statement, SymbolGroup, UnparsedSequence } from "./parser/AST";
+import { AstNodeType, BinaryOp, Expression, ExpressionStatement, Program, Statement, SymbolGroup, UnparsedSequence } from "./parser/AST";
 import { Parser } from "./parser/Parser";
 import { PreludeEAE } from "./prelude/EAE";
 import { PreludeFamily8 } from "./prelude/Family8";
@@ -50,14 +50,8 @@ export class Assembler {
 
     public run() {
         const parser = new Parser(this.lexer);
-        let ast;
 
-        try {
-            ast = parser.run();
-        } catch (e) {
-            console.error(this.lexer.getCursorString());
-            throw e;
-        }
+        const ast = parser.run();
 
         const symCtx = this.createContext(false);
         this.assignSymbols(symCtx, ast);
@@ -65,7 +59,7 @@ export class Assembler {
         const asmCtx = this.createContext(true);
         this.assemble(asmCtx, ast);
 
-        if (false) {
+        if (true) {
             this.outputSymbols(asmCtx);
             this.outputLinks(asmCtx);
         }
@@ -73,7 +67,7 @@ export class Assembler {
 
     private output(ctx: Context, field: number, clc: number, value: number) {
         if (ctx.punchEnabled) {
-            // console.log(`${field}${clc.toString(8).padStart(4, "0")} ${value.toString(8).padStart(4, "0")}`);
+            console.log(`${field}${clc.toString(8).padStart(4, "0")} ${value.toString(8).padStart(4, "0")}`);
         }
     }
 
@@ -97,22 +91,23 @@ export class Assembler {
     private assemble(ctx: Context, prog: Program) {
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
-                case "text":
+                case AstNodeType.Text:
                     let loc = ctx.clc;
-                    for (let i = 0; i < stmt.text.length - 1; i += 2) {
-                        const left = this.to6Bit(stmt.text[i]);
-                        const right = this.to6Bit(stmt.text[i + 1]);
+                    const text = stmt.token.text;
+                    for (let i = 0; i < text.length - 1; i += 2) {
+                        const left = this.to6Bit(text[i]);
+                        const right = this.to6Bit(text[i + 1]);
                         this.output(ctx, ctx.field, loc, (left << 6) | right);
                         loc++;
                     }
-                    if (stmt.text.length % 2 == 0) {
+                    if (text.length % 2 == 0) {
                         this.output(ctx, ctx.field, loc, 0);
                     } else {
-                        const left = this.to6Bit(stmt.text[stmt.text.length - 1]);
+                        const left = this.to6Bit(text[text.length - 1]);
                         this.output(ctx, ctx.field, loc, left << 6);
                     }
                     break;
-                case "exprStmt":
+                case AstNodeType.ExpressionStmt:
                     this.handleExprStmt(ctx, stmt);
                     break;
             }
@@ -126,14 +121,14 @@ export class Assembler {
 
     private updateSymbols(ctx: Context, stmt: Statement) {
         switch (stmt.type) {
-            case "param":
+            case AstNodeType.Assignment:
                 const paramVal = this.eval(ctx, stmt.val);
-                this.syms.defineParameter(stmt.sym.sym, paramVal);
+                this.syms.defineParameter(stmt.sym.token.symbol, paramVal);
                 break;
-            case "label":
-                this.syms.defineLabel(stmt.sym.sym, ctx.clc);
+            case AstNodeType.Label:
+                this.syms.defineLabel(stmt.sym.token.symbol, ctx.clc);
                 break;
-            case "exprStmt":
+            case AstNodeType.ExpressionStmt:
                 // need to handle pseudos because they can change the radix or CLC,
                 // affecting expression parsing for symbol definitions
                 if (this.isPseudoExpr(stmt.expr)) {
@@ -160,13 +155,13 @@ export class Assembler {
     }
 
     private handleLoadMRI(ctx: Context, expr: SymbolGroup) {
-        const mri = this.syms.lookup(expr.first.sym);
+        const mri = this.syms.lookup(expr.first.token.symbol);
         let mriVal = mri.value;
         let dst = 0;
 
         for (const ex of expr.exprs) {
-            if (ex.type == "symbol") {
-                const sym = this.syms.lookup(ex.sym);
+            if (ex.type == AstNodeType.Symbol) {
+                const sym = this.syms.lookup(ex.token.symbol);
                 if (sym.type == SymbolType.Permanent) {
                     mriVal |= sym.value;
                 } else {
@@ -183,17 +178,17 @@ export class Assembler {
 
     private updateCLC(ctx: Context, stmt: Statement) {
         switch (stmt.type) {
-            case "origin":
+            case AstNodeType.Origin:
                 ctx.clc = this.eval(ctx, stmt.val);;
                 break;
-            case "text":
-                ctx.clc += Math.ceil(stmt.text.length / 2);
-                if (stmt.text.length % 2 == 0) {
+            case AstNodeType.Text:
+                ctx.clc += Math.ceil(stmt.token.text.length / 2);
+                if (stmt.token.text.length % 2 == 0) {
                     // null terminator. For odd-length strings, part of last symbol.
                     ctx.clc++;
                 }
                 break;
-            case "exprStmt":
+            case AstNodeType.ExpressionStmt:
                 if (!this.isPseudoExpr(stmt.expr)) {
                     ctx.clc++;
                 }
@@ -202,7 +197,7 @@ export class Assembler {
     }
 
     private handlePseudo(ctx: Context, expr: SymbolGroup) {
-        const name = this.syms.lookup(expr.first.sym).name;
+        const name = this.syms.lookup(expr.first.token.symbol).name;
 
         switch (name) {
             case "DECIMA":
@@ -271,7 +266,7 @@ export class Assembler {
                 break;
             case "DUBL":
             case "FLTG":
-                throw Error("Unimplemented");
+                throw Error("Unimplemented", {cause: expr});
         }
     }
 
@@ -280,18 +275,18 @@ export class Assembler {
     }
 
     private handleCondition(ctx: Context, expr: SymbolGroup) {
-        const op = this.syms.lookup(expr.first.sym).name;
+        const op = this.syms.lookup(expr.first.token.symbol).name;
 
         if (op == "IFDEF" || op == "IFNDEF") {
-            if (expr.exprs.length != 2 || expr.exprs[0].type != "symbol" || expr.exprs[1].type != "unparsed") {
+            if (expr.exprs.length != 2 || expr.exprs[0].type != AstNodeType.Symbol || expr.exprs[1].type != AstNodeType.UnparsedSequence) {
                 throw Error("Invalid syntax: single symbol and body expected", {cause: expr});
             }
-            const sym = this.syms.tryLookup(expr.exprs[0].sym);
+            const sym = this.syms.tryLookup(expr.exprs[0].token.symbol);
             if ((sym && op == "IFDEF") || (!sym && op == "IFNDEF")) {
                 this.handleBody(ctx, expr.exprs[1]);
             }
         } else if (op == "IFZERO" || op == "IFNZRO") {
-            if (expr.exprs.length != 2 || expr.exprs[1].type != "unparsed") {
+            if (expr.exprs.length != 2 || expr.exprs[1].type != AstNodeType.UnparsedSequence) {
                 throw Error("Invalid syntax: single expression and body expected", {cause: expr});
             }
             const val = this.eval(ctx, expr.exprs[0]);
@@ -304,7 +299,7 @@ export class Assembler {
     private handleBody(ctx: Context, body: UnparsedSequence) {
         if (!body.parsed) {
             const lexer = new Lexer();
-            lexer.addInput("body.tmp", body.body);
+            lexer.addInput("body.tmp", body.token.body);
 
             const parser = new Parser(lexer);
             body.parsed = parser.run();
@@ -319,31 +314,31 @@ export class Assembler {
 
     private eval(ctx: Context, expr: Expression): number {
         switch (expr.type) {
-            case "integer":
-                if (ctx.radix == 8 && !expr.int.match(/^[0-7]+$/)) {
+            case AstNodeType.Integer:
+                if (ctx.radix == 8 && !expr.token.value.match(/^[0-7]+$/)) {
                     throw Error("Invalid digit in OCTAL", {cause: expr});
                 }
-                return Number.parseInt(expr.int, ctx.radix) & 0o7777;
-            case "ascii":
-                return expr.char.charCodeAt(0) & 0o7777;
-            case "symbol":
-                const sym = this.syms.tryLookup(expr.sym);
+                return Number.parseInt(expr.token.value, ctx.radix) & 0o7777;
+            case AstNodeType.ASCIIChar:
+                return expr.token.char.charCodeAt(0) & 0o7777;
+            case AstNodeType.Symbol:
+                const sym = this.syms.tryLookup(expr.token.symbol);
                 if (sym) {
                     return sym.value;
                 } else if (!ctx.generateCode) {
-                    console.warn(`Access to undefined symbol ${expr.sym}, setting 0 to fix in pass 2`);
+                    console.warn(`Access to undefined symbol ${expr.token.symbol}, setting 0 to fix in pass 2`);
                     return 0;
                 } else {
-                    throw Error(`Undefined symbol: ${expr.sym}`, {cause: expr});
+                    throw Error(`Undefined symbol: ${expr.token.symbol}`, {cause: expr});
                 }
-            case "clc":
+            case AstNodeType.CLCValue:
                 return ctx.clc;
-            case "unary":
+            case AstNodeType.UnaryOp:
                 if (expr.operator != "-") {
                     throw Error("Unexpected unary operator", {cause: expr});
                 }
                 return (-this.eval(ctx, expr.next)) & 0o7777;
-            case "paren":
+            case AstNodeType.ParenExpr:
                 const val = this.eval(ctx, expr.expr);
                 if (expr.paren == "(") {
                     const curPage = this.getPage(ctx.clc);
@@ -355,16 +350,16 @@ export class Assembler {
                 } else {
                     throw Error(`Invalid parentheses: "${expr.paren}"`, {cause: expr});
                 }
-            case "group":
+            case AstNodeType.SymbolGroup:
                 let groupVal = this.eval(ctx, expr.first);
                 for (const ex of expr.exprs) {
                     const exVal = this.eval(ctx, ex);
                     groupVal |= exVal;
                 }
                 return groupVal;
-            case "binop":
+            case AstNodeType.BinaryOp:
                 return this.evalBinOp(ctx, expr);
-            case "unparsed":
+            case AstNodeType.UnparsedSequence:
                 throw Error("Trying to evaluate unparsed list", {cause: expr});
         }
     }
@@ -384,10 +379,10 @@ export class Assembler {
     }
 
     private isPseudoExpr(expr: Expression): expr is SymbolGroup {
-        if (expr.type != "group") {
+        if (expr.type != AstNodeType.SymbolGroup) {
             return false;
         }
-        const sym = this.syms.tryLookup(expr.first.sym);
+        const sym = this.syms.tryLookup(expr.first.token.symbol);
         if (!sym) {
             return false;
         }
@@ -396,11 +391,11 @@ export class Assembler {
 
     private isMRIExpr(expr: Expression): expr is SymbolGroup {
         // An MRI expression needs to start with an MRI op followed by a space -> group
-        if (expr.type != "group") {
+        if (expr.type != AstNodeType.SymbolGroup) {
             return false;
         }
 
-        const sym = this.syms.tryLookup(expr.first.sym);
+        const sym = this.syms.tryLookup(expr.first.token.symbol);
         if (!sym || sym.type != SymbolType.Fixed) {
             return false;
         }

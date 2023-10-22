@@ -1,5 +1,5 @@
 import { Lexer } from "./Lexer";
-import { TokenType, tokenToString } from "./Token";
+import { TokenType } from "./Token";
 
 describe("Lexer", () => {
     const lexer = new Lexer();

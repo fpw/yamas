@@ -18,6 +18,10 @@ export class Lexer {
         };
     }
 
+    public getCursor(): Cursor {
+        return this.cursor;
+    }
+
     public addInput(name: string, data: string) {
         this.inputs.push({name, data, lineTable: [0]});
     }
@@ -161,7 +165,7 @@ export class Lexer {
             if (data[i] == delim) {
                 break;
             } else if (data[i] == "\r" || data[i] == "\n") {
-                throw Error("Unterminated TEXT");
+                throw Error("Unterminated TEXT", {cause: startCursor});
             }
             text += data[i];
         }
@@ -280,7 +284,7 @@ export class Lexer {
             } else {
                 if (data[this.cursor.dataIdx] == "\n") {
                     // we're skipping over a line -> update table
-                    this.inputs[this.cursor.fileIdx].lineTable[++this.cursor.lineIdx] = this.cursor.dataIdx + 1;
+                    this.inputs[newCursor.fileIdx].lineTable[++newCursor.lineIdx] = newCursor.dataIdx + 1;
                 }
                 newCursor.dataIdx++;
             }
@@ -292,7 +296,7 @@ export class Lexer {
 
     private cursorDiff(a: Cursor, b: Cursor): number {
         if (a.fileIdx != b.fileIdx) {
-            throw Error("Can't diff cursors across files");
+            throw Error("Can't diff cursors across files", {cause: this.cursor});
         }
         return b.dataIdx - a.dataIdx;
     }

@@ -11,10 +11,14 @@ describe("Assemling simple examples", () => {
             INDEX,  0
             N,      0
 
+            PAGE 1
+
+            START,
+                TAD (10)
+                JMS INTSUM
+                HLT
+
             PAGE 2
-            DC08A=	0	/A
-            IFZERO DC08A	<DCSIZE=1>
-            DATA1=2200+DCSIZE
 
             INTSUM, 0           / SAVE PC HERE
                 DCA N           / SAVE INPUT NUMBER

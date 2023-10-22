@@ -1,3 +1,5 @@
+import { Cursor } from "./Lexer";
+
 export type Token = BlankToken | EOLToken | SymbolToken | IntegerToken | CharToken | CommentToken | ASCIIToken | TextToken | RawSequenceToken | EOFToken;
 
 export enum TokenType {
@@ -15,20 +17,18 @@ export enum TokenType {
 
 export interface BaseToken {
     type: TokenType;
-    fileIdx: number;
-    line: number;
-    startCol: number;
-    endCol: number;
+    cursor: Cursor;
+    width: number;
 }
 
 export interface BlankToken extends BaseToken {
     type: TokenType.Blank;
-    char: string;
+    char: " " | "\t" | "\f";
 }
 
 export interface EOLToken extends BaseToken {
     type: TokenType.EOL;
-    char: string;
+    char: "\r" | "\n" | "\f";
 }
 
 export interface SymbolToken extends BaseToken {
@@ -69,4 +69,19 @@ export interface RawSequenceToken extends BaseToken {
 
 export interface EOFToken extends BaseToken {
     type: TokenType.EOF;
+}
+
+export function tokenToString(tok: Token): string {
+    switch (tok.type) {
+        case TokenType.ASCII:       return `ASCII('${tok.char}')`;
+        case TokenType.Blank:       return `Blank(${tok.char.replace(" ", "SPC").replace("\t", "TAB").replace("\f", "FF")})`;
+        case TokenType.Char:        return `Char(${tok.char})`;
+        case TokenType.Comment:     return `Comment("${tok.comment}")`;
+        case TokenType.EOF:         return "EOF()";
+        case TokenType.EOL:         return `EOL(${tok.char.replace("\r", "CR").replace("\n", "LF").replace("\f", "FF")})`;
+        case TokenType.Integer:     return `Integer(${tok.value})`;
+        case TokenType.RawSequence: return `RawSequence(${tok.body})`;
+        case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
+        case TokenType.Text:        return `Text("${tok.text}", '${tok.delim}')`;
+    }
 }

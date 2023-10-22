@@ -30,7 +30,7 @@ export class Parser {
     }
 
     private parseStatement(): Statement | undefined {
-        const tok = this.lexer.next(false);
+        const tok = this.lexer.nextNonBlank();
 
         const asExpr = () => {
             this.lexer.unget(tok);
@@ -43,15 +43,11 @@ export class Parser {
         switch (tok.type) {
             case TokenType.Char:
                 switch (tok.char) {
-                    case "$":
-                        return undefined;
-                    case "*":
-                        return this.parseOriginStatement(tok);
-                    case ";":
-                        return {type: "separator", separator: tok.char};
-                    case "-":
-                    case ".":
-                        return asExpr();
+                    case "$": return undefined;
+                    case "*": return this.parseOriginStatement(tok);
+                    case ";": return {type: "separator", separator: tok.char};
+                    case "-": return asExpr();
+                    case ".": return asExpr();
                 }
                 break;
             case TokenType.Text:
@@ -64,14 +60,16 @@ export class Parser {
             case TokenType.Integer:
                 return asExpr();
             case TokenType.Symbol:
-                switch (this.lexer.peekNext()) {
-                    case ",":
+                const next = this.lexer.next();
+                if (next.type == TokenType.Char) {
+                    if (next.char == ",") {
                         return this.parseLabelDef(tok);
-                    case "=":
+                    } else if (next.char == "=") {
                         return this.parseParameterDef(tok);
-                    default:
-                        return asExpr();
+                    }
                 }
+                this.lexer.unget(next);
+                return asExpr();
             case TokenType.Comment:
                 return {type: "comment", comment: tok.comment};
             case TokenType.EOL:
@@ -90,8 +88,6 @@ export class Parser {
     }
 
     private parseLabelDef(sym: SymbolToken): LabelDef {
-        this.lexer.skipChar(",");
-
         return {
             type: "label",
             sym: {
@@ -102,8 +98,6 @@ export class Parser {
     }
 
     private parseParameterDef(sym: SymbolToken): AssignStatement {
-        this.lexer.skipChar("=");
-
         return {
             type: "param",
             sym: {
@@ -128,7 +122,7 @@ export class Parser {
         const exprs: Expression[] = [];
 
         while (true) {
-            const tok = this.lexer.next(false);
+            const tok = this.lexer.nextNonBlank();
             if (this.isEndOfExpr(tok)) {
                 this.lexer.unget(tok);
                 break;
@@ -167,7 +161,7 @@ export class Parser {
      * @returns The next part of an expression
      */
     private parseExpressionPart(): Expression {
-        const first = this.lexer.next(false);
+        const first = this.lexer.nextNonBlank();
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 return {
@@ -202,12 +196,12 @@ export class Parser {
     }
 
     /**
-     * Parse the next element of an expression and the next operator, if any.
+     * Parse the next element of an expression and the next operator.
      * @returns The next element of an expression and the operator behind it, if any.
      */
     private parseElementAndOperator(): BinOpFragment {
         const firstElem = this.parseElement();
-        const nextTok = this.lexer.next(true);
+        const nextTok = this.lexer.next();
 
         if (this.isEndOfExpr(nextTok)) {
             this.lexer.unget(nextTok);
@@ -294,17 +288,17 @@ export class Parser {
     }
 
     private parseElement(): AstElement {
-        const tok = this.lexer.next(false);
+        const tok = this.lexer.nextNonBlank();
 
         if (tok.type == TokenType.Integer) {
             return {
                 type: "integer",
-                int: tok.value
+                int: tok.value,
             };
         } else if (tok.type == TokenType.Symbol) {
             return {
                 type: "symbol",
-                sym: tok.symbol
+                sym: tok.symbol,
             };
         } else if (tok.type == TokenType.Char && tok.char == ".") {
             return {

@@ -65,8 +65,16 @@ export class Assembler {
         const asmCtx = this.createContext(true);
         this.assemble(asmCtx, ast);
 
-        // this.outputSymbols(asmCtx);
-        this.outputLinks(asmCtx);
+        if (false) {
+            this.outputSymbols(asmCtx);
+            this.outputLinks(asmCtx);
+        }
+    }
+
+    private output(ctx: Context, field: number, clc: number, value: number) {
+        if (ctx.punchEnabled) {
+            // console.log(`${field}${clc.toString(8).padStart(4, "0")} ${value.toString(8).padStart(4, "0")}`);
+        }
     }
 
     private createContext(generateCode: boolean): Context {
@@ -171,12 +179,6 @@ export class Assembler {
 
         const effVal = this.genMRI(ctx, expr, mriVal, dst);
         this.output(ctx, ctx.field, ctx.clc, effVal);
-    }
-
-    private output(ctx: Context, field: number, clc: number, value: number) {
-        if (ctx.punchEnabled) {
-            console.log(`${field}${clc.toString(8).padStart(4, "0")} ${value.toString(8).padStart(4, "0")}`);
-        }
     }
 
     private updateCLC(ctx: Context, stmt: Statement) {

@@ -3,30 +3,27 @@
  * Program: Statement | Statement Program
  *
  * Statement: OriginStatement | LabelDef | AssignStatement | ExpressionStatement | Comment | Text | StatementSeparator
- * OriginStatement: *Expression
- * LabelDef: Symbol,
- * AssignStatement: Symbol=Expression
- * ExpressionStatement: Expression
- * Comment: /.*
- * Text: TEXT ...
- * StatementSeparator: ;|\n|EOF
+ *  OriginStatement: *Expression
+ *  LabelDef: Symbol,
+ *  AssignStatement: Symbol=Expression
+ *  ExpressionStatement: Expression
+ *  Comment: /.*
+ *  Text: TEXT ...
+ *  StatementSeparator: ;|\n|EOF
  *
  * Expression: SymbolGroup | ParenExpr | BinaryOp | UnparsedSequence | Element (but not symbol -> will be SymbolGroup with empty exprs instead)
- * SymbolGroup: Symbol [Expression]
- * ParenExpr: (Expression)? | [Expression]?
- * BinaryOp: BinaryOp | AstElement Op AstElement
- * UnparsedSequence: <.*>
+ *  SymbolGroup: Symbol [Expression]
+ *  ParenExpr: (Expression)? | [Expression]?
+ *  BinaryOp: BinaryOp | AstElement Op AstElement
+ *  UnparsedSequence: <.*>
  *
  * Element: UnaryOp | Integer | Symbol | ASCII | .
- * UnaryOp: -Element
- * Integer: [0-9]+
- * Symbol: [A-Z][A-Z0-9]+
- * ASCII: ".
+ *  UnaryOp: -Element
+ *  Integer: [0-9]+
+ *  Symbol: [A-Z][A-Z0-9]+
+ *  ASCII: ".
  *
  */
-
-export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
-export type UnaryOpChr = "-";
 
 export interface Program {
     type: "program";
@@ -35,6 +32,7 @@ export interface Program {
 
 export type Statement = OriginStatement | LabelDef | AssignStatement | StatementSeparator | ExpressionStatement | TextStatement | Comment;
 export type Expression = SymbolGroup | ParenExpr | BinaryOp | UnparsedSequence | AstElement;
+export type AstElement = UnaryOp | Integer | ASCIIChar | AstSymbol | CLCValue;
 
 // *200
 export interface OriginStatement {
@@ -93,6 +91,7 @@ export interface ParenExpr {
 }
 
 // A + B
+export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
 export interface BinaryOp {
     type: "binop";
     lhs: BinaryOp | AstElement;
@@ -100,9 +99,8 @@ export interface BinaryOp {
     rhs: AstElement;
 }
 
-export type AstElement = UnaryOp | Integer | ASCIIChar | AstSymbol | CLCValue;
-
 // -2
+export type UnaryOpChr = "-";
 export interface UnaryOp {
     type: "unary";
     operator: UnaryOpChr;

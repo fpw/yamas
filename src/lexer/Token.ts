@@ -75,7 +75,7 @@ export function tokenToString(tok: Token): string {
     switch (tok.type) {
         case TokenType.ASCII:       return `ASCII('${tok.char}')`;
         case TokenType.Blank:       return `Blank(${tok.char.replace(" ", "SPC").replace("\t", "TAB").replace("\f", "FF")})`;
-        case TokenType.Char:        return `Char(${tok.char})`;
+        case TokenType.Char:        return `Char('${tok.char}')`;
         case TokenType.Comment:     return `Comment("${tok.comment}")`;
         case TokenType.EOF:         return "EOF()";
         case TokenType.EOL:         return `EOL(${tok.char.replace("\r", "CR").replace("\n", "LF").replace("\f", "FF")})`;

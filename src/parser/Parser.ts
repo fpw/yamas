@@ -1,4 +1,4 @@
-import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement, SymbolGroup, AstNodeType } from "./AST";
+import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement, SymbolGroup, AstNodeType } from "./ASTNode";
 import { Token, TokenType, SymbolToken, CharToken, tokenToString } from "../lexer/Token";
 import { Lexer } from "../lexer/Lexer";
 

@@ -4,6 +4,7 @@ export enum SymbolType {
     Pseudo,     // DECIMAL
     Fixed,      // Param after FIXTAB
     Permanent,  // I and Z
+    Macro,
 }
 
 export interface DefinedSymbol {
@@ -57,6 +58,14 @@ export class SymbolTable {
         });
     }
 
+    public defineMacro(name: string) {
+        this.defineSymbol({
+            type: SymbolType.Macro,
+            name: name,
+            value: 0,
+        });
+    }
+
     public fix() {
         for (const sym of this.symbols) {
             if (sym.type == SymbolType.Param) {
@@ -75,8 +84,13 @@ export class SymbolTable {
 
         if (sym) {
             // check if duplicates are okay
-            const isParamRedefine = (sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) && data.type == SymbolType.Param;
-            const isLabelCheck = (sym.type == SymbolType.Param || sym.type == SymbolType.Label) && (data.type == SymbolType.Label && sym.value == data.value);
+            const isParamRedefine =
+                (sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) &&
+                data.type == SymbolType.Param;
+            const isLabelCheck =
+                (sym.type == SymbolType.Param || sym.type == SymbolType.Label) &&
+                (data.type == SymbolType.Label && sym.value == data.value);
+
             if (isParamRedefine || isLabelCheck) {
                 sym.value = data.value;
                 return sym;

@@ -1,19 +1,24 @@
-import { AstElement, Expression, OriginStatement, AssignStatement, Program, Statement, LabelDef, BinaryOp, BinaryOpChr, ExpressionStatement, SymbolGroup, AstNodeType } from "./ASTNode";
-import { Token, TokenType, SymbolToken, CharToken, tokenToString } from "../lexer/Token";
 import { Lexer } from "../lexer/Lexer";
+import { CharToken, RawSequenceToken, SymbolToken, Token, TokenType, tokenToString } from "../lexer/Token";
+import {
+    AssignStatement, AstElement, NodeType, AstSymbol, BinaryOp, BinaryOpChr, DefineStatement, Expression,
+    ExpressionStatement, Invocation, LabelDef, OriginStatement, Program,
+    Statement, SymbolGroup, UnparsedSequence
+} from "./ASTNode";
 
 type BinOpFragment = {elem: AstElement, op?: CharToken};
 
 export class Parser {
     private lexer: Lexer;
+    private macros = new Map<string, DefineStatement>();
 
     public constructor(lexer: Lexer) {
         this.lexer = lexer;
     }
 
-    public run(): Program {
+    public parseProgram(): Program {
         const prog: Program = {
-            type: AstNodeType.Program,
+            type: NodeType.Program,
             stmts: [],
         };
 
@@ -35,7 +40,7 @@ export class Parser {
         const asExpr = () => {
             this.lexer.unget(tok);
             return {
-                type: AstNodeType.ExpressionStmt,
+                type: NodeType.ExpressionStmt,
                 expr: this.parseExpr(),
             } as ExpressionStatement;
         };
@@ -45,20 +50,28 @@ export class Parser {
                 switch (tok.char) {
                     case "$": return undefined;
                     case "*": return this.parseOriginStatement(tok);
-                    case ";": return {type: AstNodeType.Separator, separator: tok.char, token: tok};
+                    case ";": return {type: NodeType.Separator, separator: tok.char, token: tok};
                     case "-": return asExpr();
                     case ".": return asExpr();
                 }
                 break;
             case TokenType.Text:
                 return {
-                    type: AstNodeType.Text,
+                    type: NodeType.Text,
                     token: tok,
                 };
             case TokenType.ASCII:
             case TokenType.Integer:
                 return asExpr();
             case TokenType.Symbol:
+                if (tok.symbol == "DEFINE") {
+                    const def = this.parseDefine(tok);
+                    this.macros.set(def.name.token.symbol, def);
+                    return def;
+                } else if (this.macros.has(tok.symbol)) {
+                    this.lexer.unget(tok);
+                    return this.parseInvocation();
+                }
                 const next = this.lexer.next();
                 if (next.type == TokenType.Char) {
                     if (next.char == ",") {
@@ -70,9 +83,9 @@ export class Parser {
                 this.lexer.unget(next);
                 return asExpr();
             case TokenType.Comment:
-                return {type: AstNodeType.Comment, token: tok};
+                return {type: NodeType.Comment, token: tok};
             case TokenType.EOL:
-                return {type: AstNodeType.Separator, separator: "\n", token: tok};
+                return {type: NodeType.Separator, separator: "\n", token: tok};
             case TokenType.EOF:
                 return undefined;
         }
@@ -81,7 +94,7 @@ export class Parser {
 
     private parseOriginStatement(sym: CharToken): OriginStatement {
         return {
-            type: AstNodeType.Origin,
+            type: NodeType.Origin,
             token: sym,
             val: this.parseExpr(),
         };
@@ -89,9 +102,9 @@ export class Parser {
 
     private parseLabelDef(sym: SymbolToken, chr: CharToken): LabelDef {
         return {
-            type: AstNodeType.Label,
+            type: NodeType.Label,
             sym: {
-                type: AstNodeType.Symbol,
+                type: NodeType.Symbol,
                 token: sym,
             },
             token: chr,
@@ -100,9 +113,9 @@ export class Parser {
 
     private parseParameterDef(sym: SymbolToken, chr: CharToken): AssignStatement {
         return {
-            type: AstNodeType.Assignment,
+            type: NodeType.Assignment,
             sym: {
-                type: AstNodeType.Symbol,
+                type: NodeType.Symbol,
                 token: sym,
             },
             val: this.parseExpr(),
@@ -139,9 +152,9 @@ export class Parser {
         }
 
         const firstElem = exprs[0];
-        if (firstElem.type == AstNodeType.Symbol) {
+        if (firstElem.type == NodeType.Symbol) {
             const group: SymbolGroup = {
-                type: AstNodeType.SymbolGroup,
+                type: NodeType.SymbolGroup,
                 first: firstElem,
                 exprs: exprs.splice(1),
             };
@@ -167,7 +180,7 @@ export class Parser {
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 return {
-                    type: AstNodeType.ParenExpr,
+                    type: NodeType.ParenExpr,
                     paren: first.char,
                     expr: this.parseExpressionPart(),
                     token: first,
@@ -175,7 +188,7 @@ export class Parser {
             }
         } else if (first.type == TokenType.RawSequence) {
             return {
-                type: AstNodeType.UnparsedSequence,
+                type: NodeType.UnparsedSequence,
                 token: first,
             };
         }
@@ -247,7 +260,7 @@ export class Parser {
         }
 
         let binOp: BinaryOp = {
-            type: AstNodeType.BinaryOp,
+            type: NodeType.BinaryOp,
             lhs: parts[0].elem,
             operator: parts[0].op.char as BinaryOpChr,
             rhs: parts[1].elem,
@@ -260,7 +273,7 @@ export class Parser {
                 throw Error("No operator in expression part", {cause: next.elem});
             }
             binOp = {
-                type: AstNodeType.BinaryOp,
+                type: NodeType.BinaryOp,
                 lhs: binOp,
                 operator: next.op.char as BinaryOpChr,
                 rhs: parts[i + 1].elem,
@@ -297,33 +310,102 @@ export class Parser {
 
         if (tok.type == TokenType.Integer) {
             return {
-                type: AstNodeType.Integer,
+                type: NodeType.Integer,
                 token: tok,
             };
         } else if (tok.type == TokenType.Symbol) {
             return {
-                type: AstNodeType.Symbol,
+                type: NodeType.Symbol,
                 token: tok,
             };
         } else if (tok.type == TokenType.Char && tok.char == ".") {
             return {
-                type: AstNodeType.CLCValue,
+                type: NodeType.CLCValue,
                 token: tok,
             };
         } else if (tok.type == TokenType.Char && tok.char == "-") {
             return {
-                type: AstNodeType.UnaryOp,
+                type: NodeType.UnaryOp,
                 operator: "-",
                 next: this.parseElement(),
                 token: tok,
             }
         } else if (tok.type == TokenType.ASCII) {
             return {
-                type: AstNodeType.ASCIIChar,
+                type: NodeType.ASCIIChar,
                 token: tok,
             };
         } else {
             throw Error(`Element expected, got ${tokenToString(tok)}`, {cause: tok});
         }
+    }
+
+    private parseDefine(token: SymbolToken): DefineStatement {
+        const nameElem = this.parseElement();
+        if (nameElem.type != NodeType.Symbol) {
+            throw Error("Invalid DEFINE syntax: Expecting symbol", {cause: nameElem});
+        }
+
+        const name = nameElem;
+        const params: AstSymbol[] = [];
+        let body: UnparsedSequence | undefined;
+
+        while (true) {
+            const next = this.parseExpressionPart();
+            if (next.type == NodeType.Symbol) {
+                params.push(next);
+            } else if (next.type == NodeType.UnparsedSequence) {
+                body = next;
+                break;
+            } else {
+                throw Error("Invalid DEFINE syntax: Expecting symbols and body", {cause: next});
+            }
+        }
+
+        return {
+            type: NodeType.Define, name, body, params: params, token
+        };
+    }
+
+    private parseInvocation(): Invocation {
+        const nameSym = this.parseElement();
+        if (!nameSym || nameSym.type != NodeType.Symbol) {
+            throw Error("Invalid invocation", {cause: nameSym});
+        }
+
+        const macro = this.macros.get(nameSym.token.symbol);
+        if (!macro) {
+            throw Error("Not a macro", {cause: nameSym});
+        }
+
+        const args: RawSequenceToken[] = [];
+        for (let i = 0; i < macro.params.length; i++) {
+            const arg = this.lexer.nextMacroArgument();
+            args.push(arg);
+        }
+
+        const next = this.lexer.nextNonBlank();
+        if (!this.isEndOfExpr(next)) {
+            throw Error("Excessive argument for macro", {cause: next});
+        }
+        this.lexer.unget(next);
+
+        return {
+            type: NodeType.Invocation,
+            name: nameSym,
+            args: args,
+            program: this.createMacroProgram(macro, args),
+        };
+    }
+
+    private createMacroProgram(macro: DefineStatement, args: RawSequenceToken[]): Program {
+        const macroLexer = new Lexer();
+        macroLexer.addInput(macro.name.token.symbol + ".macro", macro.body.token.body);
+        for (let i = 0; i < args.length; i++) {
+            macroLexer.addSubstitution(macro.params[i].token.symbol, args[i].body);
+        }
+
+        const macroParser = new Parser(macroLexer);
+        return macroParser.parseProgram();
     }
 }

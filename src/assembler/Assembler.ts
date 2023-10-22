@@ -1,5 +1,4 @@
 import { Lexer } from "../lexer/Lexer";
-import { AstNodeType, BinaryOp, Expression, ExpressionStatement, Program, Statement, SymbolGroup, UnparsedSequence } from "../parser/ASTNode";
 import { Parser } from "../parser/Parser";
 import { PreludeEAE } from "../prelude/EAE";
 import { PreludeFamily8 } from "../prelude/Family8";
@@ -7,6 +6,10 @@ import { PreludeIO } from "../prelude/IO";
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
 import { SymbolTable, SymbolType } from "./SymbolTable";
+import {
+    NodeType, BinaryOp, Expression, ExpressionStatement, Program,
+    Statement, SymbolGroup, UnparsedSequence, formatASTNode
+} from "../parser/ASTNode";
 
 export class Assembler {
     private lexer = new Lexer();
@@ -14,6 +17,9 @@ export class Assembler {
     private linkTable = new LinkTable();
 
     private readonly pseudos = [
+        // TEXT: handled by lexer
+        // DEFINE: handled by parser
+
         "NOPUNCH",  "ENPUNCH",
         "DECIMAL",  "OCTAL",
         "EXPUNGE",  "FIXTAB",
@@ -21,7 +27,6 @@ export class Assembler {
         "DUBL",     "FLTG",
         "TEXT",     "ZBLOCK",
         "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
-        "DEFINE",
     ];
 
     public constructor() {
@@ -39,7 +44,7 @@ export class Assembler {
         preLexer.addInput("eae.per", PreludeEAE);
 
         const parser = new Parser(preLexer);
-        const prelude = parser.run();
+        const prelude = parser.parseProgram();
         const ctx = this.createContext(false);
         this.assignSymbols(ctx, prelude);
     }
@@ -51,7 +56,8 @@ export class Assembler {
     public run() {
         const parser = new Parser(this.lexer);
 
-        const ast = parser.run();
+        const ast = parser.parseProgram();
+        console.log(formatASTNode(ast))
 
         const symCtx = this.createContext(false);
         this.assignSymbols(symCtx, ast);
@@ -91,7 +97,7 @@ export class Assembler {
     private assemble(ctx: Context, prog: Program) {
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
-                case AstNodeType.Text:
+                case NodeType.Text:
                     let loc = ctx.clc;
                     const text = stmt.token.text;
                     for (let i = 0; i < text.length - 1; i += 2) {
@@ -107,7 +113,7 @@ export class Assembler {
                         this.output(ctx, ctx.field, loc, left << 6);
                     }
                     break;
-                case AstNodeType.ExpressionStmt:
+                case NodeType.ExpressionStmt:
                     this.handleExprStmt(ctx, stmt);
                     break;
             }
@@ -121,14 +127,24 @@ export class Assembler {
 
     private updateSymbols(ctx: Context, stmt: Statement) {
         switch (stmt.type) {
-            case AstNodeType.Assignment:
+            case NodeType.Assignment:
                 const paramVal = this.eval(ctx, stmt.val);
                 this.syms.defineParameter(stmt.sym.token.symbol, paramVal);
                 break;
-            case AstNodeType.Label:
+            case NodeType.Label:
                 this.syms.defineLabel(stmt.sym.token.symbol, ctx.clc);
                 break;
-            case AstNodeType.ExpressionStmt:
+            case NodeType.Define:
+                if (!ctx.generateCode) {
+                    // define macros only once so we don't get duplicates in next pass
+                    this.syms.defineMacro(stmt.name.token.symbol);
+                }
+                break;
+            case NodeType.Invocation: {
+                this.handleMacro(ctx, stmt.program);
+                break;
+            }
+            case NodeType.ExpressionStmt:
                 // need to handle pseudos because they can change the radix or CLC,
                 // affecting expression parsing for symbol definitions
                 if (this.isPseudoExpr(stmt.expr)) {
@@ -154,13 +170,13 @@ export class Assembler {
         }
     }
 
-    private handleLoadMRI(ctx: Context, expr: SymbolGroup) {
-        const mri = this.syms.lookup(expr.first.token.symbol);
+    private handleLoadMRI(ctx: Context, group: SymbolGroup) {
+        const mri = this.syms.lookup(group.first.token.symbol);
         let mriVal = mri.value;
         let dst = 0;
 
-        for (const ex of expr.exprs) {
-            if (ex.type == AstNodeType.Symbol) {
+        for (const ex of group.exprs) {
+            if (ex.type == NodeType.Symbol) {
                 const sym = this.syms.lookup(ex.token.symbol);
                 if (sym.type == SymbolType.Permanent) {
                     mriVal |= sym.value;
@@ -172,23 +188,23 @@ export class Assembler {
             }
         }
 
-        const effVal = this.genMRI(ctx, expr, mriVal, dst);
+        const effVal = this.genMRI(ctx, group, mriVal, dst);
         this.output(ctx, ctx.field, ctx.clc, effVal);
     }
 
     private updateCLC(ctx: Context, stmt: Statement) {
         switch (stmt.type) {
-            case AstNodeType.Origin:
+            case NodeType.Origin:
                 ctx.clc = this.eval(ctx, stmt.val);;
                 break;
-            case AstNodeType.Text:
+            case NodeType.Text:
                 ctx.clc += Math.ceil(stmt.token.text.length / 2);
                 if (stmt.token.text.length % 2 == 0) {
                     // null terminator. For odd-length strings, part of last symbol.
                     ctx.clc++;
                 }
                 break;
-            case AstNodeType.ExpressionStmt:
+            case NodeType.ExpressionStmt:
                 if (!this.isPseudoExpr(stmt.expr)) {
                     ctx.clc++;
                 }
@@ -196,8 +212,8 @@ export class Assembler {
         }
     }
 
-    private handlePseudo(ctx: Context, expr: SymbolGroup) {
-        const name = this.syms.lookup(expr.first.token.symbol).name;
+    private handlePseudo(ctx: Context, group: SymbolGroup) {
+        const name = this.syms.lookup(group.first.token.symbol).name;
 
         switch (name) {
             case "DECIMA":
@@ -210,38 +226,35 @@ export class Assembler {
                 this.syms.fix();
                 break;
             case "FIELD":
-                if (expr.exprs.length == 1) {
-                    const field = this.eval(ctx, expr.exprs[0]);
+                if (group.exprs.length == 1) {
+                    const field = this.eval(ctx, group.exprs[0]);
                     if (field < 0 || field > 7) {
-                        throw Error(`Invalid field ${field}`, {cause: expr});
+                        throw Error(`Invalid field ${field}`, {cause: group});
                     }
                     ctx.field = field;
                 } else {
-                    throw Error("Expected one parameter for FIELD", {cause: expr});
+                    throw Error("Expected one parameter for FIELD", {cause: group});
                 }
                 break;
             case "PAGE":
-                if (expr.exprs.length == 0) {
+                if (group.exprs.length == 0) {
                     ctx.clc = (this.getPage(ctx.clc) + 1) * 0o200;
-                } else if (expr.exprs.length == 1) {
-                    const page = this.eval(ctx, expr.exprs[0]);
+                } else if (group.exprs.length == 1) {
+                    const page = this.eval(ctx, group.exprs[0]);
                     if (page < 0 || page > 31) {
-                        throw Error(`Invalid page ${page}`, {cause: expr});
+                        throw Error(`Invalid page ${page}`, {cause: group});
                     }
                     ctx.clc = page * 0o200;
                 } else {
-                    throw Error("Expected zero or one parameter for PAGE", {cause: expr});
+                    throw Error("Expected zero or one parameter for PAGE", {cause: group});
                 }
                 break;
             case "EXPUNG":
                 this.syms.expunge();
                 break;
-            case "DEFINE":
-                this.handleDefine(ctx, expr);
-                break;
             case "ZBLOCK":
-                if (expr.exprs.length == 1) {
-                    const num = this.eval(ctx, expr.exprs[0]);
+                if (group.exprs.length == 1) {
+                    const num = this.eval(ctx, group.exprs[0]);
                     for (let i = 0; i < num; i++) {
                         if (ctx.generateCode) {
                             this.output(ctx, ctx.field, ctx.clc, 0);
@@ -249,14 +262,14 @@ export class Assembler {
                         ctx.clc++;
                     }
                 } else {
-                    throw Error("Expected one parameter for ZBLOCK", {cause: expr});
+                    throw Error("Expected one parameter for ZBLOCK", {cause: group});
                 }
                 break;
             case "IFNZRO":
             case "IFZERO":
             case "IFDEF":
             case "IFNDEF":
-                this.handleCondition(ctx, expr);
+                this.handleCondition(ctx, group);
                 break;
             case "NOPUNC":
                 ctx.punchEnabled = false;
@@ -266,32 +279,33 @@ export class Assembler {
                 break;
             case "DUBL":
             case "FLTG":
-                throw Error("Unimplemented", {cause: expr});
+                throw Error("Unimplemented", {cause: group});
         }
     }
 
-    private handleDefine(ctx: Context, expr: SymbolGroup) {
-        throw Error("Unimplemented");
-    }
-
-    private handleCondition(ctx: Context, expr: SymbolGroup) {
-        const op = this.syms.lookup(expr.first.token.symbol).name;
+    private handleCondition(ctx: Context, group: SymbolGroup) {
+        const op = this.syms.lookup(group.first.token.symbol).name;
 
         if (op == "IFDEF" || op == "IFNDEF") {
-            if (expr.exprs.length != 2 || expr.exprs[0].type != AstNodeType.Symbol || expr.exprs[1].type != AstNodeType.UnparsedSequence) {
-                throw Error("Invalid syntax: single symbol and body expected", {cause: expr});
+            if (
+                group.exprs.length != 2 ||
+                group.exprs[0].type != NodeType.Symbol ||
+                group.exprs[1].type != NodeType.UnparsedSequence
+            ) {
+                throw Error("Invalid syntax: single symbol and body expected", {cause: group});
             }
-            const sym = this.syms.tryLookup(expr.exprs[0].token.symbol);
+
+            const sym = this.syms.tryLookup(group.exprs[0].token.symbol);
             if ((sym && op == "IFDEF") || (!sym && op == "IFNDEF")) {
-                this.handleBody(ctx, expr.exprs[1]);
+                this.handleBody(ctx, group.exprs[1]);
             }
         } else if (op == "IFZERO" || op == "IFNZRO") {
-            if (expr.exprs.length != 2 || expr.exprs[1].type != AstNodeType.UnparsedSequence) {
-                throw Error("Invalid syntax: single expression and body expected", {cause: expr});
+            if (group.exprs.length != 2 || group.exprs[1].type != NodeType.UnparsedSequence) {
+                throw Error("Invalid syntax: single expression and body expected", {cause: group});
             }
-            const val = this.eval(ctx, expr.exprs[0]);
+            const val = this.eval(ctx, group.exprs[0]);
             if ((val != 0 && op == "IFNZRO") || (val == 0 && op == "IFZERO")) {
-                this.handleBody(ctx, expr.exprs[1]);
+                this.handleBody(ctx, group.exprs[1]);
             }
         }
     }
@@ -302,7 +316,7 @@ export class Assembler {
             lexer.addInput("body.tmp", body.token.body);
 
             const parser = new Parser(lexer);
-            body.parsed = parser.run();
+            body.parsed = parser.parseProgram();
         }
 
         if (!ctx.generateCode) {
@@ -312,16 +326,24 @@ export class Assembler {
         }
     }
 
+    private handleMacro(ctx: Context, program: Program) {
+        if (!ctx.generateCode) {
+            this.assignSymbols(ctx, program);
+        } else {
+            this.assemble(ctx, program);
+        }
+    }
+
     private eval(ctx: Context, expr: Expression): number {
         switch (expr.type) {
-            case AstNodeType.Integer:
+            case NodeType.Integer:
                 if (ctx.radix == 8 && !expr.token.value.match(/^[0-7]+$/)) {
                     throw Error("Invalid digit in OCTAL", {cause: expr});
                 }
                 return Number.parseInt(expr.token.value, ctx.radix) & 0o7777;
-            case AstNodeType.ASCIIChar:
+            case NodeType.ASCIIChar:
                 return expr.token.char.charCodeAt(0) & 0o7777;
-            case AstNodeType.Symbol:
+            case NodeType.Symbol:
                 const sym = this.syms.tryLookup(expr.token.symbol);
                 if (sym) {
                     return sym.value;
@@ -331,14 +353,14 @@ export class Assembler {
                 } else {
                     throw Error(`Undefined symbol: ${expr.token.symbol}`, {cause: expr});
                 }
-            case AstNodeType.CLCValue:
+            case NodeType.CLCValue:
                 return ctx.clc;
-            case AstNodeType.UnaryOp:
+            case NodeType.UnaryOp:
                 if (expr.operator != "-") {
                     throw Error("Unexpected unary operator", {cause: expr});
                 }
                 return (-this.eval(ctx, expr.next)) & 0o7777;
-            case AstNodeType.ParenExpr:
+            case NodeType.ParenExpr:
                 const val = this.eval(ctx, expr.expr);
                 if (expr.paren == "(") {
                     const curPage = this.getPage(ctx.clc);
@@ -350,25 +372,25 @@ export class Assembler {
                 } else {
                     throw Error(`Invalid parentheses: "${expr.paren}"`, {cause: expr});
                 }
-            case AstNodeType.SymbolGroup:
+            case NodeType.SymbolGroup:
                 let groupVal = this.eval(ctx, expr.first);
                 for (const ex of expr.exprs) {
                     const exVal = this.eval(ctx, ex);
                     groupVal |= exVal;
                 }
                 return groupVal;
-            case AstNodeType.BinaryOp:
+            case NodeType.BinaryOp:
                 return this.evalBinOp(ctx, expr);
-            case AstNodeType.UnparsedSequence:
+            case NodeType.UnparsedSequence:
                 throw Error("Trying to evaluate unparsed list", {cause: expr});
         }
     }
 
-    private evalBinOp(ctx: Context, expr: BinaryOp): number {
-        const lhs = this.eval(ctx, expr.lhs);
-        const rhs = this.eval(ctx, expr.rhs);
+    private evalBinOp(ctx: Context, binOp: BinaryOp): number {
+        const lhs = this.eval(ctx, binOp.lhs);
+        const rhs = this.eval(ctx, binOp.rhs);
 
-        switch (expr.operator) {
+        switch (binOp.operator) {
             case "+":   return (lhs + rhs) & 0o7777;
             case "-":   return (lhs - rhs) & 0o7777;
             case "^":   return (lhs * rhs) & 0o7777;
@@ -379,7 +401,7 @@ export class Assembler {
     }
 
     private isPseudoExpr(expr: Expression): expr is SymbolGroup {
-        if (expr.type != AstNodeType.SymbolGroup) {
+        if (expr.type != NodeType.SymbolGroup) {
             return false;
         }
         const sym = this.syms.tryLookup(expr.first.token.symbol);
@@ -391,7 +413,7 @@ export class Assembler {
 
     private isMRIExpr(expr: Expression): expr is SymbolGroup {
         // An MRI expression needs to start with an MRI op followed by a space -> group
-        if (expr.type != AstNodeType.SymbolGroup) {
+        if (expr.type != NodeType.SymbolGroup) {
             return false;
         }
 
@@ -404,7 +426,7 @@ export class Assembler {
         return ((sym.value & 0o777) == 0) && (sym.value <= 0o5000);
     }
 
-    private genMRI(ctx: Context, expr: SymbolGroup, mri: number, dst: number, ): number {
+    private genMRI(ctx: Context, group: SymbolGroup, mri: number, dst: number, ): number {
         const IND   = 0b000100000000;
         const CUR   = 0b000010000000;
 
@@ -418,13 +440,13 @@ export class Assembler {
             return val;
         } else if (this.linkTable.has(ctx.field, 0, dst)) {
             if (mri & IND) {
-                throw Error("Double indirection on zero page", {cause: expr});
+                throw Error("Double indirection on zero page", {cause: group});
             }
             const indAddr = this.linkTable.enter(ctx.field, 0, dst);
             return mri | (indAddr & 0b1111111) | IND;
         } else {
             if (mri & IND) {
-                throw Error("Double indirection on current page", {cause: expr});
+                throw Error("Double indirection on current page", {cause: group});
             }
             const indAddr = this.linkTable.enter(ctx.field, curPage, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;

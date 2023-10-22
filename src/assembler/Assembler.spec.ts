@@ -32,6 +32,19 @@ describe("Assemling simple examples", () => {
                 SZA             / IS IT 0?
                 JMP GO          / NO: CONTINUE
                 JMP I INTSUM    / YES: ALL DONE
+
+            PAGE 3
+
+            DEFINE MOVE A B <
+                CLA
+                TAD A
+                DCA B
+                TAD B
+            > / No
+
+            MOVE INDEX, N
+            NOP
+
             `);
         asm.run();
         expect(1).toEqual(1);

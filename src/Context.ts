@@ -3,4 +3,5 @@ export interface Context {
     field: number;
     clc: number;
     generateCode: boolean;
+    punchEnabled: boolean;
 }

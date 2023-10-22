@@ -65,8 +65,8 @@ export class Assembler {
         const asmCtx = this.createContext(true);
         this.assemble(asmCtx, ast);
 
-        // this.outputSymbols();
-        this.outputLinks();
+        // this.outputSymbols(asmCtx);
+        this.outputLinks(asmCtx);
     }
 
     private createContext(generateCode: boolean): Context {
@@ -74,6 +74,7 @@ export class Assembler {
             field: 0,
             clc: 0o200,
             radix: 8,
+            punchEnabled: true,
             generateCode: generateCode,
         };
     }
@@ -93,14 +94,14 @@ export class Assembler {
                     for (let i = 0; i < stmt.text.length - 1; i += 2) {
                         const left = this.to6Bit(stmt.text[i]);
                         const right = this.to6Bit(stmt.text[i + 1]);
-                        this.output(ctx.field, loc, (left << 6) | right);
+                        this.output(ctx, ctx.field, loc, (left << 6) | right);
                         loc++;
                     }
                     if (stmt.text.length % 2 == 0) {
-                        this.output(ctx.field, loc, 0);
+                        this.output(ctx, ctx.field, loc, 0);
                     } else {
                         const left = this.to6Bit(stmt.text[stmt.text.length - 1]);
-                        this.output(ctx.field, loc, left << 6);
+                        this.output(ctx, ctx.field, loc, left << 6);
                     }
                     break;
                 case "exprStmt":
@@ -146,7 +147,7 @@ export class Assembler {
             this.handleLoadMRI(ctx, stmt.expr);
         } else {
             const val = this.eval(ctx, stmt.expr);
-            this.output(ctx.field, ctx.clc, val);
+            this.output(ctx, ctx.field, ctx.clc, val);
         }
     }
 
@@ -169,11 +170,13 @@ export class Assembler {
         }
 
         const effVal = this.genMRI(ctx, expr, mriVal, dst);
-        this.output(ctx.field, ctx.clc, effVal);
+        this.output(ctx, ctx.field, ctx.clc, effVal);
     }
 
-    private output(field: number, clc: number, value: number) {
-        // console.log(`${field}${clc.toString(8).padStart(4, "0")} ${value.toString(8).padStart(4, "0")}`);
+    private output(ctx: Context, field: number, clc: number, value: number) {
+        if (ctx.punchEnabled) {
+            console.log(`${field}${clc.toString(8).padStart(4, "0")} ${value.toString(8).padStart(4, "0")}`);
+        }
     }
 
     private updateCLC(ctx: Context, stmt: Statement) {
@@ -244,7 +247,7 @@ export class Assembler {
                     const num = this.eval(ctx, expr.exprs[0]);
                     for (let i = 0; i < num; i++) {
                         if (ctx.generateCode) {
-                            this.output(ctx.field, ctx.clc, 0);
+                            this.output(ctx, ctx.field, ctx.clc, 0);
                         }
                         ctx.clc++;
                     }
@@ -257,6 +260,12 @@ export class Assembler {
             case "IFDEF":
             case "IFNDEF":
                 this.handleCondition(ctx, expr);
+                break;
+            case "NOPUNC":
+                ctx.punchEnabled = false;
+                break;
+            case "ENPUNC":
+                ctx.punchEnabled = true;
                 break;
             case "DUBL":
             case "FLTG":
@@ -429,13 +438,13 @@ export class Assembler {
         return (loc >> 7) & 31;
     }
 
-    private outputSymbols() {
+    private outputSymbols(ctx: Context) {
         console.log(this.syms.dump());
     }
 
-    private outputLinks() {
+    private outputLinks(ctx: Context) {
         this.linkTable.visit((field, addr, val) => {
-            this.output(field, addr, val);
+            this.output(ctx, field, addr, val);
         });
     }
 }

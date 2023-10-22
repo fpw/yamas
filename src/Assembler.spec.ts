@@ -34,8 +34,11 @@ describe("Assemling simple examples", () => {
 /**
  *
  * Useful tests:
+ * IFNZRO 0<GLITCH>
+ * IFNZRO 3-2-1 <GLITCH>
+ * Using undefined symbols in IFZERO
+ * Using undefined RHS in assignment
  * TAD = 1000
  * TAD^2 = 2000
- * IFNZRO 3-2-1 <GLITCH>
  *
  */

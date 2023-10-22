@@ -1,12 +1,12 @@
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
 import { SymbolTable, SymbolType } from "./SymbolTable";
-import { Lexer } from "./lexer/Lexer";
-import { AstNodeType, BinaryOp, Expression, ExpressionStatement, Program, Statement, SymbolGroup, UnparsedSequence } from "./parser/AST";
-import { Parser } from "./parser/Parser";
-import { PreludeEAE } from "./prelude/EAE";
-import { PreludeFamily8 } from "./prelude/Family8";
-import { PreludeIO } from "./prelude/IO";
+import { Lexer } from "../lexer/Lexer";
+import { AstNodeType, BinaryOp, Expression, ExpressionStatement, Program, Statement, SymbolGroup, UnparsedSequence } from "../parser/AST";
+import { Parser } from "../parser/Parser";
+import { PreludeEAE } from "../prelude/EAE";
+import { PreludeFamily8 } from "../prelude/Family8";
+import { PreludeIO } from "../prelude/IO";
 
 export class Assembler {
     private lexer = new Lexer();

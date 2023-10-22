@@ -1,5 +1,5 @@
 import { parse } from "ts-command-line-args";
-import { Assembler } from "./Assembler";
+import { Assembler } from "./assembler/Assembler";
 import { readFileSync } from "fs";
 
 interface Options {

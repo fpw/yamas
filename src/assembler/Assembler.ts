@@ -7,12 +7,20 @@ import { PreludeFamily8 } from "../prelude/Family8";
 import { PreludeIO } from "../prelude/IO";
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
-import { SymbolTable, SymbolType } from "./SymbolTable";
+import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable";
+
+export interface OutputHandler {
+    setEnable(enable: boolean): void;
+    changeOrigin(clc: number): void;
+    changeField(field: number): void;
+    writeValue(clc: number, val: number): void;
+}
 
 export class Assembler {
     private syms = new SymbolTable();
     private linkTable = new LinkTable();
     private programs: Nodes.Program[] = [];
+    private outputHandler?: OutputHandler;
 
     private readonly pseudos = [
         // TEXT: handled by lexer
@@ -35,8 +43,16 @@ export class Assembler {
         this.loadPrelude();
     }
 
-    public addFile(name: string, content: string) {
-        this.parseInput(name, content);
+    public setOutputHandler(out: OutputHandler) {
+        this.outputHandler = out;
+    }
+
+    public addAndParseInput(name: string, content: string): Nodes.Program {
+        return this.parseInput(name, content);
+    }
+
+    public getSymbols(): SymbolData[] {
+        return this.syms.getSymbols();
     }
 
     private loadPrelude() {
@@ -45,30 +61,30 @@ export class Assembler {
         this.parseInput("prelude/eae.pa", PreludeEAE);
     }
 
-    private parseInput(name: string, input: string) {
+    private parseInput(name: string, input: string): Nodes.Program {
         const parser = new Parser(name, input);
         const prog = parser.parseProgram();
         this.programs.push(prog);
+        return prog;
     }
 
-    public run() {
+    public assembleAll() {
         const symCtx = this.createContext(false);
         this.programs.forEach(p => this.assignSymbols(symCtx, p));
 
         const asmCtx = this.createContext(true);
-        this.programs.forEach(p => this.assemble(asmCtx, p));
+        this.outputHandler?.setEnable(true);
+        this.outputHandler?.changeOrigin(asmCtx.clc);
 
-        if (false) {
-            this.outputSymbols(asmCtx);
-            this.outputLinks(asmCtx);
-        }
+        this.programs.forEach(p => this.assembleProgram(asmCtx, p));
+
+        this.outputLinks(asmCtx);
     }
 
     private createContext(generateCode: boolean): Context {
         return {
             clc: 0o200,
             radix: 8,
-            punchEnabled: true,
             generateCode: generateCode,
         };
     }
@@ -80,7 +96,7 @@ export class Assembler {
         }
     }
 
-    private assemble(ctx: Context, prog: Nodes.Program) {
+    private assembleProgram(ctx: Context, prog: Nodes.Program) {
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
                 case Nodes.NodeType.Text:
@@ -134,7 +150,7 @@ export class Assembler {
             this.handleLoadMRI(ctx, stmt.expr);
         } else {
             const val = this.eval(ctx, stmt.expr);
-            this.output(ctx, ctx.clc, val);
+            this.outputHandler?.writeValue(ctx.clc, val);
         }
     }
 
@@ -157,13 +173,14 @@ export class Assembler {
         }
 
         const effVal = this.genMRI(ctx, group, mriVal, dst);
-        this.output(ctx, ctx.clc, effVal);
+        this.outputHandler?.writeValue(ctx.clc, effVal);
     }
 
     private updateCLC(ctx: Context, stmt: Nodes.Statement) {
         switch (stmt.type) {
             case Nodes.NodeType.Origin:
-                ctx.clc = this.eval(ctx, stmt.val);;
+                ctx.clc = this.eval(ctx, stmt.val);
+                this.outputHandler?.changeOrigin(ctx.clc);
                 break;
             case Nodes.NodeType.Text:
                 ctx.clc += Math.ceil(stmt.token.text.length / 2);
@@ -215,10 +232,10 @@ export class Assembler {
                 this.handleCondition(ctx, group);
                 break;
             case "NOPUNC":
-                ctx.punchEnabled = false;
+                this.outputHandler?.setEnable(false);
                 break;
             case "ENPUNC":
-                ctx.punchEnabled = true;
+                this.outputHandler?.setEnable(true);
                 break;
             case "DUBL":
             case "FLTG":
@@ -231,7 +248,7 @@ export class Assembler {
             const num = this.eval(ctx, group.exprs[0]);
             for (let i = 0; i < num; i++) {
                 if (ctx.generateCode) {
-                    this.output(ctx, ctx.clc, 0);
+                    this.outputHandler?.writeValue(ctx.clc, 0);
                 }
                 ctx.clc++;
             }
@@ -252,6 +269,7 @@ export class Assembler {
         } else {
             throw Error("Expected zero or one parameter for PAGE", { cause: group });
         }
+        this.outputHandler?.changeOrigin(ctx.clc);
     }
 
     private handleField(ctx: Context, group: Nodes.SymbolGroup) {
@@ -261,6 +279,8 @@ export class Assembler {
                 throw Error(`Invalid field ${field}`, { cause: group });
             }
             ctx.clc = calcFirstPageLoc(field, 1);
+            this.outputHandler?.changeField(field);
+            this.outputHandler?.changeOrigin(ctx.clc);
         } else {
             throw Error("Expected one parameter for FIELD", { cause: group });
         }
@@ -306,7 +326,7 @@ export class Assembler {
         if (!ctx.generateCode) {
             this.assignSymbols(ctx, program);
         } else {
-            this.assemble(ctx, program);
+            this.assembleProgram(ctx, program);
         }
     }
 
@@ -324,10 +344,13 @@ export class Assembler {
             case Nodes.NodeType.CLCValue:
                 return ctx.clc;
             case Nodes.NodeType.UnaryOp:
-                if (expr.operator != "-") {
-                    throw Error("Unexpected unary operator", {cause: expr});
+                if (expr.operator == "-") {
+                    return (-this.eval(ctx, expr.elem)) & 0o7777;
+                } else if (expr.operator == "+") {
+                    return this.eval(ctx, expr.elem);
+                } else {
+                    throw Error(`Unsupported unary '${expr.operator}'`);
                 }
-                return (-this.eval(ctx, expr.elem)) & 0o7777;
             case Nodes.NodeType.ParenExpr:
                 return this.evalParenExpr(ctx, expr);
             case Nodes.NodeType.SymbolGroup:
@@ -436,20 +459,10 @@ export class Assembler {
         }
     }
 
-    private outputSymbols(ctx: Context) {
-        console.log(this.syms.dump());
-    }
-
     private outputLinks(ctx: Context) {
         this.linkTable.visit((field, addr, val) => {
-            this.output(ctx, calcFirstPageLoc(field, 0) | addr, val);
+            this.outputHandler?.writeValue(calcFirstPageLoc(field, 0) | addr, val);
         });
-    }
-
-    private output(ctx: Context, clc: number, value: number) {
-        if (ctx.punchEnabled) {
-            // console.log(`${clc.toString(8).padStart(5, "0")} ${value.toString(8).padStart(4, "0")}`);
-        }
     }
 
     /**
@@ -462,14 +475,14 @@ export class Assembler {
         for (let i = 0; i < text.length - 1; i += 2) {
             const left = asciiCharTo6Bit(text[i]);
             const right = asciiCharTo6Bit(text[i + 1]);
-            this.output(ctx, loc, (left << 6) | right);
+            this.outputHandler?.writeValue(loc, (left << 6) | right);
             loc++;
         }
         if (text.length % 2 == 0) {
-            this.output(ctx, loc, 0);
+            this.outputHandler?.writeValue(loc, 0);
         } else {
             const left = asciiCharTo6Bit(text[text.length - 1]);
-            this.output(ctx, loc, left << 6);
+            this.outputHandler?.writeValue(loc, left << 6);
         }
     }
 }

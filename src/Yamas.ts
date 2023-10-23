@@ -1,27 +1,34 @@
-import { parse } from "ts-command-line-args";
 import { Assembler } from "./assembler/Assembler";
-import { readFileSync } from "fs";
+import { dumpNode } from "./parser/Node";
 
-interface Options {
-    help?: boolean;
-    files: string[];
-}
+export interface Options {
+    outputAst?: (inputName: string, line: string) => void;
+    outputBin?: (byte: number) => void;
+    outputSyms?: (line: string) => void;
+};
 
-function main() {
-    const args = parse<Options>({
-        help: {type: Boolean, optional: true, description: "Show usage help"},
-        files: {type: String, multiple: true, defaultOption: true},
-    },
-    {
-        helpArg: "help",
-    });
+export class Yamas {
+    private asm = new Assembler();
+    private opts: Options;
 
-    const asm = new Assembler();
-    for (const file of args.files) {
-        const src = readFileSync(file, "ascii");
-        asm.addFile(file, src);
+    public constructor(opts: Options) {
+        this.opts = opts;
+        this.asm.setOutputHandler({
+            setEnable: () => undefined,
+            changeField: field => console.log(`FIELD = ${field}`),
+            changeOrigin: org => console.log(`ORG = ${org.toString(8).padStart(4, "0")}`),
+            writeValue: (clc, val) => console.log(` ${clc.toString(8).padStart(5, "0")} = ${val.toString(8).padStart(4, "0")}`),
+        });
     }
-    asm.run();
-}
 
-main();
+    public addInput(name: string, content: string) {
+        const ast = this.asm.addAndParseInput(name, content);
+        if (this.opts.outputAst) {
+            dumpNode(ast, line => this.opts.outputAst!(name, line));
+        }
+    }
+
+    public run() {
+        this.asm.assembleAll();
+    }
+}

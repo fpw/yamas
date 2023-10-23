@@ -4,7 +4,7 @@ import { Cursor } from "./Lexer";
 export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";
 export type ParenChr =  "(" | ")" | "[" | "]";
 export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
-export type UnaryOpChr = "-";
+export type UnaryOpChr = "-" | "+";
 
 export const OperatorChars = [
     ".", ",", "=", "*",

@@ -18,7 +18,7 @@
  *  MacroBody: <.*>
  *
  * Element: UnaryOp | Integer | Symbol | ASCII | .
- *  UnaryOp: -Element
+ *  UnaryOp: -Element | +Element
  *  Integer: [0-9]+
  *  Symbol: [A-Z][A-Z0-9]+
  *  ASCII: ".
@@ -203,59 +203,73 @@ export interface CLCValue extends BaseNode {
     token: Tokens.CharToken;
 }
 
-// TODO: Support indentation, external writer
+export function dumpNode(prog: Program, write: (line: string) => void, indent = 0) {
+    const w = (line: string, ind: number) => {
+        const indStr = "".padStart(2 * ind);
+        write(indStr + line);
+    };
+
+    w("Program(", indent);
+    for (const node of prog.stmts) {
+        switch (node.type) {
+            case NodeType.Invocation:
+                const args = node.args.map(a => Tokens.tokenToString(a)).join(", ");
+                w(`Invoke(${formatSingle(node.name)}, [${args}], program=`, indent);
+                dumpNode(node.program, write, indent + 1);
+                w(")", indent);
+                break;
+            default:
+                w(formatSingle(node), indent + 1);
+        }
+    }
+    w(")", indent);
+}
+
 // eslint-disable-next-line max-lines-per-function
-export function formatNode(node: Node): string {
-    let str = "";
+export function formatSingle(node: Node): string {
+    let str;
     switch (node.type) {
-        case NodeType.Program:
-            str = "Program(\n";
-            for (const stmt of node.stmts) {
-                str += "  Statement(" + formatNode(stmt) + ")\n";
-            }
-            str += ")";
-            return str;
         case NodeType.Origin:
-            return `Origin(${formatNode(node.val)}, tok=${Tokens.tokenToString(node.token)})`;
+            return `Origin(${formatSingle(node.val)})`;
         case NodeType.Label:
-            return `Label(${formatNode(node.sym)}, tok=${Tokens.tokenToString(node.token)})`;
+            return `Label(${formatSingle(node.sym)})`;
         case NodeType.Assignment:
-            return `Assign(${formatNode(node.sym)}, ${formatNode(node.val)}, tok=${Tokens.tokenToString(node.token)})`;
+            return `Assign(${formatSingle(node.sym)}, ${formatSingle(node.val)})`;
         case NodeType.Separator:
-            return `Separator('${replaceControlChars(node.separator)}', tok=${Tokens.tokenToString(node.token)})`;
+            return `Separator('${replaceControlChars(node.separator)}')`;
         case NodeType.ExpressionStmt:
-            return `ExprStmt(${formatNode(node.expr)})`;
+            return `ExprStmt(${formatSingle(node.expr)})`;
         case NodeType.Text:
-            return `Text(tok=${Tokens.tokenToString(node.token)})`;
+            return `Text(delim='${replaceControlChars(node.token.delim)}', "${node.token.text}")`;
         case NodeType.Comment:
-            return `Comment(tok=${Tokens.tokenToString(node.token)})`;
+            return `Comment("${node.token.comment}")`;
         case NodeType.SymbolGroup:
             str = "Group(";
-            str += `${formatNode(node.first)}, [`;
-            str += node.exprs.map(n => formatNode(n)).join(", ");
+            str += `${formatSingle(node.first)}, [`;
+            str += node.exprs.map(n => formatSingle(n)).join(", ");
             str += "])";
             return str;
         case NodeType.ParenExpr:
-            return `Paren('${node.paren}', ${formatNode(node.expr)}, tok=${Tokens.tokenToString(node.token)})`;
+            return `Paren('${node.paren}', ${formatSingle(node.expr)})`;
         case NodeType.Define:
-            const params = node.params.map(a => formatNode(a)).join(", ");
-            return `Define(${formatNode(node.name)}, [${params}], ${formatNode(node.body)})`;
-        case NodeType.Invocation:
-            const args = node.args.map(a => Tokens.tokenToString(a)).join(", ");
-            return `Invoke(${formatNode(node.name)}, [${args}], program=${formatNode(node.program)})`;
+            const params = node.params.map(a => formatSingle(a)).join(", ");
+            return `Define(${formatSingle(node.name)}, [${params}], ${formatSingle(node.body)})`;
         case NodeType.BinaryOp:
-            return `BinOp(${formatNode(node.lhs)}, ${node.operator}, ${formatNode(node.rhs)})`;
-        case NodeType.MacroBody:
-            return `Unparsed(tok=${Tokens.tokenToString(node.token)})`;
+            return `BinOp(${formatSingle(node.lhs)}, '${node.operator}', ${formatSingle(node.rhs)})`;
         case NodeType.UnaryOp:
-            return `Unary(${node.operator}, ${formatNode(node.elem)}, tok=${Tokens.tokenToString(node.token)})`;
+            return `Unary(${node.operator}, ${formatSingle(node.elem)})`;
         case NodeType.Integer:
-            return `Integer(tok=${Tokens.tokenToString(node.token)})`;
+            return `Integer(${node.token.value})`;
         case NodeType.ASCIIChar:
-            return `ASCII(tok=${Tokens.tokenToString(node.token)})`;
+            return `ASCII('${node.token.char}')`;
         case NodeType.Symbol:
-            return `Symbol(tok=${Tokens.tokenToString(node.token)})`;
+            return `Symbol("${node.token.symbol}")`;
         case NodeType.CLCValue:
-            return `CLC(tok=${Tokens.tokenToString(node.token)})`;
+            return "CLC()";
+        case NodeType.MacroBody:
+            return `MacroBody("${replaceControlChars(Tokens.tokenToString(node.token))}")`;
+        case NodeType.Invocation:
+        case NodeType.Program:
+            throw Error("Logic error");
     }
 }

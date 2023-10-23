@@ -1,4 +1,4 @@
-import { asciiCharTo6Bit, dec6BitToAscii } from "./common";
+import { asciiCharTo6Bit, dec6BitToAscii } from "../../common";
 
 describe("Converting ASCII and 6 bit", () => {
     const expectations: [string, number][] = [

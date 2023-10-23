@@ -329,7 +329,7 @@ export class Parser {
                         type: Nodes.NodeType.CLCValue,
                         token: tok,
                     };
-                } else if (tok.char == "-") {
+                } else if (tok.char == "-" || tok.char == "+") {
                     return {
                         type: Nodes.NodeType.UnaryOp,
                         operator: "-",

@@ -1,12 +1,12 @@
-import {
-    ASCIIToken, BlankToken, CharToken, CommentToken, EOLToken, IntegerToken,
-    RawSequenceToken, SymbolToken, TextToken, Token, TokenType
-} from "./Token";
+import * as Tokens from "./Token";
 
 export interface Cursor {
     fileIdx: number;
     dataIdx: number;
     lineIdx: number;
+
+    // set if we are inside a text substitution, i.e. a macro argument appearing inside the body
+    // will be set to the actual text of the substitution to avoid repeated lookups
     activeSubst?: string;
 }
 
@@ -24,10 +24,6 @@ export class Lexer {
         };
     }
 
-    public getCursor(): Cursor {
-        return this.cursor;
-    }
-
     public addInput(name: string, data: string) {
         this.inputs.push({name, data, lineTable: [0]});
     }
@@ -36,7 +32,7 @@ export class Lexer {
         this.substitutions.set(symbol, sub);
     }
 
-    public getCursorString(): string {
+    public formatCursorString(): string {
         if (this.cursor.fileIdx >= this.inputs.length) {
             return "EOF";
         }
@@ -58,7 +54,8 @@ export class Lexer {
         return `${fileName}:${this.cursor.lineIdx + 1}:${col + 1}`;
     }
 
-    public next(): Token {
+    public next(): Tokens.Token {
+        // are we inside a text substitution?
         if (this.cursor.activeSubst) {
             if (this.cursor.dataIdx < this.cursor.activeSubst.length) {
                 return this.scanFromData(this.cursor.activeSubst);
@@ -68,12 +65,73 @@ export class Lexer {
             }
         }
 
+        return this.scanFromCursor();
+    }
+
+    public nextNonBlank(): Tokens.Token {
+        while (true) {
+            const next = this.next();
+            if (next.type != Tokens.TokenType.Blank) {
+                return next;
+            }
+        }
+    }
+
+    public nextMacroArgument(): Tokens.MacroBodyToken {
+        const startCursor = this.cursor;
+        const data = this.inputs[startCursor.fileIdx].data;
+
+        let rawArg = "";
+        let hadComma = false;
+        for (let i = this.cursor.dataIdx; i < data.length; i++) {
+            if (data[i] == "," || data[i] == ";" || data[i] == "/" || this.isLineBreak(data[i])) {
+                if (data[i] == ",") {
+                    hadComma = true;
+                }
+                break;
+            }
+            rawArg += data[i];
+        }
+
+        const arg = rawArg.trim();
+        if (arg.length == 0) {
+            throw Error("Expected macro argument", {cause: startCursor});
+        }
+
+        this.advanceCursor(rawArg.length + (hadComma ? 1 : 0));
+        if (hadComma) {
+            this.advanceCursor(1);
+        }
+
+        return {
+            type: Tokens.TokenType.MacroBody,
+            body: arg,
+            ...this.getTokenMeasurement(startCursor),
+        };
+    }
+
+    public unget(tok: Tokens.Token) {
+        const fromSubst = (this.cursor.activeSubst !== undefined);
+        const toSubst = (tok.cursor.activeSubst !== undefined);
+
+        if (fromSubst != toSubst) {
+            throw Error("Can't unget across substitution boundaries");
+        }
+
+        this.cursor = tok.cursor;
+    }
+
+    private isLineBreak(chr: string) {
+        return chr == "\r" || chr == "\n" || chr == "\f";
+    }
+
+    private scanFromCursor(): Tokens.Token {
         const startCursor = this.cursor;
 
         // no more files -> EOF
         if (this.cursor.fileIdx >= this.inputs.length) {
             return {
-                type: TokenType.EOF,
+                type: Tokens.TokenType.EOF,
                 cursor: startCursor,
                 width: 0,
             };
@@ -81,11 +139,11 @@ export class Lexer {
 
         const data = this.inputs[startCursor.fileIdx].data;
 
-        // end of file, but there might be more -> EOL with form feed to indicate file switch
+        // end of current file, but there might be another -> EOL with form feed to indicate file switch
         if (this.cursor.dataIdx >= data.length) {
             this.advanceCursor(1);
             return {
-                type: TokenType.EOL,
+                type: Tokens.TokenType.EOL,
                 char: "\f",
                 cursor: startCursor,
                 width: 0,
@@ -95,59 +153,16 @@ export class Lexer {
         return this.scanFromData(data);
     }
 
-    public nextNonBlank(): Token {
-        while (true) {
-            const next = this.next();
-            if (next.type != TokenType.Blank) {
-                return next;
-            }
-        }
-    }
-
-    public nextMacroArgument(): RawSequenceToken {
-        const startCursor = this.cursor;
-        const data = this.inputs[startCursor.fileIdx].data;
-
-        let raw = "";
-        let hadComma = false;
-        for (let i = this.cursor.dataIdx; i < data.length; i++) {
-            if (data[i] == "," || data[i] == ";" || data[i] == "/" || data[i] == "\r" || data[i] == "\n") {
-                if (data[i] == ",") {
-                    hadComma = true;
-                }
-                break;
-            }
-            raw += data[i];
-        }
-
-        const arg = raw.trim();
-        if (arg.length == 0) {
-            throw Error("Expected macro argument", {cause: startCursor});
-        }
-
-        this.advanceCursor(raw.length + (hadComma ? 1 : 0));
-        if (hadComma) {
-            this.advanceCursor(1);
-        }
-
-        return {
-            type: TokenType.RawSequence,
-            body: arg,
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
-        };
-    }
-
-    private scanFromData(data: string): Token {
+    private scanFromData(data: string): Tokens.Token {
         const first = data[this.cursor.dataIdx];
 
-        if (first == "\r" || first == "\n") {
+        if (this.isLineBreak(first)) {
             return this.scanNewLine(data);
         } else if (first == " " || first == "\t" || first == "\f") {
             return this.scanBlank(data);
         } else if (first >= "A" && first <= "Z") {
             const sym = this.scanSymbol(data);
-            if (sym.type == TokenType.Symbol && this.substitutions.has(sym.symbol)) {
+            if (sym.type == Tokens.TokenType.Symbol && this.substitutions.has(sym.symbol)) {
                 this.activateSubstitution(sym.symbol);
                 return this.next();
             } else {
@@ -158,8 +173,8 @@ export class Lexer {
         } else if (first == "/") {
             return this.scanComment(data);
         } else if (first == "<") {
-            return this.scanRawSequence(data);
-        } else if (first == "\"") {
+            return this.scanMacroBody(data);
+        } else if (first == '"') {
             return this.scanASCII(data);
         } else {
             return this.scanChar(data);
@@ -181,30 +196,28 @@ export class Lexer {
         };
     }
 
-    private scanNewLine(data: string): EOLToken {
+    private scanNewLine(data: string): Tokens.EOLToken {
         const startCursor = this.cursor;
         this.advanceCursor(1);
         return {
-            type: TokenType.EOL,
-            char: data[startCursor.dataIdx] as "\r" | "\n",
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
+            type: Tokens.TokenType.EOL,
+            char: data[startCursor.dataIdx] as "\r" | "\n" | "\f",
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanBlank(data: string): BlankToken {
+    private scanBlank(data: string): Tokens.BlankToken {
         const startCursor = this.cursor;
-        const blank = data[startCursor.dataIdx] as "\t" | "\f" | " ";
+        const blank = data[startCursor.dataIdx] as "\t" | " ";
         this.advanceCursor(1);
         return {
-            type: TokenType.Blank,
-            cursor: startCursor,
+            type: Tokens.TokenType.Blank,
             char: blank,
-            width: this.cursorDiff(startCursor, this.cursor),
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanSymbol(data: string): SymbolToken | TextToken {
+    private scanSymbol(data: string): Tokens.SymbolToken | Tokens.TextToken {
         const startCursor = this.cursor;
         let symbol = "";
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
@@ -221,14 +234,13 @@ export class Lexer {
         }
 
         return {
-            type: TokenType.Symbol,
+            type: Tokens.TokenType.Symbol,
             symbol: symbol,
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanText(data: string): TextToken {
+    private scanText(data: string): Tokens.TextToken {
         const startCursor = this.cursor;
         this.advanceCursor(1);
         const delim = data[this.cursor.dataIdx];
@@ -238,21 +250,20 @@ export class Lexer {
             this.advanceCursor(1);
             if (data[i] == delim) {
                 break;
-            } else if (data[i] == "\r" || data[i] == "\n") {
+            } else if (this.isLineBreak(data[i])) {
                 throw Error("Unterminated TEXT", {cause: startCursor});
             }
             text += data[i];
         }
         return {
-            type: TokenType.Text,
+            type: Tokens.TokenType.Text,
             delim: delim,
             text: text,
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanInt(data: string): IntegerToken {
+    private scanInt(data: string): Tokens.IntegerToken {
         const startCursor = this.cursor;
         let int = "";
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
@@ -264,35 +275,33 @@ export class Lexer {
         }
         this.advanceCursor(int.length);
         return {
-            type: TokenType.Integer,
+            type: Tokens.TokenType.Integer,
             value: int,
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanComment(data: string): CommentToken {
+    private scanComment(data: string): Tokens.CommentToken {
         const startCursor = this.cursor;
         let comment = "";
         this.advanceCursor(1);
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
-            if (data[i] == "\r" || data[i] == "\n") {
+            if (this.isLineBreak(data[i])) {
                 break;
             }
             comment += data[i];
         }
         this.advanceCursor(comment.length);
         return {
-            type: TokenType.Comment,
+            type: Tokens.TokenType.Comment,
             comment: comment,
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanRawSequence(data: string): RawSequenceToken {
+    private scanMacroBody(data: string): Tokens.MacroBodyToken {
         const startCursor = this.cursor;
-        let seq = "";
+        let body = "";
         this.advanceCursor(1);
         let remain = 1;
         while (remain > 0) {
@@ -306,40 +315,62 @@ export class Lexer {
                 } else if (data[i] == "<") {
                     remain++;
                 }
-                seq += data[i];
+                body += data[i];
             }
         }
 
         return {
-            type: TokenType.RawSequence,
-            body: seq,
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
+            type: Tokens.TokenType.MacroBody,
+            body: body,
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanASCII(data: string): ASCIIToken {
+    private scanASCII(data: string): Tokens.ASCIIToken {
         const startCursor = this.cursor;
         this.advanceCursor(1);
         const chr = data[this.cursor.dataIdx];
         this.advanceCursor(1);
         return {
-            type: TokenType.ASCII,
+            type: Tokens.TokenType.ASCII,
             char: chr,
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
+            ...this.getTokenMeasurement(startCursor),
         };
     }
 
-    private scanChar(data: string): CharToken {
+    private scanChar(data: string): Tokens.CharToken | Tokens.EOFToken | Tokens.SeparatorToken {
         const startCursor = this.cursor;
+        const chr = data[startCursor.dataIdx];
         this.advanceCursor(1);
-        return {
-            type: TokenType.Char,
-            char: data[startCursor.dataIdx],
-            cursor: startCursor,
-            width: this.cursorDiff(startCursor, this.cursor),
-        };
+        if (this.isOperator(chr)) {
+            return {
+                type: Tokens.TokenType.Char,
+                char: chr,
+                ...this.getTokenMeasurement(startCursor),
+            };
+        }
+
+        // non-operator characters get their own token
+        switch (chr) {
+            case "$":
+                return {
+                    type: Tokens.TokenType.EOF,
+                    char: chr,
+                    ...this.getTokenMeasurement(startCursor),
+                };
+            case ";":
+                return {
+                    type: Tokens.TokenType.Separator,
+                    char: chr,
+                    ...this.getTokenMeasurement(startCursor),
+                };
+        }
+
+        throw Error("Unexpected character", {cause: startCursor});
+    }
+
+    private isOperator(chr: string): chr is Tokens.OperatorChr {
+        return Tokens.OperatorChars.includes(chr);
     }
 
     private advanceCursor(step: number) {
@@ -350,6 +381,7 @@ export class Lexer {
             const file = this.inputs[this.cursor.fileIdx];
             data = file.data;
         }
+        // make sure to create a new object so that the references in next() keep their state
         const newCursor = {...this.cursor};
 
         for (let i = 0; i < step; i++) {
@@ -373,25 +405,19 @@ export class Lexer {
             }
         }
 
-        // make sure to create a new object so that next() can copy a reference
         this.cursor = newCursor;
     }
 
-    private cursorDiff(a: Cursor, b: Cursor): number {
-        if (a.fileIdx != b.fileIdx) {
+    private getTokenMeasurement(start: Cursor) {
+        const end = this.cursor;
+
+        if (start.fileIdx != end.fileIdx) {
             throw Error("Can't diff cursors across files", {cause: this.cursor});
         }
-        return b.dataIdx - a.dataIdx;
-    }
 
-    public unget(tok: Token) {
-        const from = this.cursor;
-        const to = tok.cursor;
-
-        if ((from.activeSubst && !to.activeSubst) || (to.activeSubst && !from.activeSubst)) {
-            throw Error("Can't unget across substitution boundaries");
-        }
-
-        this.cursor = tok.cursor;
+        return {
+            cursor: start,
+            width: end.dataIdx - start.dataIdx,
+        };
     }
 }

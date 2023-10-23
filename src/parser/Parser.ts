@@ -1,24 +1,20 @@
 import { Lexer } from "../lexer/Lexer";
-import { CharToken, RawSequenceToken, SymbolToken, Token, TokenType, tokenToString } from "../lexer/Token";
-import {
-    AssignStatement, AstElement, NodeType, AstSymbol, BinaryOp, BinaryOpChr, DefineStatement, Expression,
-    ExpressionStatement, Invocation, LabelDef, OriginStatement, Program,
-    Statement, SymbolGroup, UnparsedSequence
-} from "./ASTNode";
+import * as Tokens from "../lexer/Token";
+import * as Nodes from "./Node";
 
-type BinOpFragment = {elem: AstElement, op?: CharToken};
+type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 
 export class Parser {
     private lexer: Lexer;
-    private macros = new Map<string, DefineStatement>();
+    private macros = new Map<string, Nodes.DefineStatement>();
 
     public constructor(lexer: Lexer) {
         this.lexer = lexer;
     }
 
-    public parseProgram(): Program {
-        const prog: Program = {
-            type: NodeType.Program,
+    public parseProgram(): Nodes.Program {
+        const prog: Nodes.Program = {
+            type: Nodes.NodeType.Program,
             stmts: [],
         };
 
@@ -34,88 +30,91 @@ export class Parser {
         return prog;
     }
 
-    private parseStatement(): Statement | undefined {
+    private parseStatement(): Nodes.Statement | undefined {
         const tok = this.lexer.nextNonBlank();
 
-        const asExpr = () => {
-            this.lexer.unget(tok);
-            return {
-                type: NodeType.ExpressionStmt,
-                expr: this.parseExpr(),
-            } as ExpressionStatement;
-        };
-
         switch (tok.type) {
-            case TokenType.Char:
+            case Tokens.TokenType.Char:
                 switch (tok.char) {
-                    case "$": return undefined;
                     case "*": return this.parseOriginStatement(tok);
-                    case ";": return {type: NodeType.Separator, separator: tok.char, token: tok};
-                    case "-": return asExpr();
-                    case ".": return asExpr();
+                    case "-": return this.finishExprStatement(tok);
+                    case ".": return this.finishExprStatement(tok);
                 }
                 break;
-            case TokenType.Text:
-                return {
-                    type: NodeType.Text,
-                    token: tok,
-                };
-            case TokenType.ASCII:
-            case TokenType.Integer:
-                return asExpr();
-            case TokenType.Symbol:
-                if (tok.symbol == "DEFINE") {
-                    const def = this.parseDefine(tok);
-                    this.macros.set(def.name.token.symbol, def);
-                    return def;
-                } else if (this.macros.has(tok.symbol)) {
-                    this.lexer.unget(tok);
-                    return this.parseInvocation();
-                }
-                const next = this.lexer.next();
-                if (next.type == TokenType.Char) {
-                    if (next.char == ",") {
-                        return this.parseLabelDef(tok, next);
-                    } else if (next.char == "=") {
-                        return this.parseParameterDef(tok, next);
-                    }
-                }
-                this.lexer.unget(next);
-                return asExpr();
-            case TokenType.Comment:
-                return {type: NodeType.Comment, token: tok};
-            case TokenType.EOL:
-                return {type: NodeType.Separator, separator: "\n", token: tok};
-            case TokenType.EOF:
+            case Tokens.TokenType.Text:
+                return {type: Nodes.NodeType.Text, token: tok};
+            case Tokens.TokenType.ASCII:
+            case Tokens.TokenType.Integer:
+                return this.finishExprStatement(tok);
+            case Tokens.TokenType.Symbol:
+                return this.finishStatement(tok);
+            case Tokens.TokenType.Comment:
+                return {type: Nodes.NodeType.Comment, token: tok};
+            case Tokens.TokenType.EOL:
+                return {type: Nodes.NodeType.Separator, separator: "\n", token: tok};
+            case Tokens.TokenType.Separator:
+                return {type: Nodes.NodeType.Separator, separator: tok.char, token: tok};
+            case Tokens.TokenType.EOF:
                 return undefined;
         }
-        throw new Error(`Statement expected, got ${tokenToString(tok)}`, {cause: tok});
+        throw new Error(`Statement expected, got ${Tokens.tokenToString(tok)}`, {cause: tok});
     }
 
-    private parseOriginStatement(sym: CharToken): OriginStatement {
+    private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
+        if (startSym.symbol == "DEFINE") {
+            const def = this.parseDefine(startSym);
+            this.macros.set(def.name.token.symbol, def);
+            return def;
+        } else if (this.macros.has(startSym.symbol)) {
+            this.lexer.unget(startSym);
+            return this.parseInvocation();
+        }
+
+        const next = this.lexer.next();
+        if (next.type == Tokens.TokenType.Char) {
+            if (next.char == ",") {
+                return this.parseLabelDef(startSym, next);
+            } else if (next.char == "=") {
+                return this.parseParameterDef(startSym, next);
+            }
+        }
+        this.lexer.unget(next);
+        return this.finishExprStatement(startSym);
+    }
+
+    private finishExprStatement(start: Tokens.Token): Nodes.ExpressionStatement {
+        this.lexer.unget(start);
         return {
-            type: NodeType.Origin,
+            type: Nodes.NodeType.ExpressionStmt,
+            expr: this.parseExpr(),
+        } as Nodes.ExpressionStatement;
+    };
+
+
+    private parseOriginStatement(sym: Tokens.CharToken): Nodes.OriginStatement {
+        return {
+            type: Nodes.NodeType.Origin,
             token: sym,
             val: this.parseExpr(),
         };
     }
 
-    private parseLabelDef(sym: SymbolToken, chr: CharToken): LabelDef {
+    private parseLabelDef(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.LabelDef {
         return {
-            type: NodeType.Label,
+            type: Nodes.NodeType.Label,
             sym: {
-                type: NodeType.Symbol,
+                type: Nodes.NodeType.Symbol,
                 token: sym,
             },
             token: chr,
         };
     }
 
-    private parseParameterDef(sym: SymbolToken, chr: CharToken): AssignStatement {
+    private parseParameterDef(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.AssignStatement {
         return {
-            type: NodeType.Assignment,
+            type: Nodes.NodeType.Assignment,
             sym: {
-                type: NodeType.Symbol,
+                type: Nodes.NodeType.Symbol,
                 token: sym,
             },
             val: this.parseExpr(),
@@ -133,28 +132,13 @@ export class Parser {
      * because all of them will be in an expression group instead of a Symbol, a BinOp or something else.
      * @returns a symbol group or an expression that's not a single symbol
      */
-    private parseExpr(): Expression {
-        const exprs: Expression[] = [];
-
-        while (true) {
-            const tok = this.lexer.nextNonBlank();
-            if (this.isEndOfExpr(tok)) {
-                this.lexer.unget(tok);
-                break;
-            }
-            this.lexer.unget(tok);
-            const expr = this.parseExpressionPart();
-            exprs.push(expr);
-        }
-
-        if (exprs.length == 0) {
-            throw Error("Expression expected", {cause: this.lexer.getCursor()});
-        }
+    private parseExpr(): Nodes.Expression {
+        const exprs: Nodes.Expression[] = this.parseExprParts();
 
         const firstElem = exprs[0];
-        if (firstElem.type == NodeType.Symbol) {
-            const group: SymbolGroup = {
-                type: NodeType.SymbolGroup,
+        if (firstElem.type == Nodes.NodeType.Symbol) {
+            const group: Nodes.SymbolGroup = {
+                type: Nodes.NodeType.SymbolGroup,
                 first: firstElem,
                 exprs: exprs.splice(1),
             };
@@ -168,6 +152,25 @@ export class Parser {
         }
     }
 
+    private parseExprParts(): Nodes.Expression[] {
+        const exprs: Nodes.Expression[] = [];
+        while (true) {
+            const tok = this.lexer.nextNonBlank();
+            if (!this.couldBeInExpr(tok)) {
+                this.lexer.unget(tok);
+                if (exprs.length == 0) {
+                    throw Error("Expression expected", {cause: tok});
+                }
+                break;
+            }
+            this.lexer.unget(tok);
+            const expr = this.parseExpressionPart();
+            exprs.push(expr);
+        }
+
+        return exprs;
+    }
+
     /**
      * Parse a an expression - symbols will be return as such.
      * This function will never return an expression group.
@@ -175,25 +178,31 @@ export class Parser {
      * for the next symbol.
      * @returns The next part of an expression
      */
-    private parseExpressionPart(): Expression {
+    private parseExpressionPart(): Nodes.Expression {
+        // check for special cases that are not linked with operators
         const first = this.lexer.nextNonBlank();
-        if (first.type == TokenType.Char) {
+        if (first.type == Tokens.TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 return {
-                    type: NodeType.ParenExpr,
+                    type: Nodes.NodeType.ParenExpr,
                     paren: first.char,
                     expr: this.parseExpressionPart(),
                     token: first,
                 }
             }
-        } else if (first.type == TokenType.RawSequence) {
+        } else if (first.type == Tokens.TokenType.MacroBody) {
             return {
-                type: NodeType.UnparsedSequence,
+                type: Nodes.NodeType.MacroBody,
                 token: first,
             };
         }
-        this.lexer.unget(first);
 
+        // no special case - must be single element or element with operators
+        this.lexer.unget(first);
+        return this.parseBinOpOrElement();
+    }
+
+    private parseBinOpOrElement(): Nodes.BinaryOp | Nodes.Element {
         // all expressions are left-associative, so collect parts and fold
         const parts: BinOpFragment[] = [];
         while (true) {
@@ -217,15 +226,15 @@ export class Parser {
      */
     private parseElementAndOperator(): BinOpFragment {
         const firstElem = this.parseElement();
-        const nextTok = this.lexer.next();
 
-        if (this.isEndOfExpr(nextTok)) {
+        const nextTok = this.lexer.next();
+        if (!this.couldBeInExpr(nextTok)) {
             this.lexer.unget(nextTok);
             return {elem: firstElem};
         }
 
         switch (nextTok.type) {
-            case TokenType.Char:
+            case Tokens.TokenType.Char:
                 switch (nextTok.char) {
                     case "+":
                     case "-":
@@ -240,17 +249,13 @@ export class Parser {
                     default:
                         throw Error(`Unexpected operator in expression: '${nextTok.char}'`, {cause: nextTok});
                 }
-            case TokenType.Comment:
-            case TokenType.RawSequence:
-            case TokenType.ASCII:
-                this.lexer.unget(nextTok);
-                return {elem: firstElem};
             default:
+                this.lexer.unget(nextTok);
                 return {elem: firstElem};
         }
     }
 
-    private foldExpressionParts(parts: BinOpFragment[]): BinaryOp {
+    private foldExpressionParts(parts: BinOpFragment[]): Nodes.BinaryOp {
         if (parts.length < 2) {
             throw Error("Unexpected end of expression", {cause: parts[0].elem});
         }
@@ -259,10 +264,10 @@ export class Parser {
             throw Error("No operator in first expression part", {cause: parts[0].elem});
         }
 
-        let binOp: BinaryOp = {
-            type: NodeType.BinaryOp,
+        let binOp: Nodes.BinaryOp = {
+            type: Nodes.NodeType.BinaryOp,
             lhs: parts[0].elem,
-            operator: parts[0].op.char as BinaryOpChr,
+            operator: parts[0].op.char as Tokens.BinaryOpChr,
             rhs: parts[1].elem,
             token: parts[0].op,
         };
@@ -273,9 +278,9 @@ export class Parser {
                 throw Error("No operator in expression part", {cause: next.elem});
             }
             binOp = {
-                type: NodeType.BinaryOp,
+                type: Nodes.NodeType.BinaryOp,
                 lhs: binOp,
-                operator: next.op.char as BinaryOpChr,
+                operator: next.op.char as Tokens.BinaryOpChr,
                 rhs: parts[i + 1].elem,
                 token: next.op,
             };
@@ -284,77 +289,70 @@ export class Parser {
         return binOp;
     }
 
-    private isEndOfExpr(tok: Token): boolean {
+    /**
+     * Checks whether token could appear inside an expression
+     * @param tok token to examine
+     * @returns true if token could be part of an expression
+     */
+    private couldBeInExpr(tok: Tokens.Token): boolean {
         switch (tok.type) {
-            case TokenType.Blank:
-            case TokenType.Integer:
-            case TokenType.ASCII:
-            case TokenType.Symbol:
-            case TokenType.RawSequence:
-                return false;
-            case TokenType.Comment:
-            case TokenType.Text:
-            case TokenType.EOF:
-            case TokenType.EOL:
+            case Tokens.TokenType.Blank:
+            case Tokens.TokenType.Integer:
+            case Tokens.TokenType.ASCII:
+            case Tokens.TokenType.Symbol:
+            case Tokens.TokenType.MacroBody:
+            case Tokens.TokenType.Char:
                 return true;
-            case TokenType.Char:
-                if (tok.char == ";") {
-                    return true;
-                }
+            case Tokens.TokenType.Comment:
+            case Tokens.TokenType.Text:
+            case Tokens.TokenType.Separator:
+            case Tokens.TokenType.EOF:
+            case Tokens.TokenType.EOL:
                 return false;
         }
     }
 
-    private parseElement(): AstElement {
+    private parseElement(): Nodes.Element {
         const tok = this.lexer.nextNonBlank();
 
-        if (tok.type == TokenType.Integer) {
-            return {
-                type: NodeType.Integer,
-                token: tok,
-            };
-        } else if (tok.type == TokenType.Symbol) {
-            return {
-                type: NodeType.Symbol,
-                token: tok,
-            };
-        } else if (tok.type == TokenType.Char && tok.char == ".") {
-            return {
-                type: NodeType.CLCValue,
-                token: tok,
-            };
-        } else if (tok.type == TokenType.Char && tok.char == "-") {
-            return {
-                type: NodeType.UnaryOp,
-                operator: "-",
-                next: this.parseElement(),
-                token: tok,
-            }
-        } else if (tok.type == TokenType.ASCII) {
-            return {
-                type: NodeType.ASCIIChar,
-                token: tok,
-            };
-        } else {
-            throw Error(`Element expected, got ${tokenToString(tok)}`, {cause: tok});
+        switch (tok.type) {
+            case Tokens.TokenType.ASCII:   return {type: Nodes.NodeType.ASCIIChar, token: tok};
+            case Tokens.TokenType.Symbol:  return {type: Nodes.NodeType.Symbol, token: tok};
+            case Tokens.TokenType.Integer: return {type: Nodes.NodeType.Integer, token: tok};
+            case Tokens.TokenType.Char:
+                if (tok.char == ".") {
+                    return {
+                        type: Nodes.NodeType.CLCValue,
+                        token: tok,
+                    };
+                } else if (tok.char == "-") {
+                    return {
+                        type: Nodes.NodeType.UnaryOp,
+                        operator: "-",
+                        elem: this.parseElement(),
+                        token: tok,
+                    }
+                }
+                break;
         }
+        throw Error(`Element expected, got ${Tokens.tokenToString(tok)}`, {cause: tok});
     }
 
-    private parseDefine(token: SymbolToken): DefineStatement {
+    private parseDefine(token: Tokens.SymbolToken): Nodes.DefineStatement {
         const nameElem = this.parseElement();
-        if (nameElem.type != NodeType.Symbol) {
+        if (nameElem.type != Nodes.NodeType.Symbol) {
             throw Error("Invalid DEFINE syntax: Expecting symbol", {cause: nameElem});
         }
 
         const name = nameElem;
-        const params: AstSymbol[] = [];
-        let body: UnparsedSequence | undefined;
+        const params: Nodes.SymbolNode[] = [];
+        let body: Nodes.MacroBody | undefined;
 
         while (true) {
             const next = this.parseExpressionPart();
-            if (next.type == NodeType.Symbol) {
+            if (next.type == Nodes.NodeType.Symbol) {
                 params.push(next);
-            } else if (next.type == NodeType.UnparsedSequence) {
+            } else if (next.type == Nodes.NodeType.MacroBody) {
                 body = next;
                 break;
             } else {
@@ -363,13 +361,13 @@ export class Parser {
         }
 
         return {
-            type: NodeType.Define, name, body, params: params, token
+            type: Nodes.NodeType.Define, name, body, params: params, token
         };
     }
 
-    private parseInvocation(): Invocation {
+    private parseInvocation(): Nodes.Invocation {
         const nameSym = this.parseElement();
-        if (!nameSym || nameSym.type != NodeType.Symbol) {
+        if (!nameSym || nameSym.type != Nodes.NodeType.Symbol) {
             throw Error("Invalid invocation", {cause: nameSym});
         }
 
@@ -378,27 +376,27 @@ export class Parser {
             throw Error("Not a macro", {cause: nameSym});
         }
 
-        const args: RawSequenceToken[] = [];
+        const args: Tokens.MacroBodyToken[] = [];
         for (let i = 0; i < macro.params.length; i++) {
             const arg = this.lexer.nextMacroArgument();
             args.push(arg);
         }
 
         const next = this.lexer.nextNonBlank();
-        if (!this.isEndOfExpr(next)) {
+        if (this.couldBeInExpr(next)) {
             throw Error("Excessive argument for macro", {cause: next});
         }
         this.lexer.unget(next);
 
         return {
-            type: NodeType.Invocation,
+            type: Nodes.NodeType.Invocation,
             name: nameSym,
             args: args,
             program: this.createMacroProgram(macro, args),
         };
     }
 
-    private createMacroProgram(macro: DefineStatement, args: RawSequenceToken[]): Program {
+    private createMacroProgram(macro: Nodes.DefineStatement, args: Tokens.MacroBodyToken[]): Nodes.Program {
         const macroLexer = new Lexer();
         macroLexer.addInput(macro.name.token.symbol + ".macro", macro.body.token.body);
         for (let i = 0; i < args.length; i++) {

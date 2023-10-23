@@ -1,9 +1,22 @@
+import { replaceControlChars } from "../common";
 import { Cursor } from "./Lexer";
 
+export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";
+export type ParenChr =  "(" | ")" | "[" | "]";
+export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
+export type UnaryOpChr = "-";
+
+export const OperatorChars = [
+    ".", ",", "=", "*",
+    "(", ")", "[", "]",
+    "+", "-", "!", "&", "^", "%",
+    "-",
+];
+
 export type Token =
-    BlankToken | EOLToken | EOFToken |
+    BlankToken | EOLToken | EOFToken | SeparatorToken |
     SymbolToken | IntegerToken | CharToken |
-    CommentToken | ASCIIToken | TextToken | RawSequenceToken;
+    CommentToken | ASCIIToken | TextToken | MacroBodyToken;
 
 export enum TokenType {
     Blank,
@@ -12,8 +25,9 @@ export enum TokenType {
     Char,
     ASCII,
     Text,
+    Separator,
     Comment,
-    RawSequence,
+    MacroBody,
     EOL,
     EOF,
 }
@@ -26,7 +40,7 @@ export interface BaseToken {
 
 export interface BlankToken extends BaseToken {
     type: TokenType.Blank;
-    char: " " | "\t" | "\f";
+    char: " " | "\t";
 }
 
 export interface EOLToken extends BaseToken {
@@ -46,7 +60,7 @@ export interface IntegerToken extends BaseToken {
 
 export interface CharToken extends BaseToken {
     type: TokenType.Char;
-    char: string;
+    char: OperatorChr;
 }
 
 export interface ASCIIToken extends BaseToken {
@@ -65,28 +79,33 @@ export interface CommentToken extends BaseToken {
     comment: string;
 }
 
-export interface RawSequenceToken extends BaseToken {
-    type: TokenType.RawSequence;
+export interface MacroBodyToken extends BaseToken {
+    type: TokenType.MacroBody;
     body: string;
+}
+
+export interface SeparatorToken extends BaseToken {
+    type: TokenType.Separator;
+    char: ";";
 }
 
 export interface EOFToken extends BaseToken {
     type: TokenType.EOF;
+    char?: "$"; // if enforced
 }
 
 export function tokenToString(tok: Token): string {
     switch (tok.type) {
-        case TokenType.ASCII:       return `ASCII('${tok.char}')`;
-        case TokenType.Char:        return `Char('${tok.char}')`;
+        case TokenType.Blank:       return `Blank('${replaceControlChars(tok.char)}')`;
+        case TokenType.Char:        return `Char('${replaceControlChars(tok.char)}')`;
+        case TokenType.ASCII:       return `ASCII('${replaceControlChars(tok.char)}')`;
         case TokenType.Comment:     return `Comment("${tok.comment}")`;
-        case TokenType.EOF:         return "EOF()";
         case TokenType.Integer:     return `Integer(${tok.value})`;
-        case TokenType.RawSequence: return `RawSequence(${tok.body})`;
+        case TokenType.MacroBody:   return `MacroBody(${replaceControlChars(tok.body)})`;
         case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
         case TokenType.Text:        return `Text("${tok.text}", '${tok.delim}')`;
-        case TokenType.Blank:
-            return `Blank(${tok.char.replace(" ", "SPC").replace("\t", "TAB").replace("\f", "FF")})`;
-        case TokenType.EOL:
-            return `EOL(${tok.char.replace("\r", "CR").replace("\n", "LF").replace("\f", "FF")})`;
+        case TokenType.Separator:   return `Separator('${replaceControlChars(tok.char)})`;
+        case TokenType.EOL:         return `EOL('${replaceControlChars(tok.char)}')`;
+        case TokenType.EOF:         return "EOF()";
     }
 }

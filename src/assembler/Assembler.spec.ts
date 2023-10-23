@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { Assembler } from "./Assembler";
 
 describe("Assemling simple examples", () => {
@@ -7,6 +8,7 @@ describe("Assemling simple examples", () => {
         asm.addFile("test.pa", `
             / INTEGER SUMMATION SUBROUTINE
             *20
+
             TOTAL,  0
             INDEX,  0
             N,      0

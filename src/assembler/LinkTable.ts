@@ -11,11 +11,11 @@ export class LinkTable {
     }
 
     public has(field: number, page: number, value: number): boolean {
-        return this.lookup(field, page, value) !== undefined;
+        return this.tryLookup(field, page, value) !== undefined;
     }
 
     public enter(field: number, page: number, value: number): number {
-        const idx = this.lookup(field, page, value);
+        const idx = this.tryLookup(field, page, value);
         if (idx !== undefined) {
             return idx;
         }
@@ -24,7 +24,7 @@ export class LinkTable {
         return this.indexToAddr(page, this.entries[field][page].length - 1);
     }
 
-    private lookup(field: number, page: number, value: number): number | undefined {
+    private tryLookup(field: number, page: number, value: number): number | undefined {
         for (let i = 0; i < this.entries[field][page].length; i++) {
             if (this.entries[field][page][i] == value) {
                 return this.indexToAddr(page, i);

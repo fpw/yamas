@@ -1,6 +1,5 @@
 export interface Context {
-    radix: number;
-    field: number;
+    radix: 8 | 10;
     clc: number;
     generateCode: boolean;
     punchEnabled: boolean;

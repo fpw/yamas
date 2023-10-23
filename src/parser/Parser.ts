@@ -1,15 +1,19 @@
 import { Lexer } from "../lexer/Lexer";
+import { LexerError } from "../lexer/LexerError";
 import * as Tokens from "../lexer/Token";
 import * as Nodes from "./Node";
+import { ParserError } from "./ParserError";
 
 type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 
 export class Parser {
+    private inputName: string;
     private lexer: Lexer;
     private macros = new Map<string, Nodes.DefineStatement>();
 
-    public constructor(lexer: Lexer) {
-        this.lexer = lexer;
+    public constructor(inputName: string, input: string) {
+        this.inputName = inputName;
+        this.lexer = new Lexer(inputName, input);
     }
 
     public parseProgram(): Nodes.Program {
@@ -57,7 +61,7 @@ export class Parser {
             case Tokens.TokenType.EOF:
                 return undefined;
         }
-        throw new Error(`Statement expected, got ${Tokens.tokenToString(tok)}`, {cause: tok});
+        throw this.errorOnTok(`Statement expected, got ${Tokens.tokenToString(tok)}`, tok);
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
@@ -147,7 +151,7 @@ export class Parser {
             if (exprs.length == 1) {
                 return exprs[0];
             } else {
-                throw Error("Logic error: Group not started by symbol", {cause: firstElem});
+                throw this.errorOnNode("Logic error: Group not started by symbol", firstElem);
             }
         }
     }
@@ -159,7 +163,7 @@ export class Parser {
             if (!this.couldBeInExpr(tok)) {
                 this.lexer.unget(tok);
                 if (exprs.length == 0) {
-                    throw Error("Expression expected", {cause: tok});
+                    throw this.errorOnTok("Expression expected", tok);
                 }
                 break;
             }
@@ -247,7 +251,7 @@ export class Parser {
                     case "]":
                         return {elem: firstElem};
                     default:
-                        throw Error(`Unexpected operator in expression: '${nextTok.char}'`, {cause: nextTok});
+                        throw this.errorOnTok(`Unexpected operator in expression: '${nextTok.char}'`, nextTok);
                 }
             default:
                 this.lexer.unget(nextTok);
@@ -257,11 +261,11 @@ export class Parser {
 
     private foldExpressionParts(parts: BinOpFragment[]): Nodes.BinaryOp {
         if (parts.length < 2) {
-            throw Error("Unexpected end of expression", {cause: parts[0].elem});
+            throw this.errorOnNode("Unexpected end of expression", parts[0].elem);
         }
 
         if (!parts[0].op) {
-            throw Error("No operator in first expression part", {cause: parts[0].elem});
+            throw this.errorOnNode("No operator in first expression part", parts[0].elem);
         }
 
         let binOp: Nodes.BinaryOp = {
@@ -275,7 +279,7 @@ export class Parser {
         for (let i = 1; i < parts.length - 1; i++) {
             const next = parts[i];
             if (!next.op) {
-                throw Error("No operator in expression part", {cause: next.elem});
+                throw this.errorOnNode("No operator in expression part", next.elem);
             }
             binOp = {
                 type: Nodes.NodeType.BinaryOp,
@@ -335,13 +339,13 @@ export class Parser {
                 }
                 break;
         }
-        throw Error(`Element expected, got ${Tokens.tokenToString(tok)}`, {cause: tok});
+        throw this.errorOnTok(`Element expected, got ${Tokens.tokenToString(tok)}`, tok);
     }
 
     private parseDefine(token: Tokens.SymbolToken): Nodes.DefineStatement {
         const nameElem = this.parseElement();
         if (nameElem.type != Nodes.NodeType.Symbol) {
-            throw Error("Invalid DEFINE syntax: Expecting symbol", {cause: nameElem});
+            throw this.errorOnNode("Invalid DEFINE syntax: Expecting symbol", nameElem);
         }
 
         const name = nameElem;
@@ -356,7 +360,7 @@ export class Parser {
                 body = next;
                 break;
             } else {
-                throw Error("Invalid DEFINE syntax: Expecting symbols and body", {cause: next});
+                throw this.errorOnNode("Invalid DEFINE syntax: Expecting symbols and body", next);
             }
         }
 
@@ -368,12 +372,12 @@ export class Parser {
     private parseInvocation(): Nodes.Invocation {
         const nameSym = this.parseElement();
         if (!nameSym || nameSym.type != Nodes.NodeType.Symbol) {
-            throw Error("Invalid invocation", {cause: nameSym});
+            throw this.errorOnNode("Invalid invocation",  nameSym);
         }
 
         const macro = this.macros.get(nameSym.token.symbol);
         if (!macro) {
-            throw Error("Not a macro", {cause: nameSym});
+            throw this.errorOnNode("Not a macro", nameSym);
         }
 
         const args: Tokens.MacroBodyToken[] = [];
@@ -384,7 +388,7 @@ export class Parser {
 
         const next = this.lexer.nextNonBlank();
         if (this.couldBeInExpr(next)) {
-            throw Error("Excessive argument for macro", {cause: next});
+            throw this.errorOnTok("Excessive argument for macro", next);
         }
         this.lexer.unget(next);
 
@@ -392,18 +396,49 @@ export class Parser {
             type: Nodes.NodeType.Invocation,
             name: nameSym,
             args: args,
-            program: this.createMacroProgram(macro, args),
+            program: this.createMacroProgram(nameSym.token, macro, args),
         };
     }
 
-    private createMacroProgram(macro: Nodes.DefineStatement, args: Tokens.MacroBodyToken[]): Nodes.Program {
-        const macroLexer = new Lexer();
-        macroLexer.addInput(macro.name.token.symbol + ".macro", macro.body.token.body);
+    private createMacroProgram(
+        nameSym: Tokens.SymbolToken,
+        macro: Nodes.DefineStatement,
+        args: Tokens.MacroBodyToken[]
+    ): Nodes.Program {
+        const macroParser = new Parser(`${this.inputName}:${macro.name.token.symbol}`, macro.body.token.body);
         for (let i = 0; i < args.length; i++) {
-            macroLexer.addSubstitution(macro.params[i].token.symbol, args[i].body);
+            macroParser.lexer.addSubstitution(macro.params[i].token.symbol, args[i].body);
         }
 
-        const macroParser = new Parser(macroLexer);
-        return macroParser.parseProgram();
+        try {
+            return macroParser.parseProgram();
+        } catch (e) {
+            if (!(e instanceof ParserError || e instanceof LexerError)) {
+                throw e;
+            }
+            const name = macro.name.token.symbol;
+            const line = e.line;
+            const col = e.col;
+            const msg = e.message;
+            throw this.errorOnTok(`Error invoking macro ${name}: "${msg}", in invocation line ${line}:${col}`, nameSym);
+        }
+    }
+
+    private errorOnNode(msg: string, lastNode: Nodes.Node): ParserError {
+        if ("token" in lastNode) {
+            return this.errorOnTok(msg, lastNode.token);
+        }
+
+        switch (lastNode.type) {
+            case Nodes.NodeType.Program:        return new ParserError(msg, this.inputName, 0, 0);
+            case Nodes.NodeType.ExpressionStmt: return this.errorOnNode(msg, lastNode.expr);
+            case Nodes.NodeType.Invocation:     return this.errorOnTok(msg, lastNode.name.token);
+            case Nodes.NodeType.SymbolGroup:    return this.errorOnTok(msg, lastNode.first.token);
+        }
+    }
+
+    private errorOnTok(msg: string, curToken: Tokens.Token): ParserError {
+        const {line, col} = this.lexer.getCursorPos(curToken.cursor);
+        return new ParserError(msg, curToken.cursor.inputName, line, col);
     }
 }

@@ -1,7 +1,8 @@
+import { LexerError } from "./LexerError";
 import * as Tokens from "./Token";
 
 export interface Cursor {
-    fileIdx: number;
+    inputName: string;
     dataIdx: number;
     lineIdx: number;
 
@@ -11,47 +12,27 @@ export interface Cursor {
 }
 
 export class Lexer {
-    private inputs: {name: string, data: string, lineTable: number[]}[] = [];
+    private inputName: string;
+    private data: string;
+    private lineTable: number[] = [];
     private cursor: Cursor;
     private savedCursor?: Cursor;
     private substitutions = new Map<string, string>();
 
-    public constructor() {
+    public constructor(inputName: string, input: string) {
+        this.inputName = inputName;
+        this.data = input;
+        this.lineTable = [0];
+
         this.cursor = {
-            fileIdx: 0,
+            inputName: inputName,
             dataIdx: 0,
             lineIdx: 0,
         };
     }
 
-    public addInput(name: string, data: string) {
-        this.inputs.push({name, data, lineTable: [0]});
-    }
-
     public addSubstitution(symbol: string, sub: string) {
         this.substitutions.set(symbol, sub);
-    }
-
-    public formatCursorString(): string {
-        if (this.cursor.fileIdx >= this.inputs.length) {
-            return "EOF";
-        }
-
-        let col: number | undefined;
-        const lineTable = this.inputs[this.cursor.fileIdx].lineTable;
-        for (let lineIdx = 0; lineIdx < lineTable.length; lineIdx++) {
-            if (this.cursor.dataIdx < lineTable[lineIdx]) {
-                col = this.cursor.dataIdx - lineTable[lineIdx - 1];
-                break;
-            }
-        }
-
-        if (col === undefined) {
-            col = this.cursor.dataIdx - lineTable[lineTable.length - 1];
-        }
-
-        const fileName = this.inputs[this.cursor.fileIdx].name;
-        return `${fileName}:${this.cursor.lineIdx + 1}:${col + 1}`;
     }
 
     public next(): Tokens.Token {
@@ -79,7 +60,7 @@ export class Lexer {
 
     public nextMacroArgument(): Tokens.MacroBodyToken {
         const startCursor = this.cursor;
-        const data = this.inputs[startCursor.fileIdx].data;
+        const data = this.data;
 
         let rawArg = "";
         let hadComma = false;
@@ -95,7 +76,7 @@ export class Lexer {
 
         const arg = rawArg.trim();
         if (arg.length == 0) {
-            throw Error("Expected macro argument", {cause: startCursor});
+            throw this.error("Expected macro argument", startCursor);
         }
 
         this.advanceCursor(rawArg.length + (hadComma ? 1 : 0));
@@ -115,10 +96,26 @@ export class Lexer {
         const toSubst = (tok.cursor.activeSubst !== undefined);
 
         if (fromSubst != toSubst) {
-            throw Error("Can't unget across substitution boundaries");
+            throw this.error("Can't unget across substitution boundaries", this.cursor);
         }
 
         this.cursor = tok.cursor;
+    }
+
+    public getCursorPos(cursor: Cursor): {line: number, col: number} {
+        let col: number | undefined;
+        for (let lineIdx = 0; lineIdx < this.lineTable.length; lineIdx++) {
+            if (this.cursor.dataIdx < this.lineTable[lineIdx]) {
+                col = this.cursor.dataIdx - this.lineTable[lineIdx - 1];
+                break;
+            }
+        }
+
+        if (col === undefined) {
+            col = this.cursor.dataIdx - this.lineTable[this.lineTable.length - 1];
+        }
+
+        return {line: cursor.lineIdx + 1, col: col + 1};
     }
 
     private isLineBreak(chr: string) {
@@ -128,8 +125,7 @@ export class Lexer {
     private scanFromCursor(): Tokens.Token {
         const startCursor = this.cursor;
 
-        // no more files -> EOF
-        if (this.cursor.fileIdx >= this.inputs.length) {
+        if (this.cursor.dataIdx >= this.data.length) {
             return {
                 type: Tokens.TokenType.EOF,
                 cursor: startCursor,
@@ -137,20 +133,7 @@ export class Lexer {
             };
         }
 
-        const data = this.inputs[startCursor.fileIdx].data;
-
-        // end of current file, but there might be another -> EOL with form feed to indicate file switch
-        if (this.cursor.dataIdx >= data.length) {
-            this.advanceCursor(1);
-            return {
-                type: Tokens.TokenType.EOL,
-                char: "\f",
-                cursor: startCursor,
-                width: 0,
-            };
-        }
-
-        return this.scanFromData(data);
+        return this.scanFromData(this.data);
     }
 
     private scanFromData(data: string): Tokens.Token {
@@ -184,14 +167,14 @@ export class Lexer {
     private activateSubstitution(symbol: string) {
         const subst = this.substitutions.get(symbol);
         if (!subst || this.savedCursor || this.cursor.activeSubst) {
-            throw Error("Logic error in substitution");
+            throw this.error("Logic error in substitution", this.cursor);
         }
 
         this.savedCursor = this.cursor;
         this.cursor = {
+            inputName: `${this.inputName}:APPLY_${symbol}`,
             activeSubst: subst,
             dataIdx: 0,
-            fileIdx: 0,
             lineIdx: 0,
         };
     }
@@ -251,7 +234,7 @@ export class Lexer {
             if (data[i] == delim) {
                 break;
             } else if (this.isLineBreak(data[i])) {
-                throw Error("Unterminated TEXT", {cause: startCursor});
+                throw this.error("Unterminated TEXT", startCursor);
             }
             text += data[i];
         }
@@ -366,7 +349,7 @@ export class Lexer {
                 };
         }
 
-        throw Error("Unexpected character", {cause: startCursor});
+        throw this.error("Unexpected character", startCursor);
     }
 
     private isOperator(chr: string): chr is Tokens.OperatorChr {
@@ -378,31 +361,19 @@ export class Lexer {
         if (this.cursor.activeSubst) {
             data = this.cursor.activeSubst;
         } else {
-            const file = this.inputs[this.cursor.fileIdx];
-            data = file.data;
+            data = this.data;
         }
         // make sure to create a new object so that the references in next() keep their state
         const newCursor = {...this.cursor};
 
         for (let i = 0; i < step; i++) {
-            if (this.cursor.activeSubst) {
-                newCursor.dataIdx++;
-            } else {
-                // we want to generate EOL \f *after* the file, so introduce a virtual character
-                if (this.cursor.dataIdx == data.length) {
-                    if (this.cursor.fileIdx < this.inputs.length) {
-                        newCursor.fileIdx++;
-                        newCursor.dataIdx = 0;
-                        newCursor.lineIdx = 0;
-                    }
-                } else {
-                    if (data[this.cursor.dataIdx] == "\n") {
-                        // we're skipping over a line -> update table
-                        this.inputs[newCursor.fileIdx].lineTable[++newCursor.lineIdx] = newCursor.dataIdx + 1;
-                    }
-                    newCursor.dataIdx++;
+            if (this.cursor.dataIdx < data.length) {
+                if (!this.cursor.activeSubst && data[this.cursor.dataIdx] == "\n") {
+                    // we're skipping over a line -> update table
+                    this.lineTable[++newCursor.lineIdx] = newCursor.dataIdx + 1;
                 }
             }
+            newCursor.dataIdx++;
         }
 
         this.cursor = newCursor;
@@ -411,13 +382,14 @@ export class Lexer {
     private getTokenMeasurement(start: Cursor) {
         const end = this.cursor;
 
-        if (start.fileIdx != end.fileIdx) {
-            throw Error("Can't diff cursors across files", {cause: this.cursor});
-        }
-
         return {
             cursor: start,
             width: end.dataIdx - start.dataIdx,
         };
+    }
+
+    private error(msg: string, cursor: Cursor) {
+        const {line, col} = this.getCursorPos(cursor);
+        return new LexerError(msg, cursor.inputName, line, col);
     }
 }

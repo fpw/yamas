@@ -1,5 +1,4 @@
 import { asciiCharTo6Bit, calcFieldNum, calcFirstPageLoc, calcPageNum } from "../common";
-import { Lexer } from "../lexer/Lexer";
 import { SymbolToken } from "../lexer/Token";
 import * as Nodes from "../parser/Node";
 import { Parser } from "../parser/Parser";
@@ -11,9 +10,9 @@ import { LinkTable } from "./LinkTable";
 import { SymbolTable, SymbolType } from "./SymbolTable";
 
 export class Assembler {
-    private lexer = new Lexer();
     private syms = new SymbolTable();
     private linkTable = new LinkTable();
+    private programs: Nodes.Program[] = [];
 
     private readonly pseudos = [
         // TEXT: handled by lexer
@@ -36,35 +35,30 @@ export class Assembler {
         this.loadPrelude();
     }
 
-    private loadPrelude() {
-        const preLexer = new Lexer();
-        preLexer.addInput("family8.per", PreludeFamily8);
-        preLexer.addInput("io.per", PreludeIO);
-        preLexer.addInput("eae.per", PreludeEAE);
-
-        const parser = new Parser(preLexer);
-        const prelude = parser.parseProgram();
-        const ctx = this.createContext(false);
-        this.assignSymbols(ctx, prelude);
+    public addFile(name: string, content: string) {
+        this.parseInput(name, content);
     }
 
-    public addFile(name: string, content: string) {
-        this.lexer.addInput(name, content);
+    private loadPrelude() {
+        this.parseInput("prelude/family8.pa", PreludeFamily8);
+        this.parseInput("prelude/iot.pa", PreludeIO);
+        this.parseInput("prelude/eae.pa", PreludeEAE);
+    }
+
+    private parseInput(name: string, input: string) {
+        const parser = new Parser(name, input);
+        const prog = parser.parseProgram();
+        this.programs.push(prog);
     }
 
     public run() {
-        const parser = new Parser(this.lexer);
-
-        const ast = parser.parseProgram();
-        console.log(Nodes.formatNode(ast))
-
         const symCtx = this.createContext(false);
-        this.assignSymbols(symCtx, ast);
+        this.programs.forEach(p => this.assignSymbols(symCtx, p));
 
         const asmCtx = this.createContext(true);
-        this.assemble(asmCtx, ast);
+        this.programs.forEach(p => this.assemble(asmCtx, p));
 
-        if (true) {
+        if (false) {
             this.outputSymbols(asmCtx);
             this.outputLinks(asmCtx);
         }
@@ -120,7 +114,7 @@ export class Assembler {
                 }
                 break;
             case Nodes.NodeType.Invocation: {
-                this.handleMacro(ctx, stmt.program);
+                this.handleSubProgram(ctx, stmt.program);
                 break;
             }
             case Nodes.NodeType.ExpressionStmt:
@@ -198,7 +192,9 @@ export class Assembler {
                 ctx.radix = 8;
                 break;
             case "FIXTAB":
-                this.syms.fix();
+                if (!ctx.generateCode) {
+                    this.syms.fix();
+                }
                 break;
             case "FIELD":
                 this.handleField(ctx, group);
@@ -299,21 +295,14 @@ export class Assembler {
 
     private handleBody(ctx: Context, body: Nodes.MacroBody) {
         if (!body.parsed) {
-            const lexer = new Lexer();
-            lexer.addInput("body.tmp", body.token.body);
-
-            const parser = new Parser(lexer);
+            const parser = new Parser(body.token.cursor.inputName, body.token.body);
             body.parsed = parser.parseProgram();
         }
 
-        if (!ctx.generateCode) {
-            this.assignSymbols(ctx, body.parsed);
-        } else {
-            this.assemble(ctx, body.parsed);
-        }
+        this.handleSubProgram(ctx, body.parsed);
     }
 
-    private handleMacro(ctx: Context, program: Nodes.Program) {
+    private handleSubProgram(ctx: Context, program: Nodes.Program) {
         if (!ctx.generateCode) {
             this.assignSymbols(ctx, program);
         } else {
@@ -459,7 +448,7 @@ export class Assembler {
 
     private output(ctx: Context, clc: number, value: number) {
         if (ctx.punchEnabled) {
-            console.log(`${clc.toString(8).padStart(5, "0")} ${value.toString(8).padStart(4, "0")}`);
+            // console.log(`${clc.toString(8).padStart(5, "0")} ${value.toString(8).padStart(4, "0")}`);
         }
     }
 

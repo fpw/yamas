@@ -85,17 +85,9 @@ export class SymbolTable {
         }
     }
 
-    public dump(): string {
+    public getSymbols(): SymbolData[] {
         const all = [...this.symbols.values()];
-        all.sort((a, b) => a.name.localeCompare(b.name));
-
-        let str = "";
-        for (const sym of all) {
-            if (sym.type == SymbolType.Label || sym.type == SymbolType.Param) {
-                str += `${sym.name} = ${sym.value?.toString(8)}\n`;
-            }
-        }
-        return str;
+        return all.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     private defineSymbol(data: SymbolData) {

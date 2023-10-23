@@ -7,12 +7,15 @@ import { PreludeFamily8 } from "../prelude/Family8";
 import { PreludeIO } from "../prelude/IO";
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
-import { SymbolTable, SymbolType } from "./SymbolTable";
+import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable";
+
+export type OutputAcceptor = (addr: number, value: number) => void;
 
 export class Assembler {
     private syms = new SymbolTable();
     private linkTable = new LinkTable();
     private programs: Nodes.Program[] = [];
+    private doOutput?: OutputAcceptor;
 
     private readonly pseudos = [
         // TEXT: handled by lexer
@@ -35,8 +38,16 @@ export class Assembler {
         this.loadPrelude();
     }
 
-    public addFile(name: string, content: string) {
-        this.parseInput(name, content);
+    public setOutputHandler(out: OutputAcceptor) {
+        this.doOutput = out;
+    }
+
+    public addAndParseInput(name: string, content: string): Nodes.Program {
+        return this.parseInput(name, content);
+    }
+
+    public getSymbols(): SymbolData[] {
+        return this.syms.getSymbols();
     }
 
     private loadPrelude() {
@@ -45,23 +56,21 @@ export class Assembler {
         this.parseInput("prelude/eae.pa", PreludeEAE);
     }
 
-    private parseInput(name: string, input: string) {
+    private parseInput(name: string, input: string): Nodes.Program {
         const parser = new Parser(name, input);
         const prog = parser.parseProgram();
         this.programs.push(prog);
+        return prog;
     }
 
-    public run() {
+    public assembleAll() {
         const symCtx = this.createContext(false);
         this.programs.forEach(p => this.assignSymbols(symCtx, p));
 
         const asmCtx = this.createContext(true);
-        this.programs.forEach(p => this.assemble(asmCtx, p));
+        this.programs.forEach(p => this.assembleProgram(asmCtx, p));
 
-        if (false) {
-            this.outputSymbols(asmCtx);
-            this.outputLinks(asmCtx);
-        }
+        this.outputLinks(asmCtx);
     }
 
     private createContext(generateCode: boolean): Context {
@@ -80,7 +89,7 @@ export class Assembler {
         }
     }
 
-    private assemble(ctx: Context, prog: Nodes.Program) {
+    private assembleProgram(ctx: Context, prog: Nodes.Program) {
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
                 case Nodes.NodeType.Text:
@@ -306,7 +315,7 @@ export class Assembler {
         if (!ctx.generateCode) {
             this.assignSymbols(ctx, program);
         } else {
-            this.assemble(ctx, program);
+            this.assembleProgram(ctx, program);
         }
     }
 
@@ -436,10 +445,6 @@ export class Assembler {
         }
     }
 
-    private outputSymbols(ctx: Context) {
-        console.log(this.syms.dump());
-    }
-
     private outputLinks(ctx: Context) {
         this.linkTable.visit((field, addr, val) => {
             this.output(ctx, calcFirstPageLoc(field, 0) | addr, val);
@@ -447,8 +452,8 @@ export class Assembler {
     }
 
     private output(ctx: Context, clc: number, value: number) {
-        if (ctx.punchEnabled) {
-            // console.log(`${clc.toString(8).padStart(5, "0")} ${value.toString(8).padStart(4, "0")}`);
+        if (ctx.punchEnabled && this.doOutput) {
+            this.doOutput(clc, value);
         }
     }
 

@@ -5,7 +5,7 @@ describe("Assemling simple examples", () => {
     const asm = new Assembler();
 
     it("should handle origin", () => {
-        asm.addFile("test.pa", `
+        asm.addAndParseInput("test.pa", `
             / INTEGER SUMMATION SUBROUTINE
             *20
 
@@ -48,7 +48,7 @@ describe("Assemling simple examples", () => {
             NOP
 
             `);
-        asm.run();
+        asm.assembleAll();
         expect(1).toEqual(1);
     });
 });

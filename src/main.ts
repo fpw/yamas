@@ -1,4 +1,4 @@
-import { closeSync, openSync, readFileSync, writeSync } from "fs";
+import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "fs";
 import { parse } from "ts-command-line-args";
 import { Options, Yamas } from "./Yamas";
 import { basename } from "path";
@@ -31,7 +31,8 @@ function main() {
         const src = readFileSync(file, "ascii");
         yamas.addInput(file, src);
     }
-    yamas.run();
+    const bin = yamas.run();
+    writeFileSync("out.bin", bin);
 
     astFiles.forEach(fd => closeSync(fd));
 }

@@ -7,6 +7,7 @@ import { ParserError } from "./ParserError";
 type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 
 export class Parser {
+    private keywords = new Set(["TEXT", "DEFINE"]);
     private inputName: string;
     private lexer: Lexer;
     private macros = new Map<string, Nodes.DefineStatement>();
@@ -45,8 +46,6 @@ export class Parser {
                     case ".": return this.finishExprStatement(tok);
                 }
                 break;
-            case Tokens.TokenType.Text:
-                return {type: Nodes.NodeType.Text, token: tok};
             case Tokens.TokenType.ASCII:
             case Tokens.TokenType.Integer:
                 return this.finishExprStatement(tok);
@@ -65,10 +64,8 @@ export class Parser {
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
-        if (startSym.symbol == "DEFINE") {
-            const def = this.parseDefine(startSym);
-            this.macros.set(def.name.token.symbol, def);
-            return def;
+        if (this.keywords.has(startSym.symbol)) {
+            return this.parseKeyword(startSym);
         } else if (this.macros.has(startSym.symbol)) {
             this.lexer.unget(startSym);
             return this.parseInvocation();
@@ -84,6 +81,25 @@ export class Parser {
         }
         this.lexer.unget(next);
         return this.finishExprStatement(startSym);
+    }
+
+    private parseKeyword(startSym: Tokens.SymbolToken): Nodes.DefineStatement | Nodes.TextStatement {
+        switch (startSym.symbol) {
+            case "DEFINE":
+                const def = this.parseDefine(startSym);
+                this.macros.set(def.name.token.symbol, def);
+                return def;
+            case "TEXT":
+                const next = this.lexer.next();
+                if (next.type != Tokens.TokenType.Blank) {
+                    const got = Tokens.tokenToString(next);
+                    throw this.errorOnTok(`Syntax error in TEXT: Expected blank, got ${got}`, next);
+                }
+                const str = this.lexer.nextStringLiteral();
+                return {type: Nodes.NodeType.Text, token: str};
+            default:
+                throw this.errorOnTok(`Unhandled keyword ${startSym.symbol}`, startSym);
+        }
     }
 
     private finishExprStatement(start: Tokens.Token): Nodes.ExpressionStatement {
@@ -308,7 +324,7 @@ export class Parser {
             case Tokens.TokenType.Char:
                 return true;
             case Tokens.TokenType.Comment:
-            case Tokens.TokenType.Text:
+            case Tokens.TokenType.StringLiteral:
             case Tokens.TokenType.Separator:
             case Tokens.TokenType.EOF:
             case Tokens.TokenType.EOL:

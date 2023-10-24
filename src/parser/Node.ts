@@ -129,7 +129,7 @@ export interface StatementSeparator extends BaseNode {
 // TEXT x...x
 export interface TextStatement extends BaseNode {
     type: NodeType.Text;
-    token: Tokens.TextToken;
+    token: Tokens.StringToken;
 }
 
 // /Comment
@@ -240,7 +240,7 @@ export function formatSingle(node: Node): string {
         case NodeType.ExpressionStmt:
             return `ExprStmt(${formatSingle(node.expr)})`;
         case NodeType.Text:
-            return `Text(delim='${replaceControlChars(node.token.delim)}', "${node.token.text}")`;
+            return `Text(delim='${replaceControlChars(node.token.delim)}', "${node.token.str}")`;
         case NodeType.Comment:
             return `Comment("${node.token.comment}")`;
         case NodeType.SymbolGroup:

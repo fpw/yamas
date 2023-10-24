@@ -58,6 +58,30 @@ export class Lexer {
         }
     }
 
+    public nextStringLiteral(): Tokens.StringToken {
+        const startCursor = this.cursor;
+        const data = this.data;
+
+        const delim = data[this.cursor.dataIdx];
+        this.advanceCursor(1);
+        let str = "";
+        for (let i = this.cursor.dataIdx; i < data.length; i++) {
+            this.advanceCursor(1);
+            if (data[i] == delim) {
+                break;
+            } else if (this.isLineBreak(data[i])) {
+                throw this.error("Unterminated TEXT", startCursor);
+            }
+            str += data[i];
+        }
+        return {
+            type: Tokens.TokenType.StringLiteral,
+            delim: delim,
+            str: str,
+            ...this.getTokenMeasurement(startCursor),
+        };
+    }
+
     public nextMacroArgument(): Tokens.MacroBodyToken {
         const startCursor = this.cursor;
         const data = this.data;
@@ -200,7 +224,7 @@ export class Lexer {
         };
     }
 
-    private scanSymbol(data: string): Tokens.SymbolToken | Tokens.TextToken {
+    private scanSymbol(data: string): Tokens.SymbolToken {
         const startCursor = this.cursor;
         let symbol = "";
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
@@ -212,36 +236,9 @@ export class Lexer {
         }
         this.advanceCursor(symbol.length);
 
-        if (symbol == "TEXT") {
-            return this.scanText(data);
-        }
-
         return {
             type: Tokens.TokenType.Symbol,
             symbol: symbol,
-            ...this.getTokenMeasurement(startCursor),
-        };
-    }
-
-    private scanText(data: string): Tokens.TextToken {
-        const startCursor = this.cursor;
-        this.advanceCursor(1);
-        const delim = data[this.cursor.dataIdx];
-        this.advanceCursor(1);
-        let text = "";
-        for (let i = this.cursor.dataIdx; i < data.length; i++) {
-            this.advanceCursor(1);
-            if (data[i] == delim) {
-                break;
-            } else if (this.isLineBreak(data[i])) {
-                throw this.error("Unterminated TEXT", startCursor);
-            }
-            text += data[i];
-        }
-        return {
-            type: Tokens.TokenType.Text,
-            delim: delim,
-            text: text,
             ...this.getTokenMeasurement(startCursor),
         };
     }

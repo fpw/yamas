@@ -23,8 +23,7 @@ export class Assembler {
     private outputHandler?: OutputHandler;
 
     private readonly pseudos = [
-        // TEXT: handled by lexer
-        // DEFINE: handled by parser
+        // DEFINE and TEXT: handled by parser
 
         "NOPUNCH",  "ENPUNCH",
         "DECIMAL",  "OCTAL",
@@ -45,10 +44,14 @@ export class Assembler {
 
     public setOutputHandler(out: OutputHandler) {
         this.outputHandler = out;
+        out.setEnable(false);
     }
 
-    public addAndParseInput(name: string, content: string): Nodes.Program {
-        return this.parseInput(name, content);
+    public parseInput(name: string, input: string): Nodes.Program {
+        const parser = new Parser(name, input);
+        const prog = parser.parseProgram();
+        this.programs.push(prog);
+        return prog;
     }
 
     public getSymbols(): SymbolData[] {
@@ -61,21 +64,14 @@ export class Assembler {
         this.parseInput("prelude/eae.pa", PreludeEAE);
     }
 
-    private parseInput(name: string, input: string): Nodes.Program {
-        const parser = new Parser(name, input);
-        const prog = parser.parseProgram();
-        this.programs.push(prog);
-        return prog;
-    }
-
     public assembleAll() {
         const symCtx = this.createContext(false);
         this.programs.forEach(p => this.assignSymbols(symCtx, p));
 
         const asmCtx = this.createContext(true);
-        this.outputHandler?.setEnable(true);
         this.outputHandler?.changeOrigin(asmCtx.clc);
 
+        this.outputHandler?.setEnable(true);
         this.programs.forEach(p => this.assembleProgram(asmCtx, p));
 
         this.outputLinks(asmCtx);
@@ -100,7 +96,7 @@ export class Assembler {
         for (const stmt of prog.stmts) {
             switch (stmt.type) {
                 case Nodes.NodeType.Text:
-                    this.outputText(ctx, stmt.token.text);
+                    this.outputText(ctx, stmt.token.str);
                     break;
                 case Nodes.NodeType.ExpressionStmt:
                     this.handleExprStmt(ctx, stmt);
@@ -183,8 +179,8 @@ export class Assembler {
                 this.outputHandler?.changeOrigin(ctx.clc);
                 break;
             case Nodes.NodeType.Text:
-                ctx.clc += Math.ceil(stmt.token.text.length / 2);
-                if (stmt.token.text.length % 2 == 0) {
+                ctx.clc += Math.ceil(stmt.token.str.length / 2);
+                if (stmt.token.str.length % 2 == 0) {
                     // null terminator. For odd-length strings, part of last symbol.
                     ctx.clc++;
                 }
@@ -235,7 +231,9 @@ export class Assembler {
                 this.outputHandler?.setEnable(false);
                 break;
             case "ENPUNC":
-                this.outputHandler?.setEnable(true);
+                if (ctx.generateCode) {
+                    this.outputHandler?.setEnable(true);
+                }
                 break;
             case "DUBL":
             case "FLTG":
@@ -461,7 +459,8 @@ export class Assembler {
 
     private outputLinks(ctx: Context) {
         this.linkTable.visit((field, addr, val) => {
-            this.outputHandler?.writeValue(calcFirstPageLoc(field, 0) | addr, val);
+            // TODO change fields
+            this.outputHandler?.writeValue(addr, val);
         });
     }
 

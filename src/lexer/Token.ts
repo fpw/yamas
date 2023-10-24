@@ -16,7 +16,7 @@ export const OperatorChars = [
 export type Token =
     BlankToken | EOLToken | EOFToken | SeparatorToken |
     SymbolToken | IntegerToken | CharToken |
-    CommentToken | ASCIIToken | TextToken | MacroBodyToken;
+    CommentToken | ASCIIToken | StringToken | MacroBodyToken;
 
 export enum TokenType {
     Blank,
@@ -24,7 +24,7 @@ export enum TokenType {
     Integer,
     Char,
     ASCII,
-    Text,
+    StringLiteral,
     Separator,
     Comment,
     MacroBody,
@@ -68,9 +68,9 @@ export interface ASCIIToken extends BaseToken {
     char: string;
 }
 
-export interface TextToken extends BaseToken {
-    type: TokenType.Text;
-    text: string;
+export interface StringToken extends BaseToken {
+    type: TokenType.StringLiteral;
+    str: string;
     delim: string;
 }
 
@@ -103,7 +103,7 @@ export function tokenToString(tok: Token): string {
         case TokenType.Integer:     return `Integer(${tok.value})`;
         case TokenType.MacroBody:   return `MacroBody(${replaceControlChars(tok.body)})`;
         case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
-        case TokenType.Text:        return `Text("${tok.text}", '${tok.delim}')`;
+        case TokenType.StringLiteral:        return `Text("${tok.str}", '${tok.delim}')`;
         case TokenType.Separator:   return `Separator('${replaceControlChars(tok.char)})`;
         case TokenType.EOL:         return `EOL('${replaceControlChars(tok.char)}')`;
         case TokenType.EOF:         return "EOF()";

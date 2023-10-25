@@ -1,7 +1,0 @@
-Useful tests:
-
-TAD = 1000
-TAD^2 = 2000
-doing ORG statements that only increase ORG by 1 must still generate ORG statements for the tape
-assigning MRIs to symbols and then using them, e.g. A= JMS I X and then using A
-PAGE when previous instruction is at page break

@@ -60,6 +60,7 @@ export class Assembler {
         this.outputHandler?.changeOrigin(asmCtx.clc);
 
         this.outputHandler?.setEnable(true);
+        this.outputHandler?.changeOrigin(asmCtx.clc);
         this.programs.forEach(p => this.assembleProgram(asmCtx, p));
 
         this.outputLinks(asmCtx);

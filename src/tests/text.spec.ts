@@ -1,8 +1,8 @@
-import { assemble, getSymbolValue } from "./util";
+import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
     describe("WHEN evaluating the TEXT statement", () => {
-        const asm = assemble(`
+        const data = assemble(`
              *0
             TEXT "Hello" / Odd length -> null termination in last symbol
             A=.
@@ -11,8 +11,8 @@ describe("GIVEN an assembler", () => {
             B=.
        `);
         test("THEN it should behave as intended", () => {
-            expect(getSymbolValue(asm, "A")).toEqual(3);
-            expect(getSymbolValue(asm, "B")).toEqual(4);
+            expect(data.symbols["A"]).toEqual(3);
+            expect(data.symbols["B"]).toEqual(4);
         });
     });
 });

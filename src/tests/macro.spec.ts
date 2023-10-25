@@ -1,12 +1,12 @@
-import { assemble, getSymbolValue } from "./util";
+import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
     describe("WHEN evaluating conditional statements", () => {
-        const asm = assemble(`
+        const data = assemble(`
             IFZERO 0<A=1>
         `);
         test("THEN they should behave as intended", () => {
-            expect(getSymbolValue(asm, "A")).toEqual(1);
+            expect(data.symbols["A"]).toEqual(1);
         });
     });
 });

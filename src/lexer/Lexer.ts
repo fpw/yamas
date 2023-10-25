@@ -1,9 +1,10 @@
-import { LexerError } from "./LexerError";
+import { CodeError } from "../CodeError";
 import * as Tokens from "./Token";
 
 export interface Cursor {
     inputName: string;
     dataIdx: number;
+    colIdx: number;
     lineIdx: number;
 
     // set if we are inside a text substitution, i.e. a macro argument appearing inside the body
@@ -27,6 +28,7 @@ export class Lexer {
         this.cursor = {
             inputName: inputName,
             dataIdx: 0,
+            colIdx: 0,
             lineIdx: 0,
         };
     }
@@ -70,7 +72,7 @@ export class Lexer {
             if (data[i] == delim) {
                 break;
             } else if (this.isLineBreak(data[i])) {
-                throw this.error("Unterminated TEXT", startCursor);
+                throw Lexer.mkError("Unterminated TEXT", startCursor);
             }
             str += data[i];
         }
@@ -100,7 +102,7 @@ export class Lexer {
 
         const arg = rawArg.trim();
         if (arg.length == 0) {
-            throw this.error("Expected macro argument", startCursor);
+            throw Lexer.mkError("Expected macro argument", startCursor);
         }
 
         this.advanceCursor(rawArg.length + (hadComma ? 1 : 0));
@@ -120,26 +122,10 @@ export class Lexer {
         const toSubst = (tok.cursor.activeSubst !== undefined);
 
         if (fromSubst != toSubst) {
-            throw this.error("Can't unget across substitution boundaries", this.cursor);
+            throw Lexer.mkError("Can't unget across substitution boundaries", this.cursor);
         }
 
         this.cursor = tok.cursor;
-    }
-
-    public getCursorPos(cursor: Cursor): {line: number, col: number} {
-        let col: number | undefined;
-        for (let lineIdx = 0; lineIdx < this.lineTable.length; lineIdx++) {
-            if (this.cursor.dataIdx < this.lineTable[lineIdx]) {
-                col = this.cursor.dataIdx - this.lineTable[lineIdx - 1];
-                break;
-            }
-        }
-
-        if (col === undefined) {
-            col = this.cursor.dataIdx - this.lineTable[this.lineTable.length - 1];
-        }
-
-        return {line: cursor.lineIdx + 1, col: col + 1};
     }
 
     private isLineBreak(chr: string) {
@@ -191,7 +177,7 @@ export class Lexer {
     private activateSubstitution(symbol: string) {
         const subst = this.substitutions.get(symbol);
         if (!subst || this.savedCursor || this.cursor.activeSubst) {
-            throw this.error("Logic error in substitution", this.cursor);
+            throw Lexer.mkError("Logic error in substitution", this.cursor);
         }
 
         this.savedCursor = this.cursor;
@@ -200,6 +186,7 @@ export class Lexer {
             activeSubst: subst,
             dataIdx: 0,
             lineIdx: 0,
+            colIdx: 0,
         };
     }
 
@@ -346,7 +333,7 @@ export class Lexer {
                 };
         }
 
-        throw this.error("Unexpected character", startCursor);
+        throw Lexer.mkError("Unexpected character", startCursor);
     }
 
     private isOperator(chr: string): chr is Tokens.OperatorChr {
@@ -365,12 +352,16 @@ export class Lexer {
 
         for (let i = 0; i < step; i++) {
             if (this.cursor.dataIdx < data.length) {
-                if (!this.cursor.activeSubst && data[this.cursor.dataIdx] == "\n") {
+                if (data[this.cursor.dataIdx] == "\n") {
                     // we're skipping over a line -> update table
-                    this.lineTable[++newCursor.lineIdx] = newCursor.dataIdx + 1;
+                    if (!newCursor.activeSubst) {
+                        this.lineTable[++newCursor.lineIdx] = newCursor.dataIdx + 1;
+                    }
+                    newCursor.colIdx = 0;
                 }
             }
             newCursor.dataIdx++;
+            newCursor.colIdx++;
         }
 
         this.cursor = newCursor;
@@ -385,8 +376,7 @@ export class Lexer {
         };
     }
 
-    private error(msg: string, cursor: Cursor) {
-        const {line, col} = this.getCursorPos(cursor);
-        return new LexerError(msg, cursor.inputName, line, col);
+    public static mkError(msg: string, cursor: Cursor): CodeError {
+        return new CodeError(msg, cursor.inputName, cursor.lineIdx + 1, cursor.colIdx + 1);
     }
 }

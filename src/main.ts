@@ -6,6 +6,7 @@ import { basename } from "path";
 interface CliArgs {
     help?: boolean;
     files: string[];
+    noPrelude?: boolean;
     compare?: string;
     outputAst?: boolean;
 }
@@ -13,6 +14,7 @@ interface CliArgs {
 function main() {
     const args = parse<CliArgs>({
         help: {type: Boolean, optional: true, description: "Show usage help"},
+        noPrelude: {type: Boolean, optional: true, defaultValue: false, description: "Do not define common symbols"},
         files: {type: String, multiple: true, defaultOption: true, description: "Input files"},
         compare: {type: String, optional: true, alias: "c", description: "Compare output with a given bin file"},
         outputAst: {type: Boolean, optional: true, alias: "a", description: "Write abstract syntrax tree"},
@@ -22,6 +24,8 @@ function main() {
     });
 
     const opts: Options = {};
+    opts.loadPrelude = args.noPrelude ? false : true;
+
     const astFiles = new Map<string, number>();
     if (args.outputAst) {
         args.files.forEach(f => astFiles.set(f, openSync(basename(f) + ".ast.txt", "w")));

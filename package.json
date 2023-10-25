@@ -7,7 +7,7 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "lint": "tsc && eslint .",
-    "test": "vitest run"
+    "test": "vitest src"
   },
   "dependencies": {
     "ts-command-line-args": "^2.5.1"

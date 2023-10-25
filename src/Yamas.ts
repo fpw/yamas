@@ -1,10 +1,14 @@
 import { Assembler } from "./assembler/Assembler";
 import { numToOctal } from "./common";
 import { dumpNode } from "./parser/Node";
+import { PreludeEAE } from "./prelude/EAE";
+import { PreludeFamily8 } from "./prelude/Family8";
+import { PreludeIO } from "./prelude/IO";
 import { BinTapeReader } from "./tapeformats/BinTapeReader";
 import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
 
 export interface Options {
+    loadPrelude?: boolean;
     outputAst?: (inputName: string, line: string) => void;
     outputBin?: (byte: number) => void;
     outputSyms?: (line: string) => void;
@@ -25,6 +29,12 @@ export class Yamas {
             changeOrigin: org => this.binEnabled && this.binTape.writeOrigin(org),
             writeValue: (_clc, val) => this.binEnabled && this.binTape.writeDataWord(val, true),
         });
+
+        if (opts.loadPrelude) {
+            this.asm.parseInput("prelude/family8.pa", PreludeFamily8);
+            this.asm.parseInput("prelude/iot.pa", PreludeIO);
+            this.asm.parseInput("prelude/eae.pa", PreludeEAE);
+        }
     }
 
     public addInput(name: string, content: string) {

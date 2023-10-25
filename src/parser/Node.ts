@@ -25,7 +25,7 @@
  *
  */
 
-import { replaceControlChars } from "../common";
+import { replaceBlanks } from "../common";
 import * as Tokens from "../lexer/Token";
 
 export enum NodeType {
@@ -78,6 +78,7 @@ export interface BaseNode {
 export interface Program extends BaseNode {
     type: NodeType.Program;
     stmts: Statement[];
+    inputName: string;
 }
 
 // *200
@@ -209,7 +210,7 @@ export function dumpNode(prog: Program, write: (line: string) => void, indent = 
         write(indStr + line);
     };
 
-    w("Program(", indent);
+    w(`Program("${prog.inputName}"`, indent);
     for (const node of prog.stmts) {
         switch (node.type) {
             case NodeType.Invocation:
@@ -236,11 +237,11 @@ export function formatSingle(node: Node): string {
         case NodeType.Assignment:
             return `Assign(${formatSingle(node.sym)}, ${formatSingle(node.val)})`;
         case NodeType.Separator:
-            return `Separator('${replaceControlChars(node.separator)}')`;
+            return `Separator('${replaceBlanks(node.separator)}')`;
         case NodeType.ExpressionStmt:
             return `ExprStmt(${formatSingle(node.expr)})`;
         case NodeType.Text:
-            return `Text(delim='${replaceControlChars(node.token.delim)}', "${node.token.str}")`;
+            return `Text(delim='${replaceBlanks(node.token.delim)}', "${node.token.str}")`;
         case NodeType.Comment:
             return `Comment("${node.token.comment}")`;
         case NodeType.SymbolGroup:
@@ -267,7 +268,7 @@ export function formatSingle(node: Node): string {
         case NodeType.CLCValue:
             return "CLC()";
         case NodeType.MacroBody:
-            return `MacroBody("${replaceControlChars(Tokens.tokenToString(node.token))}")`;
+            return `MacroBody("${replaceBlanks(Tokens.tokenToString(node.token))}")`;
         case NodeType.Invocation:
         case NodeType.Program:
             throw Error("Logic error");

@@ -1,4 +1,4 @@
-import { replaceControlChars } from "../common";
+import { replaceBlanks } from "../common";
 import { Cursor } from "./Lexer";
 
 export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";
@@ -96,16 +96,16 @@ export interface EOFToken extends BaseToken {
 
 export function tokenToString(tok: Token): string {
     switch (tok.type) {
-        case TokenType.Blank:       return `Blank('${replaceControlChars(tok.char)}')`;
-        case TokenType.Char:        return `Char('${replaceControlChars(tok.char)}')`;
-        case TokenType.ASCII:       return `ASCII('${replaceControlChars(tok.char)}')`;
+        case TokenType.Blank:       return `Blank('${replaceBlanks(tok.char)}')`;
+        case TokenType.Char:        return `Char('${replaceBlanks(tok.char)}')`;
+        case TokenType.ASCII:       return `ASCII('${replaceBlanks(tok.char)}')`;
         case TokenType.Comment:     return `Comment("${tok.comment}")`;
         case TokenType.Integer:     return `Integer(${tok.value})`;
-        case TokenType.MacroBody:   return `MacroBody(${replaceControlChars(tok.body)})`;
+        case TokenType.MacroBody:   return `MacroBody(${replaceBlanks(tok.body)})`;
         case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
         case TokenType.StringLiteral:        return `Text("${tok.str}", '${tok.delim}')`;
-        case TokenType.Separator:   return `Separator('${replaceControlChars(tok.char)})`;
-        case TokenType.EOL:         return `EOL('${replaceControlChars(tok.char)}')`;
+        case TokenType.Separator:   return `Separator('${replaceBlanks(tok.char)})`;
+        case TokenType.EOL:         return `EOL('${replaceBlanks(tok.char)}')`;
         case TokenType.EOF:         return "EOF()";
     }
 }

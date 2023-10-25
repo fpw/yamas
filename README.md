@@ -1,15 +1,8 @@
 # Introduction
 This assembler is based on the MACRO8 syntax.
 
-# Assemblers
-## MACRO8
-PAL-III: Doesn't support macros, literals or conditional assembly
-MACRO8 supports macros, but doesn't support conditional assembly using IFDEF and the like.
-PAL-D:
-PAL-8: From PS/8. Based on PAL-D, but adds these ops as in PAL-III: FILENAME, DEVICE, IFNDEF, IFNZRO, FIXMRI
-
-## Syntax
-### Symbol
+# Syntax
+## Symbol
 Can be either
 * a parameter assignment, e.g. "A=EXPR"
 * a macro
@@ -19,7 +12,7 @@ There are different types
 * permanent symbols: are OR-ed when separated by space, e.g. CLA CMA
 * user symbols: are used as addresses, e.g. JMP BEG
 
-### Element
+## Element
 Symbol or Integer
 
 ### Expressions
@@ -42,5 +35,22 @@ Symbol or Integer
 ## Pass 2
 * generate code
 
-# Grammar
-Statement: *Expr | Symbol=Expr | Symbol, | Symbol
+# Code FAQ
+## Why is the parser not using logical lines consisting of label, a statement and comments?
+Some statements can span multiple lines, for example macro and condition bodies. Also, a line can multiple statements separated with semicolons.
+For that reason, it was decided to not use logical lines.
+
+## Why can expressions be null? And why not undefined?
+Expressions can be null in pass 1, for example when a symbol is used that is only defined later. This is okay unless the expression changes the CLC.
+For that reason, the assembler differentiates between defined and undefined expressions. Using an undefined expression in an `IFZERO` is not okay
+because the resulting CLC can't be calculated - but using it in something like ``A=JMS X`` is completely fine.
+
+`null` is used instead of `define` so that the linter will spot a missing `case`
+in the eval functions after adding a new node type. It would probably be better to
+use a `Maybe` type so that exrepssions like `if (!val)` are also caught.
+
+## Why does the origin operator always lead to origin symbols in the binary tape? Couldn't this be optimized to only write them when necessary?
+Some programs deliberately use the origin operator to generate RIM loader dumps, e.g. TSS/8.
+
+## Why does the assembler emit callbacks instead of simply returning the target memory state and creating the bin tape from there?
+See above: The origin statements must be preserved as they appeared in the code.

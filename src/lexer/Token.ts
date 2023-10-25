@@ -15,16 +15,17 @@ export const OperatorChars = [
 
 export type Token =
     BlankToken | EOLToken | EOFToken | SeparatorToken |
-    SymbolToken | IntegerToken | CharToken |
+    SymbolToken | IntegerToken | CharToken | FloatToken |
     CommentToken | ASCIIToken | StringToken | MacroBodyToken;
 
 export enum TokenType {
     Blank,
     Symbol,
     Integer,
+    Float,
     Char,
     ASCII,
-    StringLiteral,
+    String,
     Separator,
     Comment,
     MacroBody,
@@ -58,6 +59,12 @@ export interface IntegerToken extends BaseToken {
     value: string;
 }
 
+export interface FloatToken extends BaseToken {
+    type: TokenType.Float;
+    mantissa: string;
+    exponent: string;
+}
+
 export interface CharToken extends BaseToken {
     type: TokenType.Char;
     char: OperatorChr;
@@ -69,7 +76,7 @@ export interface ASCIIToken extends BaseToken {
 }
 
 export interface StringToken extends BaseToken {
-    type: TokenType.StringLiteral;
+    type: TokenType.String;
     str: string;
     delim: string;
 }
@@ -101,9 +108,10 @@ export function tokenToString(tok: Token): string {
         case TokenType.ASCII:       return `ASCII('${replaceBlanks(tok.char)}')`;
         case TokenType.Comment:     return `Comment("${tok.comment}")`;
         case TokenType.Integer:     return `Integer(${tok.value})`;
+        case TokenType.Float:       return `Float(m=${tok.mantissa}, e=${tok.exponent})`;
         case TokenType.MacroBody:   return `MacroBody(${replaceBlanks(tok.body)})`;
         case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
-        case TokenType.StringLiteral:        return `Text("${tok.str}", '${tok.delim}')`;
+        case TokenType.String:      return `String("${tok.str}", '${tok.delim}')`;
         case TokenType.Separator:   return `Separator('${replaceBlanks(tok.char)})`;
         case TokenType.EOL:         return `EOL('${replaceBlanks(tok.char)}')`;
         case TokenType.EOF:         return "EOF()";

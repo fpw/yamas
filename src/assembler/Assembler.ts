@@ -1,4 +1,4 @@
-import { asciiCharTo6Bit, calcFieldNum, calcPageNum, firstAddrInPage, parseIntSafe, to7BitAscii } from "../common";
+import * as Common from "../common";
 import * as Nodes from "../parser/Node";
 import { Parser } from "../parser/Parser";
 import { Context } from "./Context";
@@ -19,14 +19,13 @@ export class Assembler {
     private outputHandler?: OutputHandler;
 
     private readonly pseudos = [
-        // DEFINE and TEXT: handled by parser
-
         "NOPUNCH",  "ENPUNCH",
         "DECIMAL",  "OCTAL",
         "EXPUNGE",  "FIXTAB",
         "PAGE",     "FIELD",
-        "DUBL",     "FLTG",
-        "TEXT",     "ZBLOCK",
+        "ZBLOCK",
+        "DUBL",     "FLTG", // both also handled by parser
+        "DEFINE",   "TEXT", // both actually handled by parser, but listing here so that they are defined
         "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
     ];
 
@@ -86,6 +85,12 @@ export class Assembler {
             switch (stmt.type) {
                 case Nodes.NodeType.Text:
                     this.outputText(ctx, stmt.token.str);
+                    break;
+                case Nodes.NodeType.DoubleIntList:
+                    this.outputDubl(ctx, stmt);
+                    break;
+                case Nodes.NodeType.FloatList:
+                    this.outputFltg(ctx, stmt);
                     break;
                 case Nodes.NodeType.ExpressionStmt:
                     this.handleExprStmt(ctx, stmt);
@@ -151,6 +156,12 @@ export class Assembler {
                     ctx.clc++;
                 }
                 break;
+            case Nodes.NodeType.DoubleIntList:
+                ctx.clc += stmt.list.filter(x => x.type == Nodes.NodeType.DoubleInt).length * 2;
+                break;
+            case Nodes.NodeType.FloatList:
+                ctx.clc += stmt.list.filter(x => x.type == Nodes.NodeType.Float).length * 3;
+                break;
             case Nodes.NodeType.ExpressionStmt:
                 if (!this.isPseudoExpr(stmt.expr)) {
                     ctx.clc++;
@@ -203,9 +214,6 @@ export class Assembler {
                     this.outputHandler?.setEnable(true);
                 }
                 break;
-            case "DUBL":
-            case "FLTG":
-                throw this.error("Unimplemented", group);
         }
     }
 
@@ -226,14 +234,14 @@ export class Assembler {
     private handlePage(ctx: Context, group: Nodes.SymbolGroup) {
         if (group.exprs.length == 0) {
             // subtracting 1 because the cursor is already at the next statement
-            const curPage = calcPageNum(ctx.clc - 1);
-            ctx.clc = firstAddrInPage(calcFieldNum(ctx.clc), curPage + 1);
+            const curPage = Common.calcPageNum(ctx.clc - 1);
+            ctx.clc = Common.firstAddrInPage(Common.calcFieldNum(ctx.clc), curPage + 1);
         } else if (group.exprs.length == 1) {
             const page = this.safeEval(ctx, group.exprs[0]);
             if (page < 0 || page > 31) {
                 throw this.error(`Invalid page ${page}`, group);
             }
-            ctx.clc = firstAddrInPage(calcFieldNum(ctx.clc), page);
+            ctx.clc = Common.firstAddrInPage(Common.calcFieldNum(ctx.clc), page);
         } else {
             throw this.error("Expected zero or one parameter for PAGE", group);
         }
@@ -246,7 +254,7 @@ export class Assembler {
             if (field < 0 || field > 7) {
                 throw this.error(`Invalid field ${field}`, group);
             }
-            ctx.clc = firstAddrInPage(field, 1);
+            ctx.clc = Common.firstAddrInPage(field, 1);
             this.outputHandler?.changeField(field);
             this.outputHandler?.changeOrigin(ctx.clc);
         } else {
@@ -309,9 +317,9 @@ export class Assembler {
     private tryEval(ctx: Context, expr: Nodes.Expression): number | null {
         switch (expr.type) {
             case Nodes.NodeType.Integer:
-                return parseIntSafe(expr.token.value, ctx.radix) & 0o7777;
+                return Common.parseIntSafe(expr.token.value, ctx.radix) & 0o7777;
             case Nodes.NodeType.ASCIIChar:
-                return to7BitAscii(expr.token.char, true);
+                return Common.to7BitAscii(expr.token.char, true);
             case Nodes.NodeType.Symbol:
                 return this.evalSymbol(ctx, expr);
             case Nodes.NodeType.CLCValue:
@@ -391,11 +399,11 @@ export class Assembler {
         }
 
         if (expr.paren == "(") {
-            const curPage = calcPageNum(ctx.clc);
-            const link = this.linkTable.enter(calcFieldNum(ctx.clc), curPage, val);
+            const curPage = Common.calcPageNum(ctx.clc);
+            const link = this.linkTable.enter(Common.calcFieldNum(ctx.clc), curPage, val);
             return link;
         } else if (expr.paren == "[") {
-            const link = this.linkTable.enter(calcFieldNum(ctx.clc), 0, val);
+            const link = this.linkTable.enter(Common.calcFieldNum(ctx.clc), 0, val);
             return link;
         } else {
             throw this.error(`Invalid parentheses: "${expr.paren}"`, expr);
@@ -464,9 +472,9 @@ export class Assembler {
 
         const effVal = mri | (dst & 0b1111111);
 
-        const curField = calcFieldNum(ctx.clc);
-        const curPage = calcPageNum(ctx.clc);
-        const dstPage = calcPageNum(dst);
+        const curField = Common.calcFieldNum(ctx.clc);
+        const curPage = Common.calcPageNum(ctx.clc);
+        const dstPage = Common.calcPageNum(dst);
         if (dstPage == 0) {
             return effVal;
         } else if (curPage == dstPage) {
@@ -501,16 +509,64 @@ export class Assembler {
     private outputText(ctx: Context, text: string) {
         let loc = ctx.clc;
         for (let i = 0; i < text.length - 1; i += 2) {
-            const left = asciiCharTo6Bit(text[i]);
-            const right = asciiCharTo6Bit(text[i + 1]);
+            const left = Common.asciiCharTo6Bit(text[i]);
+            const right = Common.asciiCharTo6Bit(text[i + 1]);
             this.outputHandler?.writeValue(loc, (left << 6) | right);
             loc++;
         }
         if (text.length % 2 == 0) {
             this.outputHandler?.writeValue(loc, 0);
         } else {
-            const left = asciiCharTo6Bit(text[text.length - 1]);
+            const left = Common.asciiCharTo6Bit(text[text.length - 1]);
             this.outputHandler?.writeValue(loc, left << 6);
+        }
+    }
+
+    private outputDubl(ctx: Context, stmt: Nodes.DoubleIntList) {
+        let loc = ctx.clc;
+        for (const dubl of stmt.list) {
+            if (dubl.type != Nodes.NodeType.DoubleInt) {
+                continue;
+            }
+            let num = Common.parseIntSafe(dubl.token.value, 10);
+            if (dubl.unaryOp?.char === "-") {
+                num = -num;
+            }
+            this.outputHandler?.writeValue(loc + 0, (num >> 12) & 0o7777);
+            this.outputHandler?.writeValue(loc + 1, num & 0o7777);
+            loc += 2;
+        }
+    }
+
+    private outputFltg(ctx: Context, stmt: Nodes.FloatList) {
+        let loc = ctx.clc;
+        for (const dubl of stmt.list) {
+            if (dubl.type != Nodes.NodeType.Float) {
+                continue;
+            }
+
+            const match = dubl.token.mantissa.match(/^([+-]?)([0-9]+)(\.([0-9]+))?$/);
+            if (!match) {
+                throw this.error(`Unexpected mantissa format ${dubl.token.mantissa}`, stmt);
+            }
+            const [_mAll, mNeg, mInt, _mDecAll, mDec] = match;
+
+            let exp = Number.parseInt(dubl.token.exponent);
+            let mantissa;
+            if (mDec) {
+                // concatenate strings (!) to get intergal mantissa
+                mantissa = Number.parseInt(mInt + mDec);
+                // and fix exp for that
+                exp -= mDec.length;
+            } else {
+                mantissa = Number.parseInt(mInt);
+            }
+
+            const [m, e] = Common.toDECFloat(mNeg === "-", mantissa, exp);
+            this.outputHandler?.writeValue(loc + 0, e & 0o7777);
+            this.outputHandler?.writeValue(loc + 1, (m >> 12) & 0o7777);
+            this.outputHandler?.writeValue(loc + 2, m & 0o7777);
+            loc += 3;
         }
     }
 

@@ -41,6 +41,8 @@ export enum NodeType {
     Define,
     Invocation,
     Text,
+    DoubleIntList,
+    FloatList,
     Comment,
 
     // Expression
@@ -55,6 +57,10 @@ export enum NodeType {
     ASCIIChar,
     Symbol,
     CLCValue,
+
+    // Specials
+    DoubleInt,
+    Float,
 }
 
 export type Node = Program | Statement | Expression | Element;
@@ -63,7 +69,7 @@ export type Statement =
     OriginStatement |
     ExpressionStatement | LabelDef | AssignStatement |
     DefineStatement | Invocation |
-    TextStatement | Comment | StatementSeparator;
+    TextStatement | DoubleIntList | FloatList | Comment | StatementSeparator;
 
 export type Expression =
     SymbolGroup | ParenExpr | BinaryOp |
@@ -125,6 +131,31 @@ export interface StatementSeparator extends BaseNode {
     type: NodeType.Separator;
     separator: ";" | "\n";
     token: Tokens.EOLToken | Tokens.SeparatorToken;
+}
+
+// DUBL
+export interface DoubleIntList extends BaseNode {
+    type: NodeType.DoubleIntList;
+    list: (DoubleInt | StatementSeparator | Comment)[];
+    token: Tokens.SymbolToken; // on DUBL
+}
+
+export interface DoubleInt extends BaseNode {
+    type: NodeType.DoubleInt;
+    unaryOp?: Tokens.CharToken;
+    token: Tokens.IntegerToken;
+}
+
+// FLTG
+export interface FloatList extends BaseNode {
+    type: NodeType.FloatList;
+    list: (Float | StatementSeparator | Comment)[];
+    token: Tokens.SymbolToken; // on FLTG
+}
+
+export interface Float extends BaseNode {
+    type: NodeType.Float;
+    token: Tokens.FloatToken;
 }
 
 // TEXT x...x
@@ -265,6 +296,10 @@ export function formatSingle(node: Node): string {
             return `ASCII('${node.token.char}')`;
         case NodeType.Symbol:
             return `Symbol("${node.token.symbol}")`;
+        case NodeType.DoubleIntList:
+            return `Dubl([${node.list.map(x => Tokens.tokenToString(x.token))}])`;
+        case NodeType.FloatList:
+            return `Fltg([${node.list.map(x => Tokens.tokenToString(x.token))}}])`;
         case NodeType.CLCValue:
             return "CLC()";
         case NodeType.MacroBody:

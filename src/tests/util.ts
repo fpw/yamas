@@ -1,10 +1,12 @@
 import { Assembler } from "../assembler/Assembler";
+import { Program } from "../parser/Node";
 import { PreludeEAE } from "../prelude/EAE";
 import { PreludeFamily8 } from "../prelude/Family8";
 import { PreludeIO } from "../prelude/IO";
 
 export interface TestData {
     asm: Assembler;
+    ast: Program;
     symbols: Record<string, number>;
     memory: number[];
     orgs: number[];
@@ -36,11 +38,11 @@ export function assemble(input: string): TestData {
     asm.parseInput("prelude/iot.pa", PreludeIO);
     asm.parseInput("prelude/eae.pa", PreludeEAE);
 
-    asm.parseInput("test.pa", input);
+    const ast = asm.parseInput("test.pa", input);
     asm.assembleAll();
 
     const symbols: Record<string, number> = {};
     asm.getSymbols().forEach(sym => symbols[sym.name] = sym.value);
 
-    return {asm, symbols, orgs, memory};
+    return {asm, ast, symbols, orgs, memory};
 }

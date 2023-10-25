@@ -77,9 +77,27 @@ export class Lexer {
             str += data[i];
         }
         return {
-            type: Tokens.TokenType.StringLiteral,
+            type: Tokens.TokenType.String,
             delim: delim,
             str: str,
+            ...this.getTokenMeasurement(startCursor),
+        };
+    }
+
+    public nextFloat(): Tokens.FloatToken {
+        const startCursor = this.cursor;
+
+        const match = this.data.substring(this.cursor.dataIdx).match(/^([-+]?[0-9]+(\.[0-9]+)?)E([-+]?[0-9]+)/);
+        if (!match) {
+            throw Lexer.mkError("Invalid float format", startCursor);
+        }
+
+        this.advanceCursor(match[0].length);
+
+        return {
+            type: Tokens.TokenType.Float,
+            mantissa: match[1],
+            exponent: match[3],
             ...this.getTokenMeasurement(startCursor),
         };
     }

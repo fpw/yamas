@@ -56,3 +56,59 @@ export function to7BitAscii(chr: string, markParity: boolean): number {
     }
     return code | (markParity ? 0o200 : 0);
 }
+
+// inputs must be integral and mantissa must be positive!
+// algorithm from macro8x.c, Gary A. Messenbrink
+export function toDECFloat(negative: boolean, mantissa: number, exponent: number): [number, number] {
+    const shift = 3; // increase internal precision by this
+    let m = mantissa;
+    let e = exponent;
+
+    while ((m != 0) && (m % 10 == 0)) {
+        m = Math.trunc(m / 10);
+        e++;
+    }
+
+    let [outM, outE] = normalize(m << shift, 23 + shift, 23 + shift);
+    while (e != 0) {
+        if (e < 0) {
+            outM = Math.trunc(outM / 10);
+            e++;
+        } else {
+            outM = Math.trunc(outM * 10);
+            e--;
+        }
+        [outM, outE] = normalize(outM, outE, 23 + shift);
+    }
+    outM >>= shift;
+    outE -= shift;
+
+    if (negative) {
+        outM = -outM & 0o77777777;
+    }
+
+    return [outM, outE];
+}
+
+function normalize(mantissa: number, exponent: number, bits: number): [number, number] {
+    const upMask = (1 << bits) - 1;
+    const loMask = (1 << (bits - 1)) - 1;
+
+    if (mantissa == 0) {
+        return [mantissa, 0];
+    }
+
+    if ((mantissa & ~upMask) == 0) {
+        while ((mantissa & ~loMask) == 0) {
+            mantissa <<= 1;
+            exponent--;
+        }
+    } else {
+        while ((mantissa & ~upMask) != 0) {
+            mantissa >>= 1;
+            exponent++;
+        }
+    }
+
+    return [mantissa, exponent];
+}

@@ -6,7 +6,7 @@ import * as Nodes from "./Node";
 type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 
 export class Parser {
-    private keywords = new Set(["TEXT", "DEFINE"]);
+    private keywords = new Set(["TEXT", "DEFINE", "DUBL", "FLTG"]);
     private inputName: string;
     private lexer: Lexer;
     private macros = new Map<string, Nodes.DefineStatement>();
@@ -43,6 +43,7 @@ export class Parser {
                 switch (tok.char) {
                     case "*": return this.parseOriginStatement(tok);
                     case "-": return this.finishExprStatement(tok);
+                    case "+": return this.finishExprStatement(tok);
                     case ".": return this.finishExprStatement(tok);
                 }
                 break;
@@ -52,15 +53,26 @@ export class Parser {
             case Tokens.TokenType.Symbol:
                 return this.finishStatement(tok);
             case Tokens.TokenType.Comment:
-                return {type: Nodes.NodeType.Comment, token: tok};
+                return this.parseComment(tok);
             case Tokens.TokenType.EOL:
-                return {type: Nodes.NodeType.Separator, separator: "\n", token: tok};
             case Tokens.TokenType.Separator:
-                return {type: Nodes.NodeType.Separator, separator: tok.char, token: tok};
+                return this.parseSeparator(tok);
             case Tokens.TokenType.EOF:
                 return undefined;
         }
         throw Parser.mkTokError(`Statement expected, got ${Tokens.tokenToString(tok)}`, tok);
+    }
+
+    private parseSeparator(tok: Tokens.EOLToken | Tokens.SeparatorToken): Nodes.StatementSeparator {
+        if (tok.type == Tokens.TokenType.EOL) {
+            return { type: Nodes.NodeType.Separator, separator: "\n", token: tok };
+        } else {
+            return {type: Nodes.NodeType.Separator, separator: tok.char, token: tok};
+        }
+    }
+
+    private parseComment(tok: Tokens.CommentToken): Nodes.Comment {
+        return { type: Nodes.NodeType.Comment, token: tok };
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
@@ -83,7 +95,7 @@ export class Parser {
         return this.finishExprStatement(startSym);
     }
 
-    private parseKeyword(startSym: Tokens.SymbolToken): Nodes.DefineStatement | Nodes.TextStatement {
+    private parseKeyword(startSym: Tokens.SymbolToken): Nodes.Statement {
         switch (startSym.symbol) {
             case "DEFINE":
                 const def = this.parseDefine(startSym);
@@ -97,6 +109,10 @@ export class Parser {
                 }
                 const str = this.lexer.nextStringLiteral();
                 return {type: Nodes.NodeType.Text, token: str};
+            case "DUBL":
+                return this.parseDubl(startSym);
+            case "FLTG":
+                return this.parseFltg(startSym);
             default:
                 throw Parser.mkTokError(`Unhandled keyword ${startSym.symbol}`, startSym);
         }
@@ -324,8 +340,9 @@ export class Parser {
             case Tokens.TokenType.Char:
                 return true;
             case Tokens.TokenType.Comment:
-            case Tokens.TokenType.StringLiteral:
+            case Tokens.TokenType.String:
             case Tokens.TokenType.Separator:
+            case Tokens.TokenType.Float:
             case Tokens.TokenType.EOF:
             case Tokens.TokenType.EOL:
                 return false;
@@ -338,7 +355,7 @@ export class Parser {
         switch (tok.type) {
             case Tokens.TokenType.ASCII:   return {type: Nodes.NodeType.ASCIIChar, token: tok};
             case Tokens.TokenType.Symbol:  return {type: Nodes.NodeType.Symbol, token: tok};
-            case Tokens.TokenType.Integer: return {type: Nodes.NodeType.Integer, token: tok};
+            case Tokens.TokenType.Integer: return this.parseInteger(tok);
             case Tokens.TokenType.Char:
                 if (tok.char == ".") {
                     return {
@@ -356,6 +373,97 @@ export class Parser {
                 break;
         }
         throw Parser.mkTokError(`Element expected, got ${Tokens.tokenToString(tok)}`, tok);
+    }
+
+    private parseInteger(tok: Tokens.IntegerToken): Nodes.Integer {
+        return { type: Nodes.NodeType.Integer, token: tok };
+    }
+
+    // eslint-disable-next-line max-lines-per-function
+    private parseDubl(dublSym: Tokens.SymbolToken): Nodes.DoubleIntList {
+        const list: (Nodes.DoubleInt | Nodes.StatementSeparator | Nodes.Comment)[] = [];
+
+        let done = false;
+        while (!done) {
+            const next = this.lexer.nextNonBlank();
+            switch (next.type) {
+                case Tokens.TokenType.Separator:
+                case Tokens.TokenType.EOL:
+                    list.push(this.parseSeparator(next));
+                    break;
+                case Tokens.TokenType.Integer:
+                    list.push({type: Nodes.NodeType.DoubleInt, token: next});
+                    break;
+                case Tokens.TokenType.Comment:
+                    list.push(this.parseComment(next));
+                    break;
+                case Tokens.TokenType.Char:
+                    if (next.char == "+" || next.char == "-") {
+                        const nextInt = this.lexer.next();
+                        if (nextInt.type != Tokens.TokenType.Integer) {
+                            throw Parser.mkTokError("Unexpected unary operand", nextInt);
+                        }
+                        list.push({type: Nodes.NodeType.DoubleInt, unaryOp: next, token: nextInt});
+                    } else {
+                        this.lexer.unget(next);
+                        done = true;
+                    }
+                    break;
+                default:
+                    this.lexer.unget(next);
+                    done = true;
+                    break;
+            }
+        }
+
+        return {
+            type: Nodes.NodeType.DoubleIntList,
+            list: list,
+            token: dublSym,
+        };
+    }
+
+    // eslint-disable-next-line max-lines-per-function
+    private parseFltg(fltgSym: Tokens.SymbolToken): Nodes.FloatList {
+        const list: (Nodes.Float | Nodes.StatementSeparator | Nodes.Comment)[] = [];
+
+        let done = false;
+        while (!done) {
+            const next = this.lexer.nextNonBlank();
+            switch (next.type) {
+                case Tokens.TokenType.Separator:
+                case Tokens.TokenType.EOL:
+                    list.push(this.parseSeparator(next));
+                    break;
+                case Tokens.TokenType.Integer:
+                    this.lexer.unget(next);
+                    list.push({type: Nodes.NodeType.Float, token: this.lexer.nextFloat()});
+                    break;
+                case Tokens.TokenType.Char:
+                    if (next.char == "-" || next.char == "+" || (next.char >= "0" && next.char <= "9")) {
+                        this.lexer.unget(next);
+                        list.push({type: Nodes.NodeType.Float, token: this.lexer.nextFloat()});
+                    } else {
+                        this.lexer.unget(next);
+                        done = true;
+                        break;
+                    }
+                    break;
+                case Tokens.TokenType.Comment:
+                    list.push(this.parseComment(next));
+                    break;
+                default:
+                    this.lexer.unget(next);
+                    done = true;
+                    break;
+            }
+        }
+
+        return {
+            type: Nodes.NodeType.FloatList,
+            list: list,
+            token: fltgSym,
+        };
     }
 
     private parseDefine(token: Tokens.SymbolToken): Nodes.DefineStatement {

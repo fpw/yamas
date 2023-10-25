@@ -5,15 +5,17 @@ import { basename } from "path";
 
 interface CliArgs {
     help?: boolean;
-    outputAst?: boolean;
     files: string[];
+    compare?: string;
+    outputAst?: boolean;
 }
 
 function main() {
     const args = parse<CliArgs>({
         help: {type: Boolean, optional: true, description: "Show usage help"},
+        files: {type: String, multiple: true, defaultOption: true, description: "Input files"},
+        compare: {type: String, optional: true, alias: "c", description: "Compare output with a given bin file"},
         outputAst: {type: Boolean, optional: true, alias: "a", description: "Write abstract syntrax tree"},
-        files: {type: String, multiple: true, defaultOption: true},
     },
     {
         helpArg: "help",
@@ -24,6 +26,10 @@ function main() {
     if (args.outputAst) {
         args.files.forEach(f => astFiles.set(f, openSync(basename(f) + ".ast.txt", "w")));
         opts.outputAst = (file, line) => writeSync(astFiles.get(file)!, line + "\n");
+    }
+
+    if (args.compare) {
+        opts.compareBin = readFileSync(args.compare);
     }
 
     const yamas = new Yamas(opts);

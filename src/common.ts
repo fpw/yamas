@@ -26,6 +26,10 @@ export function calcFieldNum(loc: number): number {
     return (loc >> 12) & 7;
 }
 
-export function calcFirstPageLoc(fieldNum: number, pageNum: number): number {
+export function firstAddrInPage(fieldNum: number, pageNum: number): number {
     return (fieldNum * 0o10000) | (pageNum * 0o200);
+}
+
+export function numToOctal(num: number, width: number): string {
+    return num.toString(8).padStart(width, "0");
 }

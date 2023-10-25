@@ -1,4 +1,4 @@
-import { asciiCharTo6Bit, calcFieldNum, calcFirstPageLoc, calcPageNum } from "../common";
+import { asciiCharTo6Bit, calcFieldNum, firstAddrInPage, calcPageNum } from "../common";
 import { SymbolToken } from "../lexer/Token";
 import * as Nodes from "../parser/Node";
 import { Parser } from "../parser/Parser";
@@ -133,32 +133,33 @@ export class Assembler {
                 // need to handle pseudos because they can change the radix or CLC,
                 // affecting expression parsing for symbol definitions
                 if (this.isPseudoExpr(stmt.expr)) {
-                    this.handlePseudo(ctx, stmt.expr);
+                    this.handlePseudo(ctx, stmt.expr as Nodes.SymbolGroup);
                 }
                 break;
         }
     }
 
     private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement) {
-        if (this.isPseudoExpr(stmt.expr)) {
-            // this is handled by updateSymbols which is called in both symbol and assembly phases
-        } else if (this.isMRIExpr(stmt.expr)) {
-            this.handleLoadMRI(ctx, stmt.expr);
-        } else {
+        if (!this.isPseudoExpr(stmt.expr)) {
             const val = this.eval(ctx, stmt.expr);
             this.outputHandler?.writeValue(ctx.clc, val);
         }
     }
 
-    private handleLoadMRI(ctx: Context, group: Nodes.SymbolGroup) {
+    private convertMRI(ctx: Context, group: Nodes.SymbolGroup): number {
         const mri = this.syms.lookup(group.first.token.symbol);
         let mriVal = mri.value;
         let dst = 0;
 
         for (const ex of group.exprs) {
             if (ex.type == Nodes.NodeType.Symbol) {
-                const sym = this.syms.lookup(ex.token.symbol);
-                if (sym.type == SymbolType.Permanent) {
+                const sym = this.syms.tryLookup(ex.token.symbol);
+                if (!sym) {
+                    // using an undefined symbol doesn't matter here in pass 1, TSS8 actually does this
+                    if (ctx.generateCode) {
+                        throw Error(`Undefined MRI parameter ${ex.token.symbol}`);
+                    }
+                } else if (sym.type == SymbolType.Permanent) {
                     mriVal |= sym.value;
                 } else {
                     dst |= sym.value;
@@ -168,8 +169,7 @@ export class Assembler {
             }
         }
 
-        const effVal = this.genMRI(ctx, group, mriVal, dst);
-        this.outputHandler?.writeValue(ctx.clc, effVal);
+        return this.genMRI(ctx, group, mriVal, dst);
     }
 
     private updateCLC(ctx: Context, stmt: Nodes.Statement) {
@@ -257,13 +257,15 @@ export class Assembler {
 
     private handlePage(ctx: Context, group: Nodes.SymbolGroup) {
         if (group.exprs.length == 0) {
-            ctx.clc = calcFirstPageLoc(calcFieldNum(ctx.clc), calcPageNum(ctx.clc) + 1);
+            // subtracting 1 because the cursor is already at the next statement
+            const curPage = calcPageNum(ctx.clc - 1);
+            ctx.clc = firstAddrInPage(calcFieldNum(ctx.clc), curPage + 1);
         } else if (group.exprs.length == 1) {
             const page = this.eval(ctx, group.exprs[0]);
             if (page < 0 || page > 31) {
                 throw Error(`Invalid page ${page}`, { cause: group });
             }
-            ctx.clc = calcFirstPageLoc(calcFieldNum(ctx.clc), page);
+            ctx.clc = firstAddrInPage(calcFieldNum(ctx.clc), page);
         } else {
             throw Error("Expected zero or one parameter for PAGE", { cause: group });
         }
@@ -276,7 +278,7 @@ export class Assembler {
             if (field < 0 || field > 7) {
                 throw Error(`Invalid field ${field}`, { cause: group });
             }
-            ctx.clc = calcFirstPageLoc(field, 1);
+            ctx.clc = firstAddrInPage(field, 1);
             this.outputHandler?.changeField(field);
             this.outputHandler?.changeOrigin(ctx.clc);
         } else {
@@ -328,6 +330,7 @@ export class Assembler {
         }
     }
 
+    // eslint-disable-next-line max-lines-per-function
     private eval(ctx: Context, expr: Nodes.Expression): number {
         switch (expr.type) {
             case Nodes.NodeType.Integer:
@@ -336,7 +339,7 @@ export class Assembler {
                 }
                 return Number.parseInt(expr.token.value, ctx.radix) & 0o7777;
             case Nodes.NodeType.ASCIIChar:
-                return expr.token.char.charCodeAt(0) & 0o7777;
+                return (expr.token.char.charCodeAt(0) & 0o7777) | 0o200;
             case Nodes.NodeType.Symbol:
                 return this.evalSymbol(ctx, expr.token);
             case Nodes.NodeType.CLCValue:
@@ -352,8 +355,12 @@ export class Assembler {
             case Nodes.NodeType.ParenExpr:
                 return this.evalParenExpr(ctx, expr);
             case Nodes.NodeType.SymbolGroup:
-                const init = this.eval(ctx, expr.first);
-                return expr.exprs.reduce((acc, cur) => acc | this.eval(ctx, cur), init);
+                if (this.isMRIExpr(expr)) {
+                    return this.convertMRI(ctx, expr);
+                } else {
+                    const init = this.eval(ctx, expr.first);
+                    return expr.exprs.reduce((acc, cur) => acc | this.eval(ctx, cur), init);
+                }
             case Nodes.NodeType.BinaryOp:
                 return this.evalBinOp(ctx, expr);
             case Nodes.NodeType.MacroBody:
@@ -369,7 +376,9 @@ export class Assembler {
             }
             return sym.value;
         } else if (!ctx.generateCode) {
-            console.warn(`Access to undefined symbol ${symTok.symbol}, setting 0 to fix in pass 2`);
+            // Used in TSS8 - this is potentially dangerous because it could be used in an IFNZRO that generaes code,
+            // thereby changing the CLCs of pass 1 vs pass 2
+            console.warn(`Access to undefined symbol ${symTok.symbol}, assuming 0 in pass 1 - this is dangerous!`);
             return 0;
         } else {
             throw Error(`Undefined symbol: ${symTok.symbol}`, {cause: symTok});
@@ -404,7 +413,7 @@ export class Assembler {
         }
     }
 
-    private isPseudoExpr(expr: Nodes.Expression): expr is Nodes.SymbolGroup {
+    private isPseudoExpr(expr: Nodes.Expression): boolean {
         if (expr.type != Nodes.NodeType.SymbolGroup) {
             return false;
         }
@@ -415,7 +424,7 @@ export class Assembler {
         return sym.type == SymbolType.Pseudo;
     }
 
-    private isMRIExpr(expr: Nodes.Expression): expr is Nodes.SymbolGroup {
+    private isMRIExpr(expr: Nodes.Expression): boolean {
         // An MRI expression needs to start with an MRI op followed by a space -> group
         if (expr.type != Nodes.NodeType.SymbolGroup) {
             return false;
@@ -430,29 +439,30 @@ export class Assembler {
         return ((sym.value & 0o777) == 0) && (sym.value <= 0o5000);
     }
 
-    private genMRI(ctx: Context, group: Nodes.SymbolGroup, mri: number, dst: number, ): number {
+    private genMRI(ctx: Context, group: Nodes.SymbolGroup, mri: number, dst: number): number {
         const IND   = 0b000100000000;
         const CUR   = 0b000010000000;
 
-        const val = mri | (dst & 0b1111111);
+        const effVal = mri | (dst & 0b1111111);
 
+        const curField = calcFieldNum(ctx.clc);
         const curPage = calcPageNum(ctx.clc);
         const dstPage = calcPageNum(dst);
-        if (curPage == dstPage) {
-            return val | CUR;
-        } else if (dstPage == 0) {
-            return val;
-        } else if (this.linkTable.has(calcFieldNum(ctx.clc), 0, dst)) {
+        if (dstPage == 0) {
+            return effVal;
+        } else if (curPage == dstPage) {
+            return effVal | CUR;
+        } else if (this.linkTable.has(curField, 0, dst)) {
             if (mri & IND) {
                 throw Error("Double indirection on zero page", {cause: group});
             }
-            const indAddr = this.linkTable.enter(calcFieldNum(ctx.clc), 0, dst);
+            const indAddr = this.linkTable.enter(curField, 0, dst);
             return mri | (indAddr & 0b1111111) | IND;
         } else {
             if (mri & IND) {
                 throw Error("Double indirection on current page", {cause: group});
             }
-            const indAddr = this.linkTable.enter(calcFieldNum(ctx.clc), curPage, dst);
+            const indAddr = this.linkTable.enter(curField, curPage, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
         }
     }

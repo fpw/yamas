@@ -84,10 +84,10 @@ export class Lexer {
         };
     }
 
+    private floatRegex = /^([-+]?(([0-9]+\.[0-9]+)|([0-9]+)|(\.([0-9]+))))([eE]([-+]?[0-9]+))?/;
     public nextFloat(): Tokens.FloatToken {
         const startCursor = this.cursor;
-
-        const match = this.data.substring(this.cursor.dataIdx).match(/^([-+]?[0-9]+(\.[0-9]+)?)E([-+]?[0-9]+)/);
+        const match = this.data.substring(this.cursor.dataIdx).match(this.floatRegex);
         if (!match) {
             throw Lexer.mkError("Invalid float format", startCursor);
         }
@@ -96,8 +96,7 @@ export class Lexer {
 
         return {
             type: Tokens.TokenType.Float,
-            mantissa: match[1],
-            exponent: match[3],
+            float: Number.parseFloat(match[0]),
             ...this.getTokenMeasurement(startCursor),
         };
     }

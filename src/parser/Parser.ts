@@ -110,9 +110,9 @@ export class Parser {
                 const str = this.lexer.nextStringLiteral();
                 return {type: Nodes.NodeType.Text, token: str};
             case "DUBL":
-                return this.parseDubl(startSym);
+                return this.parseDublList(startSym);
             case "FLTG":
-                return this.parseFltg(startSym);
+                return this.parseFltgList(startSym);
             default:
                 throw Parser.mkTokError(`Unhandled keyword ${startSym.symbol}`, startSym);
         }
@@ -379,40 +379,15 @@ export class Parser {
         return { type: Nodes.NodeType.Integer, token: tok };
     }
 
-    // eslint-disable-next-line max-lines-per-function
-    private parseDubl(dublSym: Tokens.SymbolToken): Nodes.DoubleIntList {
+    private parseDublList(dublSym: Tokens.SymbolToken): Nodes.DoubleIntList {
         const list: (Nodes.DoubleInt | Nodes.StatementSeparator | Nodes.Comment)[] = [];
 
-        let done = false;
-        while (!done) {
-            const next = this.lexer.nextNonBlank();
-            switch (next.type) {
-                case Tokens.TokenType.Separator:
-                case Tokens.TokenType.EOL:
-                    list.push(this.parseSeparator(next));
-                    break;
-                case Tokens.TokenType.Integer:
-                    list.push({type: Nodes.NodeType.DoubleInt, token: next});
-                    break;
-                case Tokens.TokenType.Comment:
-                    list.push(this.parseComment(next));
-                    break;
-                case Tokens.TokenType.Char:
-                    if (next.char == "+" || next.char == "-") {
-                        const nextInt = this.lexer.next();
-                        if (nextInt.type != Tokens.TokenType.Integer) {
-                            throw Parser.mkTokError("Unexpected unary operand", nextInt);
-                        }
-                        list.push({type: Nodes.NodeType.DoubleInt, unaryOp: next, token: nextInt});
-                    } else {
-                        this.lexer.unget(next);
-                        done = true;
-                    }
-                    break;
-                default:
-                    this.lexer.unget(next);
-                    done = true;
-                    break;
+        while (true) {
+            const dubl = this.parseDubl();
+            if (dubl) {
+                list.push(dubl);
+            } else {
+                break;
             }
         }
 
@@ -423,39 +398,42 @@ export class Parser {
         };
     }
 
-    // eslint-disable-next-line max-lines-per-function
-    private parseFltg(fltgSym: Tokens.SymbolToken): Nodes.FloatList {
+    private parseDubl(): Nodes.DoubleInt | Nodes.StatementSeparator | Nodes.Comment | undefined {
+        const next = this.lexer.nextNonBlank();
+        switch (next.type) {
+            case Tokens.TokenType.Comment:
+                return this.parseComment(next);
+            case Tokens.TokenType.Separator:
+            case Tokens.TokenType.EOL:
+                return this.parseSeparator(next);
+            case Tokens.TokenType.Integer:
+                return {type: Nodes.NodeType.DoubleInt, token: next};
+            case Tokens.TokenType.Char:
+                if (next.char == "+" || next.char == "-") {
+                    const nextInt = this.lexer.next();
+                    if (nextInt.type != Tokens.TokenType.Integer) {
+                        throw Parser.mkTokError("Unexpected unary operand", nextInt);
+                    }
+                    return { type: Nodes.NodeType.DoubleInt, unaryOp: next, token: nextInt};
+                } else {
+                    this.lexer.unget(next);
+                    return undefined;
+                }
+            default:
+                this.lexer.unget(next);
+                return undefined;
+        }
+    }
+
+    private parseFltgList(fltgSym: Tokens.SymbolToken): Nodes.FloatList {
         const list: (Nodes.Float | Nodes.StatementSeparator | Nodes.Comment)[] = [];
 
-        let done = false;
-        while (!done) {
-            const next = this.lexer.nextNonBlank();
-            switch (next.type) {
-                case Tokens.TokenType.Separator:
-                case Tokens.TokenType.EOL:
-                    list.push(this.parseSeparator(next));
-                    break;
-                case Tokens.TokenType.Integer:
-                    this.lexer.unget(next);
-                    list.push({type: Nodes.NodeType.Float, token: this.lexer.nextFloat()});
-                    break;
-                case Tokens.TokenType.Char:
-                    if (next.char == "-" || next.char == "+" || (next.char >= "0" && next.char <= "9")) {
-                        this.lexer.unget(next);
-                        list.push({type: Nodes.NodeType.Float, token: this.lexer.nextFloat()});
-                    } else {
-                        this.lexer.unget(next);
-                        done = true;
-                        break;
-                    }
-                    break;
-                case Tokens.TokenType.Comment:
-                    list.push(this.parseComment(next));
-                    break;
-                default:
-                    this.lexer.unget(next);
-                    done = true;
-                    break;
+        while (true) {
+            const fltg = this.parseFloat();
+            if (fltg) {
+                list.push(fltg);
+            } else {
+                break;
             }
         }
 
@@ -464,6 +442,31 @@ export class Parser {
             list: list,
             token: fltgSym,
         };
+    }
+
+    private parseFloat(): Nodes.Float | Nodes.StatementSeparator | Nodes.Comment | undefined {
+        const next = this.lexer.nextNonBlank();
+        switch (next.type) {
+            case Tokens.TokenType.Comment:
+                return this.parseComment(next);
+            case Tokens.TokenType.Separator:
+            case Tokens.TokenType.EOL:
+                return this.parseSeparator(next);
+            case Tokens.TokenType.Integer:
+                this.lexer.unget(next);
+                return {type: Nodes.NodeType.Float, token: this.lexer.nextFloat()};
+            case Tokens.TokenType.Char:
+                if (["-", "+", "."].includes(next.char) || (next.char >= "0" && next.char <= "9")) {
+                    this.lexer.unget(next);
+                    return {type: Nodes.NodeType.Float, token: this.lexer.nextFloat()};
+                } else {
+                    this.lexer.unget(next);
+                    return undefined;
+                }
+            default:
+                this.lexer.unget(next);
+                return undefined;
+        }
     }
 
     private parseDefine(token: Tokens.SymbolToken): Nodes.DefineStatement {

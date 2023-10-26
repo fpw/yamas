@@ -6,7 +6,7 @@ describe("GIVEN an assembler", () => {
             *177
             PAGE
             A=.
-            PAGE / as per macro8x and PALBART because they use the last emitted address, TODO: test against PAL8
+            PAGE / Verified against dec-08-cma1-pb
             B=.
             *576
             HLT

@@ -234,14 +234,14 @@ export class Assembler {
     private handlePage(ctx: Context, group: Nodes.SymbolGroup) {
         if (group.exprs.length == 0) {
             // subtracting 1 because the cursor is already at the next statement
-            const curPage = Common.calcPageNum(ctx.clc - 1);
-            ctx.clc = Common.firstAddrInPage(Common.calcFieldNum(ctx.clc), curPage + 1);
+            const curPage = this.calcPageNum(ctx.clc - 1);
+            ctx.clc = this.firstAddrInPage(this.calcFieldNum(ctx.clc), curPage + 1);
         } else if (group.exprs.length == 1) {
             const page = this.safeEval(ctx, group.exprs[0]);
             if (page < 0 || page > 31) {
                 throw this.error(`Invalid page ${page}`, group);
             }
-            ctx.clc = Common.firstAddrInPage(Common.calcFieldNum(ctx.clc), page);
+            ctx.clc = this.firstAddrInPage(this.calcFieldNum(ctx.clc), page);
         } else {
             throw this.error("Expected zero or one parameter for PAGE", group);
         }
@@ -254,7 +254,7 @@ export class Assembler {
             if (field < 0 || field > 7) {
                 throw this.error(`Invalid field ${field}`, group);
             }
-            ctx.clc = Common.firstAddrInPage(field, 1);
+            ctx.clc = this.firstAddrInPage(field, 1);
             this.outputHandler?.changeField(field);
             this.outputHandler?.changeOrigin(ctx.clc);
         } else {
@@ -399,11 +399,11 @@ export class Assembler {
         }
 
         if (expr.paren == "(") {
-            const curPage = Common.calcPageNum(ctx.clc);
-            const link = this.linkTable.enter(Common.calcFieldNum(ctx.clc), curPage, val);
+            const curPage = this.calcPageNum(ctx.clc);
+            const link = this.linkTable.enter(this.calcFieldNum(ctx.clc), curPage, val);
             return link;
         } else if (expr.paren == "[") {
-            const link = this.linkTable.enter(Common.calcFieldNum(ctx.clc), 0, val);
+            const link = this.linkTable.enter(this.calcFieldNum(ctx.clc), 0, val);
             return link;
         } else {
             throw this.error(`Invalid parentheses: "${expr.paren}"`, expr);
@@ -472,9 +472,9 @@ export class Assembler {
 
         const effVal = mri | (dst & 0b1111111);
 
-        const curField = Common.calcFieldNum(ctx.clc);
-        const curPage = Common.calcPageNum(ctx.clc);
-        const dstPage = Common.calcPageNum(dst);
+        const curField = this.calcFieldNum(ctx.clc);
+        const curPage = this.calcPageNum(ctx.clc);
+        const dstPage = this.calcPageNum(dst);
         if (dstPage == 0) {
             return effVal;
         } else if (curPage == dstPage) {
@@ -492,13 +492,6 @@ export class Assembler {
             const indAddr = this.linkTable.enter(curField, curPage, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
         }
-    }
-
-    private outputLinks(ctx: Context) {
-        this.linkTable.visit((field, addr, val) => {
-            // TODO change fields
-            this.outputHandler?.writeValue(addr, val);
-        });
     }
 
     /**
@@ -540,34 +533,40 @@ export class Assembler {
 
     private outputFltg(ctx: Context, stmt: Nodes.FloatList) {
         let loc = ctx.clc;
-        for (const dubl of stmt.list) {
-            if (dubl.type != Nodes.NodeType.Float) {
+        for (const fltg of stmt.list) {
+            if (fltg.type != Nodes.NodeType.Float) {
                 continue;
             }
 
-            const match = dubl.token.mantissa.match(/^([+-]?)([0-9]+)(\.([0-9]+))?$/);
-            if (!match) {
-                throw this.error(`Unexpected mantissa format ${dubl.token.mantissa}`, stmt);
-            }
-            const [_mAll, mNeg, mInt, _mDecAll, mDec] = match;
-
-            let exp = Number.parseInt(dubl.token.exponent);
-            let mantissa;
-            if (mDec) {
-                // concatenate strings (!) to get intergal mantissa
-                mantissa = Number.parseInt(mInt + mDec);
-                // and fix exp for that
-                exp -= mDec.length;
-            } else {
-                mantissa = Number.parseInt(mInt);
-            }
-
-            const [m, e] = Common.toDECFloat(mNeg === "-", mantissa, exp);
-            this.outputHandler?.writeValue(loc + 0, e & 0o7777);
-            this.outputHandler?.writeValue(loc + 1, (m >> 12) & 0o7777);
-            this.outputHandler?.writeValue(loc + 2, m & 0o7777);
+            const [e, m1, m2] = Common.toDECFloat(fltg.token.float);
+            this.outputHandler?.writeValue(loc + 0, e);
+            this.outputHandler?.writeValue(loc + 1, m1);
+            this.outputHandler?.writeValue(loc + 2, m2);
             loc += 3;
         }
+    }
+
+    private outputLinks(ctx: Context) {
+        const curField = this.calcFieldNum(ctx.clc);
+
+        this.linkTable.visit((field, addr, val) => {
+            if (field != curField) {
+                this.outputHandler?.changeField(field);
+            }
+            this.outputHandler?.writeValue(addr, val);
+        });
+    }
+
+    private calcPageNum(loc: number): number {
+        return (loc >> 7) & 31;
+    }
+
+    private calcFieldNum(loc: number): number {
+        return (loc >> 12) & 7;
+    }
+
+    private firstAddrInPage(fieldNum: number, pageNum: number): number {
+        return (fieldNum * 0o10000) | (pageNum * 0o200);
     }
 
     private error(msg: string, node: Nodes.Node) {

@@ -61,8 +61,7 @@ export interface IntegerToken extends BaseToken {
 
 export interface FloatToken extends BaseToken {
     type: TokenType.Float;
-    mantissa: string;
-    exponent: string;
+    float: number;
 }
 
 export interface CharToken extends BaseToken {
@@ -108,7 +107,7 @@ export function tokenToString(tok: Token): string {
         case TokenType.ASCII:       return `ASCII('${replaceBlanks(tok.char)}')`;
         case TokenType.Comment:     return `Comment("${tok.comment}")`;
         case TokenType.Integer:     return `Integer(${tok.value})`;
-        case TokenType.Float:       return `Float(m=${tok.mantissa}, e=${tok.exponent})`;
+        case TokenType.Float:       return `Float(${tok.float})`;
         case TokenType.MacroBody:   return `MacroBody(${replaceBlanks(tok.body)})`;
         case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
         case TokenType.String:      return `String("${tok.str}", '${tok.delim}')`;

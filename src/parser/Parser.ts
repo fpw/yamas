@@ -380,7 +380,7 @@ export class Parser {
     }
 
     private parseDublList(dublSym: Tokens.SymbolToken): Nodes.DoubleIntList {
-        const list: (Nodes.DoubleInt | Nodes.StatementSeparator | Nodes.Comment)[] = [];
+        const list: Nodes.DublListMember[] = [];
 
         while (true) {
             const dubl = this.parseDubl();
@@ -398,7 +398,7 @@ export class Parser {
         };
     }
 
-    private parseDubl(): Nodes.DoubleInt | Nodes.StatementSeparator | Nodes.Comment | undefined {
+    private parseDubl(): Nodes.DublListMember | undefined {
         const next = this.lexer.nextNonBlank();
         switch (next.type) {
             case Tokens.TokenType.Comment:
@@ -426,7 +426,7 @@ export class Parser {
     }
 
     private parseFltgList(fltgSym: Tokens.SymbolToken): Nodes.FloatList {
-        const list: (Nodes.Float | Nodes.StatementSeparator | Nodes.Comment)[] = [];
+        const list: Nodes.FloatListMember[] = [];
 
         while (true) {
             const fltg = this.parseFloat();
@@ -444,7 +444,7 @@ export class Parser {
         };
     }
 
-    private parseFloat(): Nodes.Float | Nodes.StatementSeparator | Nodes.Comment | undefined {
+    private parseFloat(): Nodes.FloatListMember | undefined {
         const next = this.lexer.nextNonBlank();
         switch (next.type) {
             case Tokens.TokenType.Comment:

@@ -134,9 +134,10 @@ export interface StatementSeparator extends BaseNode {
 }
 
 // DUBL
+export type DublListMember = (DoubleInt | StatementSeparator | Comment);
 export interface DoubleIntList extends BaseNode {
     type: NodeType.DoubleIntList;
-    list: (DoubleInt | StatementSeparator | Comment)[];
+    list: DublListMember[];
     token: Tokens.SymbolToken; // on DUBL
 }
 
@@ -147,9 +148,10 @@ export interface DoubleInt extends BaseNode {
 }
 
 // FLTG
+export type FloatListMember = (Float | StatementSeparator | Comment);
 export interface FloatList extends BaseNode {
     type: NodeType.FloatList;
-    list: (Float | StatementSeparator | Comment)[];
+    list: FloatListMember[];
     token: Tokens.SymbolToken; // on FLTG
 }
 

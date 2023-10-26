@@ -10,7 +10,6 @@ export const OperatorChars = [
     ".", ",", "=", "*",
     "(", ")", "[", "]",
     "+", "-", "!", "&", "^", "%",
-    "-",
 ];
 
 export type Token =

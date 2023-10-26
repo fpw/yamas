@@ -33,7 +33,7 @@ describe("GIVEN an assembler", () => {
                         JMP START
 
         `);
-        test("THEN it should behave as stated in the manual", () => {
+        test("THEN the output should match the one on the manual page", () => {
             expect(data.memory[0o200]).toEqual(0o1777);
             expect(data.memory[0o201]).toEqual(0o1376);
             expect(data.memory[0o202]).toEqual(0o3777);

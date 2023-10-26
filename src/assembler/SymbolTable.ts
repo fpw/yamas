@@ -2,7 +2,7 @@ export enum SymbolType {
     Param,      // A=x
     Label,      // A,
     Pseudo,     // PAGE, DECIMAL, ...
-    Fixed,      // Converted from param using FIXTAB
+    Fixed,      // Converted from param using FIXTAB. Means no output in symbol table.
     Permanent,  // I and Z
     Macro,      // DEFINE
 }
@@ -87,7 +87,7 @@ export class SymbolTable {
 
     public getSymbols(): SymbolData[] {
         const all = [...this.symbols.values()];
-        return all.sort((a, b) => a.name.localeCompare(b.name));
+        return all.sort((a, b) => a.name.localeCompare(b.name, "ascii"));
     }
 
     private defineSymbol(data: SymbolData) {
@@ -108,7 +108,7 @@ export class SymbolTable {
 
             if (isParamRedefine || isLabelCheck) {
                 sym.value = data.value;
-                return sym;
+                return;
             } else {
                 throw Error(`Duplicate symbol ${normName}, old: ${sym.value}, new: ${data.value}`);
             }
@@ -118,6 +118,6 @@ export class SymbolTable {
     }
 
     private normalizeName(name: string) {
-        return name.toLocaleUpperCase().substring(0, 6);
+        return name.toUpperCase().substring(0, 6);
     }
 }

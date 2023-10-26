@@ -84,7 +84,7 @@ export class Lexer {
         };
     }
 
-    private floatRegex = /^([-+]?(([0-9]+\.[0-9]+)|([0-9]+)|(\.([0-9]+))))([eE]([-+]?[0-9]+))?/;
+    private floatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([eE][-+]?\d+)?/;
     public nextFloat(): Tokens.FloatToken {
         const startCursor = this.cursor;
         const match = this.data.substring(this.cursor.dataIdx).match(this.floatRegex);
@@ -170,7 +170,7 @@ export class Lexer {
             return this.scanNewLine(data);
         } else if (first == " " || first == "\t" || first == "\f") {
             return this.scanBlank(data);
-        } else if (first >= "A" && first <= "Z") {
+        } else if ((first >= "A" && first <= "Z") || (first >= "a" && first <= "z")) {
             const sym = this.scanSymbol(data);
             if (sym.type == Tokens.TokenType.Symbol && this.substitutions.has(sym.symbol)) {
                 this.activateSubstitution(sym.symbol);
@@ -232,8 +232,9 @@ export class Lexer {
         const startCursor = this.cursor;
         let symbol = "";
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
-            if ((data[i] >= "A" && data[i] <= "Z") || (data[i] >= "0" && data[i] <= "9")) {
-                symbol += data[i];
+            const c = data[i].toUpperCase();
+            if ((c >= "A" && c <= "Z") || (c >= "0" && c <= "9")) {
+                symbol += c;
             } else {
                 break;
             }

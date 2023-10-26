@@ -7,8 +7,12 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "lint": "tsc && eslint .",
-    "test": "vitest src",
+    "test": "vitest run --dir src",
+    "test:watch": "vitest --dir src",
     "test:coverage": "vitest run --coverage"
+  },
+  "bin": {
+    "yamas": "dist/src/main.js"
   },
   "dependencies": {
     "ts-command-line-args": "^2.5.1"
@@ -23,6 +27,7 @@
     "typescript": "^5.2.2",
     "vitest": "^0.34.6"
   },
+  "types": "dist/src/index.d.ts",
   "eslintConfig": {
     "plugins": [
       "@typescript-eslint"
@@ -96,7 +101,8 @@
     },
     "ignorePatterns": [
       "public/",
-      "build/",
+      "coverage/",
+      "dist/",
       "node_modules/"
     ]
   },

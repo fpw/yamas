@@ -5,7 +5,7 @@ import { assemble } from "./util";
 describe("GIVEN an assembler", () => {
     describe("WHEN evaluating expression statements", () => {
         const data = assemble(`
-            OSR     / Non-MRI
+            osr     / Non-MRI, also test lowercase
             TAD     / MRI without parameters
             TAD^2   / MRI in expression
             .&7

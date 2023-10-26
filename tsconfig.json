@@ -7,6 +7,8 @@
     "types": [
       "vitest/globals"
     ],
+    "outDir": "dist",
+    "declaration": true,
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -19,11 +21,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "noEmit": true,
-    "incremental": true
+    "noEmit": false,
+    "incremental": true,
+    "noImplicitThis": true,
+    "noImplicitReturns": true,
+    "noImplicitAny": true,
   },
   "include": [
-    "src",
+    "src/",
     "vite.config.ts"
   ],
 }

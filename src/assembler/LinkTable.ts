@@ -36,7 +36,7 @@ export class LinkTable {
         if (linkCount == 0) {
             return;
         }
-        console.log(numToOctal(page, 4), numToOctal(clc, 4))
+
         const lowAddr = this.indexToAddr(page, linkCount - 1);
         if (clc >= lowAddr) {
             throw Error(`Link table for page ${page} in field ${field} overlap`);

@@ -14,7 +14,7 @@ describe("GIVEN an assembler", () => {
                     .1
             TAG, CLA
         `);
-        test("THEN they should behave as intended", () => {
+        test("THEN they should generate 12 bit exponents and 24 bit mantissas", () => {
             expect(data.symbols["TAG"]).equals(0o422);
 
             // the original MACRO-8 (dec-08-cma1-pb) generates slightly different,

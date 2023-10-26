@@ -37,6 +37,14 @@ export function parseIntSafe(str: string, radix: 8 | 10 | 16): number {
     return Number.parseInt(str, radix);
 }
 
+export function calcPageNum(loc: number): number {
+    return (loc >> 7) & 31;
+}
+
+export function firstAddrInPage(pageNum: number): number {
+    return pageNum * 0o200;
+}
+
 export function to7BitAscii(chr: string, markParity: boolean): number {
     const code = chr.codePointAt(0);
     if (code === undefined || code >= 0x80) {

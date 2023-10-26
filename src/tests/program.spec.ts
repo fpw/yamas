@@ -1,4 +1,5 @@
 /* eslint-disable max-lines-per-function */
+import { dumpNode } from "../parser/Node";
 import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
@@ -63,6 +64,11 @@ describe("GIVEN an assembler", () => {
             expect(data.memory[0o577]).toEqual(0o0003);
             expect(data.memory[0o10177]).toEqual(0o0002);
             expect(data.memory[0o20177]).toEqual(0o0003);
+
+            // Dumping a complex AST should not crash
+            let ast = "";
+            dumpNode(data.ast, line => ast += line + "\n");
+            expect(ast.length).toBeGreaterThan(0);
         });
     });
 });

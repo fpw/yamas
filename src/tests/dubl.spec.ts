@@ -6,11 +6,11 @@ describe("GIVEN an assembler", () => {
             *400
             DUBL    679467      / Example from page 6-2
                     44; -3      / of the MACRO-8 manual
-                    +2
+                    +2;NOP
             TAG, CLA
         `);
-        test("THEN they should behave as intended", () => {
-            expect(data.symbols["TAG"]).equals(0o410);
+        test("THEN they should generate signed 24 bit values", () => {
+            expect(data.symbols["TAG"]).equals(0o411);
 
             expect(data.memory[0o400]).equals(0o0245);
             expect(data.memory[0o401]).equals(0o7053);

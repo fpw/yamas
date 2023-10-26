@@ -7,7 +7,7 @@ describe("GIVEN an assembler", () => {
             *1234; B=.
             *100+20+4; C=.
         `);
-        test("THEN it should behave as intended", () => {
+        test("THEN it should affect the CLC operator", () => {
             expect(data.symbols["A"]).toEqual(0o200);
             expect(data.symbols["B"]).toEqual(0o1234);
             expect(data.symbols["C"]).toEqual(0o124);

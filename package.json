@@ -7,15 +7,17 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "lint": "tsc && eslint .",
-    "test": "vitest src"
+    "test": "vitest src",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "ts-command-line-args": "^2.5.1"
   },
   "devDependencies": {
-    "@types/node": "^20.8.7",
-    "@typescript-eslint/eslint-plugin": "^6.8.0",
-    "@typescript-eslint/parser": "^6.8.0",
+    "@types/node": "^20.8.9",
+    "@typescript-eslint/eslint-plugin": "^6.9.0",
+    "@typescript-eslint/parser": "^6.9.0",
+    "@vitest/coverage-v8": "^0.34.6",
     "eslint": "^8.52.0",
     "tsx": "^3.14.0",
     "typescript": "^5.2.2",
@@ -43,8 +45,16 @@
           "allowSingleLine": true
         }
       ],
-      "max-len": ["error", {"code": 120}],
-      "max-lines-per-function": ["error", 35],
+      "max-len": [
+        "error",
+        {
+          "code": 120
+        }
+      ],
+      "max-lines-per-function": [
+        "error",
+        35
+      ],
       "@typescript-eslint/comma-spacing": "error",
       "@typescript-eslint/require-await": "off",
       "@typescript-eslint/no-non-null-assertion": "off",

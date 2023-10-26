@@ -1,3 +1,5 @@
+import { calcPageNum, numToOctal } from "../common";
+
 export class LinkTable {
     private entries: number[][][] = [];
 
@@ -20,8 +22,25 @@ export class LinkTable {
             return idx;
         }
 
+        if (this.entries[field][page].length == 0o200) {
+            throw Error(`No more space in link page ${page} on field ${field}`);
+        }
+
         this.entries[field][page].push(value);
         return this.indexToAddr(page, this.entries[field][page].length - 1);
+    }
+
+    public checkOverlap(field: number, clc: number) {
+        const page = calcPageNum(clc);
+        const linkCount = this.entries[field][page].length;
+        if (linkCount == 0) {
+            return;
+        }
+        console.log(numToOctal(page, 4), numToOctal(clc, 4))
+        const lowAddr = this.indexToAddr(page, linkCount - 1);
+        if (clc >= lowAddr) {
+            throw Error(`Link table for page ${page} in field ${field} overlap`);
+        }
     }
 
     private tryLookup(field: number, page: number, value: number): number | undefined {

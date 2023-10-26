@@ -1,3 +1,5 @@
+/* eslint-disable max-lines-per-function */
+import { Assembler } from "../assembler/Assembler";
 import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
@@ -24,6 +26,25 @@ describe("GIVEN an assembler", () => {
             expect(data.symbols["A"]).toEqual(10);
             expect(data.symbols["B"]).toEqual(-23 & 0o7777);
             expect(data.symbols["C"]).toEqual(-8 & 0o7777);
+        });
+    });
+
+    describe("WHEN evaluating the ASCII operator", () => {
+        const data = assemble(`
+            OUT="A
+        `);
+        test("THEN it should generate mark parity", () => {
+            expect(data.symbols["OUT"]).toEqual("A".charCodeAt(0) | 0o200);
+        });
+    });
+
+    describe("WHEN accessing undefined symbols", () => {
+        const asm = new Assembler();
+        asm.parseInput("test.pa", `
+            IFNDEF A <GLITCH>
+        `);
+        test("THEN it should generate an error", () => {
+            expect(() => asm.assembleAll()).toThrow();
         });
     });
 });

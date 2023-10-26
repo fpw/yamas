@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
@@ -13,7 +14,7 @@ describe("GIVEN an assembler", () => {
             ADD (1000), I C
             C=321
         `);
-        test("THEN they should behave as intended", () => {
+        test("THEN they should assemble like a literal text replacement", () => {
             expect(data.memory[0o200]).toEqual(0o7200);
 
             // must put an immediate 1000 into last address of current page

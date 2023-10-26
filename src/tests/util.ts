@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { Assembler } from "../assembler/Assembler";
 import { Program } from "../parser/Node";
 import { PreludeEAE } from "../prelude/EAE";
@@ -30,7 +31,9 @@ export function assemble(input: string): TestData {
             enabled = e;
         },
         writeValue(clc, val) {
-            memory[field * 4096 + clc] = val;
+            if (enabled) {
+                memory[field * 4096 + clc] = val;
+            }
         },
     })
 

@@ -83,19 +83,27 @@ export class Assembler {
 
     private assembleProgram(ctx: Context, prog: Nodes.Program) {
         for (const stmt of prog.stmts) {
+            let generated: boolean;
             switch (stmt.type) {
                 case Nodes.NodeType.Text:
-                    this.outputText(ctx, stmt.token.str);
+                    generated = this.outputText(ctx, stmt.token.str);
                     break;
                 case Nodes.NodeType.DoubleIntList:
-                    this.outputDubl(ctx, stmt);
+                    generated = this.outputDubl(ctx, stmt);
                     break;
                 case Nodes.NodeType.FloatList:
-                    this.outputFltg(ctx, stmt);
+                    generated = this.outputFltg(ctx, stmt);
                     break;
                 case Nodes.NodeType.ExpressionStmt:
-                    this.handleExprStmt(ctx, stmt);
+                    generated = this.handleExprStmt(ctx, stmt);
                     break;
+                default:
+                    generated = false;
+            }
+
+            if (generated) {
+                // we just put something at CLC - check if it overlaps with a link
+                this.linkTable.checkOverlap(ctx.field, ctx.clc);
             }
 
             // symbols need to be updated here as well because it's possible to use
@@ -137,11 +145,13 @@ export class Assembler {
         }
     }
 
-    private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement) {
-        if (!this.isPseudoExpr(stmt.expr)) {
-            const val = this.safeEval(ctx, stmt.expr);
-            this.outputHandler?.writeValue(ctx.clc, val);
+    private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): boolean {
+        if (this.isPseudoExpr(stmt.expr)) {
+            return false;
         }
+        const val = this.safeEval(ctx, stmt.expr);
+        this.outputHandler?.writeValue(ctx.clc, val);
+        return true;
     }
 
     private updateCLC(ctx: Context, stmt: Nodes.Statement) {
@@ -235,14 +245,14 @@ export class Assembler {
     private handlePage(ctx: Context, group: Nodes.SymbolGroup) {
         if (group.exprs.length == 0) {
             // subtracting 1 because the cursor is already at the next statement
-            const curPage = this.calcPageNum(ctx.clc - 1);
-            ctx.clc = this.firstAddrInPage(curPage + 1);
+            const curPage = Common.calcPageNum(ctx.clc - 1);
+            ctx.clc = Common.firstAddrInPage(curPage + 1);
         } else if (group.exprs.length == 1) {
             const page = this.safeEval(ctx, group.exprs[0]);
             if (page < 0 || page > 31) {
                 throw this.error(`Invalid page ${page}`, group);
             }
-            ctx.clc = this.firstAddrInPage(page);
+            ctx.clc = Common.firstAddrInPage(page);
         } else {
             throw this.error("Expected zero or one parameter for PAGE", group);
         }
@@ -259,7 +269,7 @@ export class Assembler {
             }
 
             ctx.field = field;
-            ctx.clc = this.firstAddrInPage(1);
+            ctx.clc = Common.firstAddrInPage(1);
             if (ctx.generateCode) {
                 this.outputHandler?.changeField(field);
                 this.outputHandler?.changeOrigin(ctx.clc);
@@ -406,7 +416,7 @@ export class Assembler {
         }
 
         if (expr.paren == "(") {
-            const curPage = this.calcPageNum(ctx.clc);
+            const curPage = Common.calcPageNum(ctx.clc);
             const link = this.linkTable.enter(ctx.field, curPage, val);
             return link;
         } else if (expr.paren == "[") {
@@ -435,6 +445,10 @@ export class Assembler {
 
         if (lhs === null || rhs === null) {
             return null;
+        }
+
+        if (binOp.operator == "%" && rhs == 0) {
+            throw this.error("Division by zero", binOp);
         }
 
         switch (binOp.operator) {
@@ -480,8 +494,8 @@ export class Assembler {
         const effVal = mri | (dst & 0b1111111);
 
         const curField = ctx.field;
-        const curPage = this.calcPageNum(ctx.clc);
-        const dstPage = this.calcPageNum(dst);
+        const curPage = Common.calcPageNum(ctx.clc);
+        const dstPage = Common.calcPageNum(dst);
         if (dstPage == 0) {
             return effVal;
         } else if (curPage == dstPage) {
@@ -506,7 +520,7 @@ export class Assembler {
      * @param ctx current context
      * @param text text in ASCII
      */
-    private outputText(ctx: Context, text: string) {
+    private outputText(ctx: Context, text: string): boolean {
         let loc = ctx.clc;
         for (let i = 0; i < text.length - 1; i += 2) {
             const left = Common.asciiCharTo6Bit(text[i]);
@@ -520,9 +534,14 @@ export class Assembler {
             const left = Common.asciiCharTo6Bit(text[text.length - 1]);
             this.outputHandler?.writeValue(loc, left << 6);
         }
+        return true;
     }
 
-    private outputDubl(ctx: Context, stmt: Nodes.DoubleIntList) {
+    private outputDubl(ctx: Context, stmt: Nodes.DoubleIntList): boolean {
+        if (stmt.list.length == 0) {
+            return false;
+        }
+
         let loc = ctx.clc;
         for (const dubl of stmt.list) {
             if (dubl.type != Nodes.NodeType.DoubleInt) {
@@ -536,9 +555,14 @@ export class Assembler {
             this.outputHandler?.writeValue(loc + 1, num & 0o7777);
             loc += 2;
         }
+        return true;
     }
 
-    private outputFltg(ctx: Context, stmt: Nodes.FloatList) {
+    private outputFltg(ctx: Context, stmt: Nodes.FloatList): boolean {
+        if (stmt.list.length == 0) {
+            return false;
+        }
+
         let loc = ctx.clc;
         for (const fltg of stmt.list) {
             if (fltg.type != Nodes.NodeType.Float) {
@@ -551,6 +575,7 @@ export class Assembler {
             this.outputHandler?.writeValue(loc + 2, m2);
             loc += 3;
         }
+        return true;
     }
 
     private outputLinks(ctx: Context) {
@@ -561,14 +586,6 @@ export class Assembler {
             }
             this.outputHandler?.writeValue(addr, val);
         });
-    }
-
-    private calcPageNum(loc: number): number {
-        return (loc >> 7) & 31;
-    }
-
-    private firstAddrInPage(pageNum: number): number {
-        return pageNum * 0o200;
     }
 
     private error(msg: string, node: Nodes.Node) {

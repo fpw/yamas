@@ -68,6 +68,7 @@ export class Assembler {
     private createContext(generateCode: boolean): Context {
         return {
             clc: 0o200,
+            field: 0,
             radix: 8,
             generateCode: generateCode,
         };
@@ -235,17 +236,19 @@ export class Assembler {
         if (group.exprs.length == 0) {
             // subtracting 1 because the cursor is already at the next statement
             const curPage = this.calcPageNum(ctx.clc - 1);
-            ctx.clc = this.firstAddrInPage(this.calcFieldNum(ctx.clc), curPage + 1);
+            ctx.clc = this.firstAddrInPage(curPage + 1);
         } else if (group.exprs.length == 1) {
             const page = this.safeEval(ctx, group.exprs[0]);
             if (page < 0 || page > 31) {
                 throw this.error(`Invalid page ${page}`, group);
             }
-            ctx.clc = this.firstAddrInPage(this.calcFieldNum(ctx.clc), page);
+            ctx.clc = this.firstAddrInPage(page);
         } else {
             throw this.error("Expected zero or one parameter for PAGE", group);
         }
-        this.outputHandler?.changeOrigin(ctx.clc);
+        if (ctx.generateCode) {
+            this.outputHandler?.changeOrigin(ctx.clc);
+        }
     }
 
     private handleField(ctx: Context, group: Nodes.SymbolGroup) {
@@ -254,9 +257,13 @@ export class Assembler {
             if (field < 0 || field > 7) {
                 throw this.error(`Invalid field ${field}`, group);
             }
-            ctx.clc = this.firstAddrInPage(field, 1);
-            this.outputHandler?.changeField(field);
-            this.outputHandler?.changeOrigin(ctx.clc);
+
+            ctx.field = field;
+            ctx.clc = this.firstAddrInPage(1);
+            if (ctx.generateCode) {
+                this.outputHandler?.changeField(field);
+                this.outputHandler?.changeOrigin(ctx.clc);
+            }
         } else {
             throw this.error("Expected one parameter for FIELD", group);
         }
@@ -400,10 +407,10 @@ export class Assembler {
 
         if (expr.paren == "(") {
             const curPage = this.calcPageNum(ctx.clc);
-            const link = this.linkTable.enter(this.calcFieldNum(ctx.clc), curPage, val);
+            const link = this.linkTable.enter(ctx.field, curPage, val);
             return link;
         } else if (expr.paren == "[") {
-            const link = this.linkTable.enter(this.calcFieldNum(ctx.clc), 0, val);
+            const link = this.linkTable.enter(ctx.field, 0, val);
             return link;
         } else {
             throw this.error(`Invalid parentheses: "${expr.paren}"`, expr);
@@ -472,7 +479,7 @@ export class Assembler {
 
         const effVal = mri | (dst & 0b1111111);
 
-        const curField = this.calcFieldNum(ctx.clc);
+        const curField = ctx.field;
         const curPage = this.calcPageNum(ctx.clc);
         const dstPage = this.calcPageNum(dst);
         if (dstPage == 0) {
@@ -547,11 +554,10 @@ export class Assembler {
     }
 
     private outputLinks(ctx: Context) {
-        const curField = this.calcFieldNum(ctx.clc);
-
         this.linkTable.visit((field, addr, val) => {
-            if (field != curField) {
+            if (field != ctx.field) {
                 this.outputHandler?.changeField(field);
+                ctx.field = field;
             }
             this.outputHandler?.writeValue(addr, val);
         });
@@ -561,12 +567,8 @@ export class Assembler {
         return (loc >> 7) & 31;
     }
 
-    private calcFieldNum(loc: number): number {
-        return (loc >> 12) & 7;
-    }
-
-    private firstAddrInPage(fieldNum: number, pageNum: number): number {
-        return (fieldNum * 0o10000) | (pageNum * 0o200);
+    private firstAddrInPage(pageNum: number): number {
+        return pageNum * 0o200;
     }
 
     private error(msg: string, node: Nodes.Node) {

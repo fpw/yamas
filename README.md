@@ -45,6 +45,9 @@ Expressions can be null in pass 1, for example when a symbol is used that is onl
 For that reason, the assembler differentiates between defined and undefined expressions. Using an undefined expression in an `IFZERO` is not okay
 because the resulting CLC can't be calculated - but using it in something like ``A=JMS X`` is completely fine.
 
+It's still possible to cause havoc (as in palbart and macro8x) by using undefined symbols in `IFDEF`/ `IFNDEF` when they are defined later.
+But this is usually noticed when labels after the conditional are assembled since the addresses will not match between pass 1 and 2.
+
 `null` is used instead of `define` so that the linter will spot a missing `case`
 in the eval functions after adding a new node type. It would probably be better to
 use a `Maybe` type so that exrepssions like `if (!val)` are also caught.

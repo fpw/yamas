@@ -1,4 +1,4 @@
-import { CodeError } from "../CodeError";
+import { CodeError } from "../utils/CodeError";
 import * as Tokens from "./Token";
 
 export interface Cursor {

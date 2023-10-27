@@ -25,7 +25,7 @@
  *
  */
 
-import { replaceBlanks } from "../common";
+import { replaceBlanks } from "../utils/Strings";
 import * as Tokens from "../lexer/Token";
 
 export enum NodeType {

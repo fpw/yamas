@@ -1,4 +1,4 @@
-import { replaceBlanks } from "../common";
+import { replaceBlanks } from "../utils/Strings";
 import { Cursor } from "./Lexer";
 
 export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";

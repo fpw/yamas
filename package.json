@@ -7,8 +7,8 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "lint": "tsc && eslint .",
-    "test": "vitest run --dir src",
-    "test:watch": "vitest --dir src",
+    "test": "vitest run --dir test",
+    "test:watch": "vitest --dir test",
     "test:coverage": "vitest run --coverage"
   },
   "bin": {

@@ -1,12 +1,13 @@
-import { calcPageNum, numToOctal } from "../common";
+import * as PDP8 from "../utils/PDP8";
 
 export class LinkTable {
+    // [field][page][index]
     private entries: number[][][] = [];
 
     public constructor() {
-        for (let field = 0; field < 8; field++) {
+        for (let field = 0; field < PDP8.NumFields; field++) {
             this.entries[field] = [];
-            for (let page = 0; page < 32; page++) {
+            for (let page = 0; page < PDP8.NumPages; page++) {
                 this.entries[field][page] = [];
             }
         }
@@ -22,7 +23,7 @@ export class LinkTable {
             return idx;
         }
 
-        if (this.entries[field][page].length == 0o200) {
+        if (this.entries[field][page].length == PDP8.PageSize) {
             throw Error(`No more space in link page ${page} on field ${field}`);
         }
 
@@ -31,7 +32,7 @@ export class LinkTable {
     }
 
     public checkOverlap(field: number, clc: number) {
-        const page = calcPageNum(clc);
+        const page = PDP8.calcPageNum(clc);
         const linkCount = this.entries[field][page].length;
         if (linkCount == 0) {
             return;
@@ -53,12 +54,12 @@ export class LinkTable {
     }
 
     private indexToAddr(page: number, idx: number): number {
-        return page * 0o200 + (0o177 - idx);
+        return page * PDP8.PageSize + (PDP8.PageSize - 1 - idx);
     }
 
     public visit(f: (field: number, addr: number, val: number) => void) {
-        for (let field = 0; field < 8; field++) {
-            for (let page = 0; page < 32; page++) {
+        for (let field = 0; field < PDP8.NumFields; field++) {
+            for (let page = 0; page < PDP8.NumPages; page++) {
                 for (let i = this.entries[field][page].length - 1; i >= 0; i--) {
                     f(field, this.indexToAddr(page, i), this.entries[field][page][i]);
                 }

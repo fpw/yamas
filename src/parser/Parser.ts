@@ -1,4 +1,4 @@
-import { CodeError } from "../CodeError";
+import { CodeError } from "../utils/CodeError";
 import { Lexer } from "../lexer/Lexer";
 import * as Tokens from "../lexer/Token";
 import * as Nodes from "./Node";

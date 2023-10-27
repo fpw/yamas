@@ -1,12 +1,14 @@
-import * as Common from "../common";
 import * as Nodes from "../parser/Node";
+import * as PDP8 from "../utils/PDP8";
+import * as CharSets from "../utils/CharSets";
 import { Parser } from "../parser/Parser";
+import { toDECFloat } from "../utils/Floats";
+import { parseIntSafe } from "../utils/Strings";
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
 import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable";
 
 export interface OutputHandler {
-    setEnable(enable: boolean): void;
     changeOrigin(clc: number): void;
     changeField(field: number): void;
     writeValue(clc: number, val: number): void;
@@ -37,7 +39,6 @@ export class Assembler {
 
     public setOutputHandler(out: OutputHandler) {
         this.outputHandler = out;
-        out.setEnable(false);
     }
 
     public parseInput(name: string, input: string): Nodes.Program {
@@ -56,10 +57,8 @@ export class Assembler {
         this.programs.forEach(p => this.assignSymbols(symCtx, p));
 
         const asmCtx = this.createContext(true);
-        this.outputHandler?.changeOrigin(asmCtx.clc);
 
-        this.outputHandler?.setEnable(true);
-        this.outputHandler?.changeOrigin(asmCtx.clc);
+        this.punchOrigin(asmCtx, asmCtx.clc);
         this.programs.forEach(p => this.assembleProgram(asmCtx, p));
 
         this.outputLinks(asmCtx);
@@ -67,10 +66,11 @@ export class Assembler {
 
     private createContext(generateCode: boolean): Context {
         return {
-            clc: 0o200,
+            clc: PDP8.firstAddrInPage(1),
             field: 0,
             radix: 8,
             generateCode: generateCode,
+            punchEnabled: true,
         };
     }
 
@@ -150,7 +150,7 @@ export class Assembler {
             return false;
         }
         const val = this.safeEval(ctx, stmt.expr);
-        this.outputHandler?.writeValue(ctx.clc, val);
+        this.punchData(ctx, ctx.clc, val);
         return true;
     }
 
@@ -158,14 +158,10 @@ export class Assembler {
         switch (stmt.type) {
             case Nodes.NodeType.Origin:
                 ctx.clc = this.safeEval(ctx, stmt.val);
-                this.outputHandler?.changeOrigin(ctx.clc);
+                this.punchOrigin(ctx, ctx.clc);
                 break;
             case Nodes.NodeType.Text:
-                ctx.clc += Math.ceil(stmt.token.str.length / 2);
-                if (stmt.token.str.length % 2 == 0) {
-                    // null terminator. For odd-length strings, part of last symbol.
-                    ctx.clc++;
-                }
+                ctx.clc += CharSets.asciiStringToDec(stmt.token.str, true).length;
                 break;
             case Nodes.NodeType.DoubleIntList:
                 ctx.clc += stmt.list.filter(x => x.type == Nodes.NodeType.DoubleInt).length * 2;
@@ -218,12 +214,10 @@ export class Assembler {
                 this.handleCondition(ctx, group);
                 break;
             case "NOPUNC":
-                this.outputHandler?.setEnable(false);
+                ctx.punchEnabled = false;
                 break;
             case "ENPUNC":
-                if (ctx.generateCode) {
-                    this.outputHandler?.setEnable(true);
-                }
+                ctx.punchEnabled = true;
                 break;
         }
     }
@@ -233,7 +227,7 @@ export class Assembler {
             const num = this.safeEval(ctx, group.exprs[0]);
             for (let i = 0; i < num; i++) {
                 if (ctx.generateCode) {
-                    this.outputHandler?.writeValue(ctx.clc, 0);
+                    this.punchData(ctx, ctx.clc, 0);
                 }
                 ctx.clc++;
             }
@@ -245,34 +239,33 @@ export class Assembler {
     private handlePage(ctx: Context, group: Nodes.SymbolGroup) {
         if (group.exprs.length == 0) {
             // subtracting 1 because the cursor is already at the next statement
-            const curPage = Common.calcPageNum(ctx.clc - 1);
-            ctx.clc = Common.firstAddrInPage(curPage + 1);
+            const curPage = PDP8.calcPageNum(ctx.clc - 1);
+            ctx.clc = PDP8.firstAddrInPage(curPage + 1);
         } else if (group.exprs.length == 1) {
             const page = this.safeEval(ctx, group.exprs[0]);
-            if (page < 0 || page > 31) {
+            if (page < 0 || page >= PDP8.NumPages) {
                 throw this.error(`Invalid page ${page}`, group);
             }
-            ctx.clc = Common.firstAddrInPage(page);
+            ctx.clc = PDP8.firstAddrInPage(page);
         } else {
             throw this.error("Expected zero or one parameter for PAGE", group);
         }
         if (ctx.generateCode) {
-            this.outputHandler?.changeOrigin(ctx.clc);
+            this.punchOrigin(ctx, ctx.clc);
         }
     }
 
     private handleField(ctx: Context, group: Nodes.SymbolGroup) {
         if (group.exprs.length == 1) {
             const field = this.safeEval(ctx, group.exprs[0]);
-            if (field < 0 || field > 7) {
+            if (field < 0 || field >= PDP8.NumFields) {
                 throw this.error(`Invalid field ${field}`, group);
             }
 
             ctx.field = field;
-            ctx.clc = Common.firstAddrInPage(1);
+            ctx.clc = PDP8.firstAddrInPage(1);
             if (ctx.generateCode) {
-                this.outputHandler?.changeField(field);
-                this.outputHandler?.changeOrigin(ctx.clc);
+                this.punchField(ctx, field);
             }
         } else {
             throw this.error("Expected one parameter for FIELD", group);
@@ -334,9 +327,9 @@ export class Assembler {
     private tryEval(ctx: Context, expr: Nodes.Expression): number | null {
         switch (expr.type) {
             case Nodes.NodeType.Integer:
-                return Common.parseIntSafe(expr.token.value, ctx.radix) & 0o7777;
+                return parseIntSafe(expr.token.value, ctx.radix) & 0o7777;
             case Nodes.NodeType.ASCIIChar:
-                return Common.to7BitAscii(expr.token.char, true);
+                return CharSets.asciiCharTo7Bit(expr.token.char, true);
             case Nodes.NodeType.Symbol:
                 return this.evalSymbol(ctx, expr);
             case Nodes.NodeType.CLCValue:
@@ -416,7 +409,7 @@ export class Assembler {
         }
 
         if (expr.paren == "(") {
-            const curPage = Common.calcPageNum(ctx.clc);
+            const curPage = PDP8.calcPageNum(ctx.clc);
             const link = this.linkTable.enter(ctx.field, curPage, val);
             return link;
         } else if (expr.paren == "[") {
@@ -483,8 +476,8 @@ export class Assembler {
             return false;
         }
 
-        // We've got a fixed symbol, now check if it's a MRI
-        return ((sym.value & 0o777) == 0) && (sym.value <= 0o5000);
+        // We've got a fixed symbol, now check if it's a MRI opcode
+        return PDP8.isMRIOp(sym.value);
     }
 
     private genMRI(ctx: Context, group: Nodes.SymbolGroup, mri: number, dst: number): number {
@@ -494,8 +487,8 @@ export class Assembler {
         const effVal = mri | (dst & 0b1111111);
 
         const curField = ctx.field;
-        const curPage = Common.calcPageNum(ctx.clc);
-        const dstPage = Common.calcPageNum(dst);
+        const curPage = PDP8.calcPageNum(ctx.clc);
+        const dstPage = PDP8.calcPageNum(dst);
         if (dstPage == 0) {
             return effVal;
         } else if (curPage == dstPage) {
@@ -515,25 +508,9 @@ export class Assembler {
         }
     }
 
-    /**
-     * Output ASCII text as 6bit text
-     * @param ctx current context
-     * @param text text in ASCII
-     */
     private outputText(ctx: Context, text: string): boolean {
-        let loc = ctx.clc;
-        for (let i = 0; i < text.length - 1; i += 2) {
-            const left = Common.asciiCharTo6Bit(text[i]);
-            const right = Common.asciiCharTo6Bit(text[i + 1]);
-            this.outputHandler?.writeValue(loc, (left << 6) | right);
-            loc++;
-        }
-        if (text.length % 2 == 0) {
-            this.outputHandler?.writeValue(loc, 0);
-        } else {
-            const left = Common.asciiCharTo6Bit(text[text.length - 1]);
-            this.outputHandler?.writeValue(loc, left << 6);
-        }
+        const outStr = CharSets.asciiStringToDec(text, true);
+        outStr.forEach((w, i) => this.punchData(ctx, ctx.clc + i, w));
         return true;
     }
 
@@ -547,13 +524,12 @@ export class Assembler {
             if (dubl.type != Nodes.NodeType.DoubleInt) {
                 continue;
             }
-            let num = Common.parseIntSafe(dubl.token.value, 10);
+            let num = parseIntSafe(dubl.token.value, 10);
             if (dubl.unaryOp?.char === "-") {
                 num = -num;
             }
-            this.outputHandler?.writeValue(loc + 0, (num >> 12) & 0o7777);
-            this.outputHandler?.writeValue(loc + 1, num & 0o7777);
-            loc += 2;
+            this.punchData(ctx, loc++, (num >> 12) & 0o7777);
+            this.punchData(ctx, loc++, num & 0o7777);
         }
         return true;
     }
@@ -569,11 +545,10 @@ export class Assembler {
                 continue;
             }
 
-            const [e, m1, m2] = Common.toDECFloat(fltg.token.float);
-            this.outputHandler?.writeValue(loc + 0, e);
-            this.outputHandler?.writeValue(loc + 1, m1);
-            this.outputHandler?.writeValue(loc + 2, m2);
-            loc += 3;
+            const [e, m1, m2] = toDECFloat(fltg.token.float);
+            this.punchData(ctx, loc++, e);
+            this.punchData(ctx, loc++, m1);
+            this.punchData(ctx, loc++, m2);
         }
         return true;
     }
@@ -581,11 +556,30 @@ export class Assembler {
     private outputLinks(ctx: Context) {
         this.linkTable.visit((field, addr, val) => {
             if (field != ctx.field) {
-                this.outputHandler?.changeField(field);
+                this.punchField(ctx, field);
                 ctx.field = field;
             }
-            this.outputHandler?.writeValue(addr, val);
+
+            this.punchData(ctx, addr, val);
         });
+    }
+
+    private punchData(ctx: Context, addr: number, val: number) {
+        if (ctx.punchEnabled && this.outputHandler) {
+            this.outputHandler.writeValue(addr, val);
+        }
+    }
+
+    private punchOrigin(ctx: Context, origin: number) {
+        if (ctx.punchEnabled && this.outputHandler) {
+            this.outputHandler.changeOrigin(origin);
+        }
+    }
+
+    private punchField(ctx: Context, field: number) {
+        if (ctx.punchEnabled && this.outputHandler) {
+            this.outputHandler.changeField(field);
+        }
     }
 
     private error(msg: string, node: Nodes.Node) {

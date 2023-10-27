@@ -1,11 +1,11 @@
 import { Assembler } from "./assembler/Assembler";
-import { numToOctal } from "./common";
 import { dumpNode } from "./parser/Node";
 import { PreludeEAE } from "./prelude/EAE";
 import { PreludeFamily8 } from "./prelude/Family8";
 import { PreludeIO } from "./prelude/IO";
 import { BinTapeReader } from "./tapeformats/BinTapeReader";
 import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
+import * as Strings from "./utils/Strings";
 
 export interface Options {
     loadPrelude?: boolean;
@@ -59,9 +59,9 @@ export class Yamas {
 
         for (let i = 0; i < 8 * 4096; i++) {
             if (ourState[i] !== otherState[i]) {
-                const addrStr = numToOctal(i, 5);
-                const ourStr = ourState[i] !== undefined ? numToOctal(ourState[i]!, 4) : "null";
-                const otherStr = otherState[i] !== undefined ? numToOctal(otherState[i]!, 4) : "null";
+                const addrStr = Strings.numToOctal(i, 5);
+                const ourStr = ourState[i] !== undefined ? Strings.numToOctal(ourState[i]!, 4) : "null";
+                const otherStr = otherState[i] !== undefined ? Strings.numToOctal(otherState[i]!, 4) : "null";
                 console.log(`${addrStr}: ${ourStr} != ${otherStr}`);
             }
         }

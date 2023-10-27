@@ -76,7 +76,6 @@ export interface ASCIIToken extends BaseToken {
 export interface StringToken extends BaseToken {
     type: TokenType.String;
     str: string;
-    delim: string;
 }
 
 export interface CommentToken extends BaseToken {
@@ -109,7 +108,7 @@ export function tokenToString(tok: Token): string {
         case TokenType.Float:       return `Float(${tok.float})`;
         case TokenType.MacroBody:   return `MacroBody(${replaceBlanks(tok.body)})`;
         case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
-        case TokenType.String:      return `String("${tok.str}", '${tok.delim}')`;
+        case TokenType.String:      return `String("${tok.str}")`;
         case TokenType.Separator:   return `Separator('${replaceBlanks(tok.char)})`;
         case TokenType.EOL:         return `EOL('${replaceBlanks(tok.char)}')`;
         case TokenType.EOF:         return "EOF()";

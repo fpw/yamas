@@ -6,7 +6,12 @@ import * as Nodes from "./Node";
 type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 
 export class Parser {
-    private keywords = new Set(["TEXT", "DEFINE", "DUBL", "FLTG"]);
+    private keywords = new Set([
+        "TEXT",
+        "DEFINE",
+        "DUBL", "FLTG",
+        "EJECT",
+    ]);
     private inputName: string;
     private lexer: Lexer;
     private macros = new Map<string, Nodes.DefineStatement>();
@@ -95,6 +100,7 @@ export class Parser {
         return this.finishExprStatement(startSym);
     }
 
+    // eslint-disable-next-line max-lines-per-function
     private parseKeyword(startSym: Tokens.SymbolToken): Nodes.Statement {
         switch (startSym.symbol) {
             case "DEFINE":
@@ -107,12 +113,20 @@ export class Parser {
                     const got = Tokens.tokenToString(next);
                     throw Parser.mkTokError(`Syntax error in TEXT: Expected blank, got ${got}`, next);
                 }
-                const str = this.lexer.nextStringLiteral();
-                return {type: Nodes.NodeType.Text, token: str};
+                const [str, delimChr] = this.lexer.nextStringLiteral(true);
+                return {type: Nodes.NodeType.Text, token: str, delim: delimChr};
             case "DUBL":
                 return this.parseDublList(startSym);
             case "FLTG":
                 return this.parseFltgList(startSym);
+            case "EJECT":
+                const blank = this.lexer.next();
+                if (blank.type != Tokens.TokenType.Blank) {
+                    const got = Tokens.tokenToString(blank);
+                    throw Parser.mkTokError(`Syntax error in EJECT: Expected blank, got ${got}`, blank);
+                }
+                const [text, _] = this.lexer.nextStringLiteral(false);
+                return {type: Nodes.NodeType.Eject, token: text};
             default:
                 throw Parser.mkTokError(`Unhandled keyword ${startSym.symbol}`, startSym);
         }
@@ -160,10 +174,10 @@ export class Parser {
 
     /**
      * Parse expression parts separated by blanks, then either return a single
-     * expression or an expression group (e.g. [CLA, OSR]).
-     * Note that while Symbols are an AstElement and thus an expression, this function
+     * expression or an expression group (e.g. [CLA OSR]).
+     * Note that while Symbols are an Element and thus an expression, this function
      * will never return a single Symbol. Instead, it will return an expression group
-     * with a symbol and an empty operand array.
+     * with a symbol and an empty operand array for these situations.
      * This makes it a lot easier to figure out if the first part of an expression is a pseudo, an MRI etc.
      * because all of them will be in an expression group instead of a Symbol, a BinOp or something else.
      * @returns a symbol group or an expression that's not a single symbol
@@ -183,6 +197,7 @@ export class Parser {
             if (exprs.length == 1) {
                 return exprs[0];
             } else {
+                exprs.forEach(e => console.log(Nodes.formatSingle(e)));
                 throw Parser.mkNodeError("Logic error: Group not started by symbol", firstElem);
             }
         }
@@ -219,10 +234,20 @@ export class Parser {
         const first = this.lexer.nextNonBlank();
         if (first.type == Tokens.TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
+                const afterParen = this.lexer.nextNonBlank();
+                this.lexer.unget(afterParen);
+                let expr: Nodes.Expression;
+                if (afterParen.type == Tokens.TokenType.Symbol) {
+                    // starts with symbol -> could be group, e.g. (TAD I 1234)
+                    expr = this.parseExpr();
+                } else {
+                    // starts with something else -> don't try as group, e.g. (-CDF 0)
+                    expr = this.parseExpressionPart();
+                }
                 return {
                     type: Nodes.NodeType.ParenExpr,
                     paren: first.char,
-                    expr: this.parseExpressionPart(),
+                    expr: expr,
                     token: first,
                 }
             }

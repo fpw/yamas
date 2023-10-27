@@ -57,12 +57,15 @@ export class LinkTable {
         return page * PDP8.PageSize + (PDP8.PageSize - 1 - idx);
     }
 
-    public visit(f: (field: number, addr: number, val: number) => void) {
+    public visit(f: (field: number, addr: number, vals: number[]) => void) {
         for (let field = 0; field < PDP8.NumFields; field++) {
             for (let page = 0; page < PDP8.NumPages; page++) {
-                for (let i = this.entries[field][page].length - 1; i >= 0; i--) {
-                    f(field, this.indexToAddr(page, i), this.entries[field][page][i]);
+                const vals = this.entries[field][page].toReversed();
+                if (!vals.length) {
+                    continue;
                 }
+                const firstAddr = this.indexToAddr(page, vals.length - 1);
+                f(field, firstAddr, vals);
             }
         }
     }

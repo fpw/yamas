@@ -41,4 +41,16 @@ describe("GIVEN an assembler", () => {
             expect(data.symbols["C"]).toEqual(5);
         });
     });
+
+    describe("WHEN evaluating grouped conditional expressions", () => {
+        const data = assemble(`
+            A=0
+            B=1
+            C=0
+            IFNZRO A B C <D=2>
+        `);
+        test("THEN they should be ORed", () => {
+            expect(data.symbols["D"]).toEqual(2);
+        });
+    });
 });

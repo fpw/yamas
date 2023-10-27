@@ -44,6 +44,7 @@ export enum NodeType {
     DoubleIntList,
     FloatList,
     Comment,
+    Eject,
 
     // Expression
     SymbolGroup,
@@ -69,7 +70,8 @@ export type Statement =
     OriginStatement |
     ExpressionStatement | LabelDef | AssignStatement |
     DefineStatement | Invocation |
-    TextStatement | DoubleIntList | FloatList | Comment | StatementSeparator;
+    TextStatement | DoubleIntList | FloatList | Comment | StatementSeparator |
+    EjectStatement;
 
 export type Expression =
     SymbolGroup | ParenExpr | BinaryOp |
@@ -163,6 +165,12 @@ export interface Float extends BaseNode {
 // TEXT x...x
 export interface TextStatement extends BaseNode {
     type: NodeType.Text;
+    delim: string;
+    token: Tokens.StringToken;
+}
+
+export interface EjectStatement extends BaseNode {
+    type: NodeType.Eject;
     token: Tokens.StringToken;
 }
 
@@ -274,7 +282,7 @@ export function formatSingle(node: Node): string {
         case NodeType.ExpressionStmt:
             return `ExprStmt(${formatSingle(node.expr)})`;
         case NodeType.Text:
-            return `Text(delim='${replaceBlanks(node.token.delim)}', "${node.token.str}")`;
+            return `Text(delim='${node.delim}', "${node.token.str}")`;
         case NodeType.Comment:
             return `Comment("${node.token.comment}")`;
         case NodeType.SymbolGroup:
@@ -306,6 +314,8 @@ export function formatSingle(node: Node): string {
             return "CLC()";
         case NodeType.MacroBody:
             return `MacroBody("${replaceBlanks(Tokens.tokenToString(node.token))}")`;
+        case NodeType.Eject:
+            return `Eject("${node.token.str}")`;
         case NodeType.Invocation:
         case NodeType.Program:
             throw Error("Logic error");

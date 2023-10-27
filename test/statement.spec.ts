@@ -1,5 +1,6 @@
 /* eslint-disable max-lines-per-function */
 import { Assembler } from "../src/assembler/Assembler";
+import { dumpNode } from "../src/parser/Node";
 import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
@@ -30,9 +31,16 @@ describe("GIVEN an assembler", () => {
             TAD (1234)
             PAGE 1
             JMP 1234
+            JMP [1234]
         `);
-        test("THEN the zero page link should be used instead of creating one on the current page", () => {
-            expect(data.memory[0o200]).toEqual(0o5577);
+        test("THEN the zero page link should not be used (no optimization)", () => {
+            expect(data.memory[0o000]).toEqual(0o1177);
+            expect(data.memory[0o200]).toEqual(0o5777);
+            expect(data.memory[0o201]).toEqual(0o5177);
+
+            // links
+            expect(data.memory[0o177]).toEqual(0o1234);
+            expect(data.memory[0o377]).toEqual(0o1234);
         });
     });
 
@@ -93,7 +101,29 @@ describe("GIVEN an assembler", () => {
             This is a test {}[]"!"
         `);
         test("THEN it should be ignored", () => {
-            expect(data.memory[0o210]).toBeUndefined();
+            expect(data.memory[0o201]).toBeUndefined();
+        });
+    });
+
+    describe("WHEN the input contains a TAD with an immediate MRI", () => {
+        const data = assemble(`
+            TAD (JMP I 234)
+        `);
+        test("THEN it should generate the MRI in a link and use it as operand", () => {
+            expect(data.memory[0o200]).toEqual(0o1377);
+            expect(data.memory[0o377]).toEqual(0o5634);
+        });
+    });
+
+    describe("WHEN the input contains a TAD with an immediate unary", () => {
+        const data = assemble(`
+            TAD (-CDF 0)
+            TAD (-CDF 5)
+        `);
+        test("THEN it should generate the MRI in a link and use it as operand", () => {
+            expect(data.memory[0o200]).toEqual(0o1377);
+            expect(data.memory[0o201]).toEqual(0o1377);
+            expect(data.memory[0o377]).toEqual(0o1577);
         });
     });
 });

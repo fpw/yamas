@@ -6,6 +6,7 @@ import { PreludeIO } from "./prelude/IO";
 import { BinTapeReader } from "./tapeformats/BinTapeReader";
 import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
 import * as Strings from "./utils/Strings";
+import * as PDP8 from "./utils/PDP8";
 
 export interface Options {
     loadPrelude?: boolean;
@@ -19,15 +20,13 @@ export class Yamas {
     private asm = new Assembler();
     private opts: Options;
     private binTape = new BinTapeWriter();
-    private binEnabled = true;
 
     public constructor(opts: Options) {
         this.opts = opts;
         this.asm.setOutputHandler({
-            setEnable: en => this.binEnabled = en,
-            changeField: field => this.binEnabled && this.binTape.writeField(field),
-            changeOrigin: org => this.binEnabled && this.binTape.writeOrigin(org),
-            writeValue: (_clc, val) => this.binEnabled && this.binTape.writeDataWord(val, true),
+            changeField: field => this.binTape.writeField(field),
+            changeOrigin: org => this.binTape.writeOrigin(org),
+            writeValue: (_clc, val) => this.binTape.writeDataWord(val, true),
         });
 
         if (opts.loadPrelude) {
@@ -57,7 +56,7 @@ export class Yamas {
         const ourState = new BinTapeReader(ours).read();
         const otherState = new BinTapeReader(other).read();
 
-        for (let i = 0; i < 8 * 4096; i++) {
+        for (let i = 0; i < PDP8.MemSize; i++) {
             if (ourState[i] !== otherState[i]) {
                 const addrStr = Strings.numToOctal(i, 5);
                 const ourStr = ourState[i] !== undefined ? Strings.numToOctal(ourState[i]!, 4) : "null";

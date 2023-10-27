@@ -18,7 +18,6 @@ export function assemble(input: string): TestData {
     const orgs: number[] = [];
     const asm = new Assembler();
     let field = 0;
-    let enabled = true;
 
     asm.setOutputHandler({
         changeField(f) {
@@ -27,13 +26,8 @@ export function assemble(input: string): TestData {
         changeOrigin(clc) {
             orgs.push(clc);
         },
-        setEnable(e) {
-            enabled = e;
-        },
         writeValue(clc, val) {
-            if (enabled) {
-                memory[field * 4096 + clc] = val;
-            }
+            memory[field * 4096 + clc] = val;
         },
     })
 

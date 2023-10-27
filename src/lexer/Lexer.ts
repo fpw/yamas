@@ -60,28 +60,36 @@ export class Lexer {
         }
     }
 
-    public nextStringLiteral(): Tokens.StringToken {
+    public nextStringLiteral(delim: boolean): [Tokens.StringToken, string] {
         const startCursor = this.cursor;
         const data = this.data;
 
-        const delim = data[this.cursor.dataIdx];
-        this.advanceCursor(1);
+        let delimChr: string | undefined;
+        if (delim) {
+            delimChr = data[this.cursor.dataIdx];
+            this.advanceCursor(1);
+        }
+
         let str = "";
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
             this.advanceCursor(1);
-            if (data[i] == delim) {
+            if (data[i] === delimChr) {
                 break;
             } else if (this.isLineBreak(data[i])) {
-                throw Lexer.mkError("Unterminated TEXT", startCursor);
+                if (delim) {
+                    throw Lexer.mkError("Unterminated delimiter string", startCursor);
+                }
+                break;
             }
             str += data[i];
         }
-        return {
+
+        const tok: Tokens.StringToken = {
             type: Tokens.TokenType.String,
-            delim: delim,
             str: str,
             ...this.getTokenMeasurement(startCursor),
         };
+        return [tok, delimChr ?? ""];
     }
 
     private floatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([eE][-+]?\d+)?/;

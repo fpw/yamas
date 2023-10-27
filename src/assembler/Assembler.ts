@@ -1,8 +1,8 @@
 import * as Nodes from "../parser/Node";
-import * as PDP8 from "../utils/PDP8";
-import * as CharSets from "../utils/CharSets";
 import { Parser } from "../parser/Parser";
+import * as CharSets from "../utils/CharSets";
 import { toDECFloat } from "../utils/Floats";
+import * as PDP8 from "../utils/PDP8";
 import { parseIntSafe } from "../utils/Strings";
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
@@ -23,12 +23,16 @@ export class Assembler {
     private readonly pseudos = [
         "NOPUNCH",  "ENPUNCH",
         "DECIMAL",  "OCTAL",
-        "EXPUNGE",  "FIXTAB",
-        "PAGE",     "FIELD",
+        "EXPUNGE",  "FIXTAB",   "FIXMRI",
+        "PAGE",     "FIELD",    "RELOC",
         "ZBLOCK",
-        "DUBL",     "FLTG", // both also handled by parser
-        "DEFINE",   "TEXT", // both actually handled by parser, but listing here so that they are defined
         "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
+
+        // the following pseudos are handled by the parser, but we still
+        // add them here to make the symbols defined
+        "DEFINE",   "TEXT",
+        "DUBL",     "FLTG",
+        "EJECT",
     ];
 
     public constructor() {
@@ -199,6 +203,10 @@ export class Assembler {
             case "PAGE":
                 this.handlePage(ctx, group);
                 break;
+            case "FIXMRI":
+                throw Error("FIXMRI not supported yet");
+            case "RELOC":
+                throw Error("RELOC not supported yet");
             case "EXPUNG":
                 if (!ctx.generateCode) {
                     this.syms.expunge();
@@ -266,6 +274,7 @@ export class Assembler {
             ctx.clc = PDP8.firstAddrInPage(1);
             if (ctx.generateCode) {
                 this.punchField(ctx, field);
+                this.punchOrigin(ctx, ctx.clc);
             }
         } else {
             throw this.error("Expected one parameter for FIELD", group);
@@ -289,12 +298,17 @@ export class Assembler {
                 this.handleBody(ctx, group.exprs[1]);
             }
         } else if (op == "IFZERO" || op == "IFNZRO") {
-            if (group.exprs.length != 2 || group.exprs[1].type != Nodes.NodeType.MacroBody) {
-                throw this.error("Invalid syntax: single expression and body expected", group);
+            const last = group.exprs[group.exprs.length - 1];
+            if (last.type != Nodes.NodeType.MacroBody) {
+                throw this.error("Invalid syntax: expression and body expected", group);
             }
-            const val = this.safeEval(ctx, group.exprs[0]);
+
+            let val = 0;
+            for (let i = 0; i < group.exprs.length - 1; i++) {
+                val |= this.safeEval(ctx, group.exprs[i]);
+            }
             if ((val != 0 && op == "IFNZRO") || (val == 0 && op == "IFZERO")) {
-                this.handleBody(ctx, group.exprs[1]);
+                this.handleBody(ctx, last);
             }
         }
     }
@@ -319,7 +333,7 @@ export class Assembler {
     private safeEval(ctx: Context, expr: Nodes.Expression): number {
         const val = this.tryEval(ctx, expr);
         if (val === null) {
-            throw this.error("Cant't use undefined expression here", expr);
+            throw this.error("Undefined expression", expr);
         }
         return val;
     }
@@ -493,15 +507,9 @@ export class Assembler {
             return effVal;
         } else if (curPage == dstPage) {
             return effVal | CUR;
-        } else if (this.linkTable.has(curField, 0, dst)) {
-            if (mri & IND) {
-                throw this.error("Double indirection on zero page", group);
-            }
-            const indAddr = this.linkTable.enter(curField, 0, dst);
-            return mri | (indAddr & 0b1111111) | IND;
         } else {
             if (mri & IND) {
-                throw this.error("Double indirection on current page", group);
+                throw this.error(`Double indirection on page ${curPage}"`, group);
             }
             const indAddr = this.linkTable.enter(curField, curPage, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
@@ -554,13 +562,14 @@ export class Assembler {
     }
 
     private outputLinks(ctx: Context) {
-        this.linkTable.visit((field, addr, val) => {
-            if (field != ctx.field) {
+        let curField = ctx.field;
+        this.linkTable.visit((field, firstAddr, vals) => {
+            if (field != curField) {
                 this.punchField(ctx, field);
-                ctx.field = field;
+                curField = field;
             }
-
-            this.punchData(ctx, addr, val);
+            this.punchOrigin(ctx, firstAddr);
+            vals.forEach((val, i) => this.punchData(ctx, firstAddr + i, val));
         });
     }
 

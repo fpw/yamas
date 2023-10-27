@@ -114,4 +114,12 @@ describe("GIVEN an assembler", () => {
             expect(data.memory[0o203]).toBeUndefined();
         });
     });
+
+    describe("WHEN evaluating the EJECT statement", () => {
+        const data = assemble(`
+            EJECT THIS IS A TEST STRING
+       `);
+        test("THEN it should ignore it", () => {
+        });
+    });
 });

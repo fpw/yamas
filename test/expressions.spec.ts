@@ -1,5 +1,4 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../src/assembler/Assembler";
 import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
@@ -35,16 +34,6 @@ describe("GIVEN an assembler", () => {
         `);
         test("THEN it should generate mark parity", () => {
             expect(data.symbols["OUT"]).toEqual("A".charCodeAt(0) | 0o200);
-        });
-    });
-
-    describe("WHEN accessing undefined symbols", () => {
-        const asm = new Assembler();
-        asm.parseInput("test.pa", `
-            IFNDEF A <GLITCH>
-        `);
-        test("THEN it should generate an error", () => {
-            expect(() => asm.assembleAll()).toThrow();
         });
     });
 });

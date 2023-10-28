@@ -9,7 +9,8 @@
     "lint": "tsc && eslint .",
     "test": "vitest run --dir test",
     "test:watch": "vitest --dir test",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "testbench": "tsx src/testbench.ts"
   },
   "bin": {
     "yamas": "dist/src/main.js"

@@ -1,8 +1,7 @@
-/* eslint-disable max-lines-per-function */
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "fs";
+import { basename } from "path";
 import { parse } from "ts-command-line-args";
 import { Options, Yamas } from "./Yamas";
-import { basename } from "path";
 
 interface CliArgs {
     help?: boolean;
@@ -31,10 +30,6 @@ function main() {
     if (args.outputAst) {
         args.files.forEach(f => astFiles.set(f, openSync(basename(f) + ".ast.txt", "w")));
         opts.outputAst = (file, line) => writeSync(astFiles.get(file)!, line + "\n");
-    }
-
-    if (args.compare) {
-        opts.compareBin = readFileSync(args.compare);
     }
 
     const yamas = new Yamas(opts);

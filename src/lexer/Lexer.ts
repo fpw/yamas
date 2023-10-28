@@ -1,4 +1,5 @@
 import { CodeError } from "../utils/CodeError";
+import { replaceBlanks } from "../utils/Strings";
 import * as Tokens from "./Token";
 
 export interface Cursor {
@@ -60,6 +61,7 @@ export class Lexer {
         }
     }
 
+    // eslint-disable-next-line max-lines-per-function
     public nextStringLiteral(delim: boolean): [Tokens.StringToken, string] {
         const startCursor = this.cursor;
         const data = this.data;
@@ -78,6 +80,10 @@ export class Lexer {
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
             this.advanceCursor(1);
             if (data[i] === delimChr) {
+                break;
+            } else if (data[i] == "/" && !delim) {
+                str = str.trim();
+                this.cursor.dataIdx--;
                 break;
             } else if (this.isLineBreak(data[i])) {
                 if (delim) {
@@ -296,24 +302,32 @@ export class Lexer {
         };
     }
 
-    private scanMacroBody(data: string): Tokens.MacroBodyToken {
+    private scanMacroBody(data: string, allowEndInsideComment = false): Tokens.MacroBodyToken {
         const startCursor = this.cursor;
         let body = "";
         this.advanceCursor(1);
         let remain = 1;
-        while (remain > 0) {
-            for (let i = this.cursor.dataIdx; i < data.length; i++) {
-                this.advanceCursor(1);
-                if (data[i] == ">") {
+        while (remain > 0 && this.cursor.dataIdx < data.length) {
+            for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
+                const pos = this.cursor.dataIdx;
+                if (data[pos] == ">") {
                     remain--;
                     if (remain == 0) {
+                        this.advanceCursor(1);
                         break;
                     }
-                } else if (data[i] == "<") {
+                } else if (data[pos] == "<") {
                     remain++;
+                } else if (data[pos] == "/" && !allowEndInsideComment) {
+                    body += this.skipToLineBreak(data);
+                    continue;
                 }
-                body += data[i];
+                body += data[pos];
             }
+        }
+
+        if (remain && this.cursor.dataIdx >= data.length) {
+            throw Lexer.mkError("Unterminated macro body", startCursor);
         }
 
         return {
@@ -321,6 +335,17 @@ export class Lexer {
             body: body,
             ...this.getTokenMeasurement(startCursor),
         };
+    }
+
+    private skipToLineBreak(data: string): string {
+        let res = "";
+        for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
+            res += data[this.cursor.dataIdx];
+            if (data[this.cursor.dataIdx] == "\n") {
+                break;
+            }
+        }
+        return res;
     }
 
     private scanASCII(data: string): Tokens.ASCIIToken {
@@ -363,7 +388,7 @@ export class Lexer {
                 };
         }
 
-        throw Lexer.mkError("Unexpected character", startCursor);
+        throw Lexer.mkError(`Unexpected character '${replaceBlanks(chr)}'`, startCursor);
     }
 
     private isOperator(chr: string): chr is Tokens.OperatorChr {

@@ -1,4 +1,5 @@
 /* eslint-disable max-lines-per-function */
+import { Assembler } from "../src/assembler/Assembler";
 import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
@@ -7,7 +8,7 @@ describe("GIVEN an assembler", () => {
             / Testing different syntax variations
             IFZERO 0<A=1>
             IFNZRO 0 <
-                AA=1
+                AA=1 / Comment inside
             >
             IFDEF X <BB=2
             >
@@ -36,9 +37,11 @@ describe("GIVEN an assembler", () => {
                     C=5
                 >
             >
+            IFNDEF D<IFNDEF E<F=23>>
         `);
         test("THEN they should work as expected", () => {
             expect(data.symbols["C"]).toEqual(5);
+            expect(data.symbols["F"]).toEqual(0o23);
         });
     });
 
@@ -51,6 +54,53 @@ describe("GIVEN an assembler", () => {
         `);
         test("THEN they should be ORed", () => {
             expect(data.symbols["D"]).toEqual(2);
+        });
+    });
+
+    describe("WHEN accessing undefined symbols in condition bodies", () => {
+        const asm = new Assembler();
+        asm.parseInput("test.pa", `
+            IFNDEF A <GLITCH>
+        `);
+        test("THEN it should generate an error", () => {
+            expect(() => asm.assembleAll()).toThrow();
+        });
+    });
+
+    describe("WHEN evaluating undefined symbols that evaluate differently in pass 1 and 2", () => {
+        describe("WHEN IFNZRO doesn't run in pass 1 but in pass 2", () => {
+            const asm = new Assembler();
+            asm.parseInput("test.pa", `
+                IFNZRO A <B=1>
+                A=1
+            `);
+            test("THEN it should generate an error", () => {
+                expect(() => asm.assembleAll()).toThrow();
+            });
+        });
+
+        describe("WHEN IFZERO runs in pass 1 but not in pass 2", () => {
+            const asm = new Assembler();
+            asm.parseInput("test.pa", `
+                IFZERO A <TAD>
+                A=1
+            `);
+            test("THEN it should generate an error", () => {
+                expect(() => asm.assembleAll()).toThrow();
+            });
+        });
+    });
+
+    describe("WHEN evaluating undefined symbols that evaluate the same in pass 1 and 2", () => {
+        describe("WHEN IFNZRO runs in pass 1 and in pass 2", () => {
+            const data = assemble(`
+                IFZERO A <TAD>
+                A=1-1
+                B,
+            `);
+            test("THEN it should assemble successfully", () => {
+                expect(data.symbols["B"]).toEqual(0o201);
+            });
         });
     });
 });

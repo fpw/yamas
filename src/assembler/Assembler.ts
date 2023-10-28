@@ -3,7 +3,7 @@ import { Parser } from "../parser/Parser";
 import * as CharSets from "../utils/CharSets";
 import { toDECFloat } from "../utils/Floats";
 import * as PDP8 from "../utils/PDP8";
-import { parseIntSafe } from "../utils/Strings";
+import { numToOctal, parseIntSafe } from "../utils/Strings";
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
 import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable";
@@ -32,7 +32,7 @@ export class Assembler {
         // add them here to make the symbols defined
         "DEFINE",
         "TEXT",     "DUBL",     "FLTG",
-        "EJECT",    "FIXMRI",
+        "EJECT",    "FIXMRI",   "FILENAME",
     ];
 
     public constructor() {
@@ -91,7 +91,10 @@ export class Assembler {
             let generated: boolean;
             switch (stmt.type) {
                 case Nodes.NodeType.Text:
-                    generated = this.outputText(ctx, stmt.token.str);
+                    generated = this.outputText(ctx, stmt.token.str, false);
+                    break;
+                case Nodes.NodeType.FileName:
+                    generated = this.outputText(ctx, stmt.name.str, true);
                     break;
                 case Nodes.NodeType.DoubleIntList:
                     generated = this.outputDubl(ctx, stmt);
@@ -129,7 +132,7 @@ export class Assembler {
                 break;
             case Nodes.NodeType.FixMri:
                 const val = this.safeEval(ctx, stmt.assignment.val);
-                this.syms.defineFixedParameter(stmt.assignment.sym.token.symbol, val);
+                this.syms.defineForcedMri(stmt.assignment.sym.token.symbol, val);
                 break;
             case Nodes.NodeType.Label:
                 this.syms.defineLabel(stmt.sym.token.symbol, this.getClc(ctx, true));
@@ -154,15 +157,6 @@ export class Assembler {
         }
     }
 
-    private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): boolean {
-        if (this.isPseudoExpr(stmt.expr)) {
-            return false;
-        }
-        const val = this.safeEval(ctx, stmt.expr);
-        this.punchData(ctx, this.getClc(ctx, false), val);
-        return true;
-    }
-
     private updateCLC(ctx: Context, stmt: Nodes.Statement) {
         let newClc = this.getClc(ctx, false);
 
@@ -174,6 +168,9 @@ export class Assembler {
                 return;
             case Nodes.NodeType.Text:
                 newClc += CharSets.asciiStringToDec(stmt.token.str, true).length;
+                break;
+            case Nodes.NodeType.FileName:
+                newClc += CharSets.asciiStringToOS8Name(stmt.name.str).length;
                 break;
             case Nodes.NodeType.DoubleIntList:
                 newClc += stmt.list.filter(x => x.type == Nodes.NodeType.DoubleInt).length * 2;
@@ -225,9 +222,11 @@ export class Assembler {
                 break;
             case "IFNZRO":
             case "IFZERO":
+                this.handleIfZero(ctx, group, pseudo);
+                break;
             case "IFDEF":
             case "IFNDEF":
-                this.handleCondition(ctx, group);
+                this.handleIfDef(ctx, group, pseudo);
                 break;
             case "NOPUNC":
                 ctx.punchEnabled = false;
@@ -272,6 +271,8 @@ export class Assembler {
             }
             this.setClc(ctx, PDP8.firstAddrInPage(1), false);
             if (ctx.generateCode) {
+                this.outputLinks(ctx);
+                this.linkTable.clear();
                 this.punchField(ctx, field);
                 this.punchOrigin(ctx);
             }
@@ -291,44 +292,57 @@ export class Assembler {
         }
     }
 
-    private handleCondition(ctx: Context, group: Nodes.SymbolGroup) {
-        const op = this.syms.lookup(group.first.token.symbol).name;
+    private handleIfDef(ctx: Context, group: Nodes.SymbolGroup, op: "IFDEF" | "IFNDEF") {
+        if (group.exprs.length != 2 ||
+            group.exprs[0].type != Nodes.NodeType.Symbol ||
+            group.exprs[1].type != Nodes.NodeType.MacroBody) {
+            throw this.mkError("Invalid syntax: single symbol and body expected", group);
+        }
 
-        if (op == "IFDEF" || op == "IFNDEF") {
-            if (
-                group.exprs.length != 2 ||
-                group.exprs[0].type != Nodes.NodeType.Symbol ||
-                group.exprs[1].type != Nodes.NodeType.MacroBody
-            ) {
-                throw this.mkError("Invalid syntax: single symbol and body expected", group);
-            }
+        const sym = this.syms.tryLookup(group.exprs[0].token.symbol);
+        if ((sym && op == "IFDEF") || (!sym && op == "IFNDEF")) {
+            this.handleConditionBody(ctx, group.exprs[1]);
+        }
+    }
 
-            const sym = this.syms.tryLookup(group.exprs[0].token.symbol);
-            if ((sym && op == "IFDEF") || (!sym && op == "IFNDEF")) {
-                this.handleBody(ctx, group.exprs[1]);
-            }
-        } else if (op == "IFZERO" || op == "IFNZRO") {
-            const last = group.exprs[group.exprs.length - 1];
-            if (last.type != Nodes.NodeType.MacroBody) {
-                throw this.mkError("Invalid syntax: expression and body expected", group);
-            }
+    private handleIfZero(ctx: Context, group: Nodes.SymbolGroup, op: "IFNZRO" | "IFZERO") {
+        const body = group.exprs[group.exprs.length - 1];
+        if (body.type != Nodes.NodeType.MacroBody) {
+            throw this.mkError("Invalid syntax: expression and body expected", group);
+        }
 
-            let val = 0;
-            for (let i = 0; i < group.exprs.length - 1; i++) {
-                val |= this.safeEval(ctx, group.exprs[i]);
+        // It's allowed to use IFZERO with undefined expressions if they are later defined
+        // However, that only makes sense if the bodies don't generate code.
+        // Otherwise, we would get different CLCs after the body in pass 1 vs 2.
+        // We will notice that later because parsing happens in pass 1 and execution in pass 2 where the body
+        // will be unparsed if this happens.
+        let val = 0;
+        for (let i = 0; i < group.exprs.length - 1; i++) {
+            const exVal = this.tryEval(ctx, group.exprs[i]);;
+            if (exVal !== null) {
+                val |= exVal;
             }
-            if ((val != 0 && op == "IFNZRO") || (val == 0 && op == "IFZERO")) {
-                this.handleBody(ctx, last);
+        }
+
+        if ((val != 0 && op == "IFNZRO") || (val == 0 && op == "IFZERO")) {
+            this.handleConditionBody(ctx, body);
+        } else {
+            if (body.parsed) {
+                throw this.mkError("Condition was true in pass 1, now false -> Illegal", body);
             }
         }
     }
 
-    private handleBody(ctx: Context, body: Nodes.MacroBody) {
-        if (!body.parsed) {
-            const parser = new Parser(body.token.cursor.inputName, body.token.body);
+    private handleConditionBody(ctx: Context, body: Nodes.MacroBody) {
+        if (!ctx.generateCode) {
+            const name = body.token.cursor.inputName + `:ConditionOnLine${body.token.cursor.lineIdx + 1}`;
+            const parser = new Parser(name, body.token.body);
             body.parsed = parser.parseProgram();
+        } else {
+            if (!body.parsed) {
+                throw this.mkError("Condition was false in pass 1, now true -> Illegal", body);
+            }
         }
-
         this.handleSubProgram(ctx, body.parsed);
     }
 
@@ -338,6 +352,15 @@ export class Assembler {
         } else {
             this.assembleProgram(ctx, program);
         }
+    }
+
+    private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): boolean {
+        if (this.isPseudoExpr(stmt.expr)) {
+            return false;
+        }
+        const val = this.safeEval(ctx, stmt.expr);
+        this.punchData(ctx, this.getClc(ctx, false), val);
+        return true;
     }
 
     private safeEval(ctx: Context, expr: Nodes.Expression): number {
@@ -404,16 +427,14 @@ export class Assembler {
         let mriVal = mri.value;
         let dst = 0;
 
-        if (!ctx.generateCode) {
-            return null;
-        }
-
-        for (const ex of group.exprs) {
+        for (let i = 0; i < group.exprs.length; i++) {
+            const ex = group.exprs[i];
             if (ex.type == Nodes.NodeType.Symbol) {
                 const sym = this.syms.tryLookup(ex.token.symbol);
                 if (!sym) {
                     return null;
-                } else if (sym.type == SymbolType.Permanent) {
+                } else if (sym.type == SymbolType.Permanent && i == 0) {
+                    // permanent symbols are only allowed as first symbol after the MRI, otherwise they act on dst
                     mriVal |= sym.value;
                 } else {
                     dst |= sym.value;
@@ -502,8 +523,8 @@ export class Assembler {
             return false;
         }
 
-        // We've got a fixed symbol, now check if it's a MRI opcode
-        return PDP8.isMRIOp(sym.value);
+        // check if FIXTAB with auto-MRI detection
+        return sym.forceMri || PDP8.isMRIOp(sym.value);
     }
 
     private genMRI(ctx: Context, group: Nodes.SymbolGroup, mri: number, dst: number): number {
@@ -528,8 +549,13 @@ export class Assembler {
         }
     }
 
-    private outputText(ctx: Context, text: string): boolean {
-        const outStr = CharSets.asciiStringToDec(text, true);
+    private outputText(ctx: Context, text: string, fileName: boolean): boolean {
+        let outStr;
+        if (fileName) {
+            outStr = CharSets.asciiStringToOS8Name(text);
+        } else {
+            outStr = CharSets.asciiStringToDec(text, true);
+        }
         const addr = this.getClc(ctx, false);
         outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
         return true;

@@ -113,6 +113,19 @@ describe("GIVEN an assembler", () => {
         });
     });
 
+    describe("WHEN evaluating the TEXT inside a condition", () => {
+        const data = assemble(`
+            TAG1,
+            IFZERO 0 <
+                A, TEXT /HELLO!/
+            >
+            TAG2,
+       `);
+        test("THEN it should be conditionally generated", () => {
+            expect(data.symbols["TAG2"] - data.symbols["TAG1"]).toEqual(4);
+        });
+    });
+
     describe("WHEN evaluating the ZBLOCK statement", () => {
         const data = assemble(`
             ZBLOCK 3

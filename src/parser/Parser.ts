@@ -7,7 +7,7 @@ type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 
 export class Parser {
     private keywords = new Set([
-        "TEXT",
+        "TEXT", "FILENAME",
         "DEFINE",
         "DUBL", "FLTG",
         "EJECT",
@@ -119,6 +119,8 @@ export class Parser {
                 return {type: Nodes.NodeType.Eject, token: text};
             case "FIXMRI":
                 return this.parseFixMri(startSym);
+            case "FILENAME":
+                return this.parseFilename(startSym);
             default:
                 throw Parser.mkTokError(`Unhandled keyword ${startSym.symbol}`, startSym);
         }
@@ -173,6 +175,15 @@ export class Parser {
             }
         }
         throw Parser.mkTokError("FIXMRI must be followed by assignment statement", nextSym);
+    }
+
+    private parseFilename(startSym: Tokens.SymbolToken): Nodes.FilenameStatement {
+        const [name] = this.lexer.nextStringLiteral(false);
+        return {
+            type: Nodes.NodeType.FileName,
+            name: name,
+            token: startSym,
+        };
     }
 
     /**

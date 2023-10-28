@@ -6,15 +6,14 @@ export class LinkTable {
     private entries: number[][][] = [];
 
     public constructor() {
-        for (let field = 0; field < PDP8.NumFields; field++) {
-            this.entries[field] = [];
-            for (let page = 0; page < PDP8.NumPages; page++) {
-                this.entries[field][page] = [];
-            }
-        }
+        this.clear();
     }
 
     public enter(ctx: Context, page: number, value: number): number {
+        if (!ctx.generateCode) {
+            throw Error("Can't generate links ");
+        }
+
         const field = ctx.field;
         let delta = 0;
         if (page != 0 && ctx.reloc != 0) {
@@ -51,6 +50,25 @@ export class LinkTable {
         }
     }
 
+    public clear() {
+        for (let field = 0; field < PDP8.NumFields; field++) {
+            this.entries[field] = [];
+            for (let page = 0; page < PDP8.NumPages; page++) {
+                this.entries[field][page] = [];
+            }
+        }
+    }
+
+    public visit(f: (field: number, addr: number, val: number) => void) {
+        for (let field = 0; field < PDP8.NumFields; field++) {
+            for (let page = 0; page < PDP8.NumPages; page++) {
+                const firstAddr = this.indexToAddr(page, this.entries[field][page].length - 1);
+                const vals = this.entries[field][page].toReversed();
+                vals.forEach((v, i) => f(field, firstAddr + i, v));
+            }
+        }
+    }
+
     private tryLookup(field: number, page: number, value: number): number | undefined {
         for (let i = 0; i < this.entries[field][page].length; i++) {
             if (this.entries[field][page][i] == value) {
@@ -62,15 +80,5 @@ export class LinkTable {
 
     private indexToAddr(page: number, idx: number): number {
         return page * PDP8.PageSize + (PDP8.PageSize - 1 - idx);
-    }
-
-    public visit(f: (field: number, addr: number, val: number) => void) {
-        for (let field = 0; field < PDP8.NumFields; field++) {
-            for (let page = 0; page < PDP8.NumPages; page++) {
-                const firstAddr = this.indexToAddr(page, this.entries[field][page].length - 1);
-                const vals = this.entries[field][page].toReversed();
-                vals.forEach((v, i) => f(field, firstAddr + i, v));
-            }
-        }
     }
 }

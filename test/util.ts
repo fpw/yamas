@@ -1,7 +1,6 @@
 /* eslint-disable max-lines-per-function */
 import { Assembler } from "../src/assembler/Assembler";
 import { Program } from "../src/parser/Node";
-import { PreludeEAE } from "../src/prelude/EAE";
 import { PreludeFamily8 } from "../src/prelude/Family8";
 import { PreludeIO } from "../src/prelude/IO";
 
@@ -33,7 +32,6 @@ export function assemble(input: string): TestData {
 
     asm.parseInput("prelude/family8.pa", PreludeFamily8);
     asm.parseInput("prelude/iot.pa", PreludeIO);
-    asm.parseInput("prelude/eae.pa", PreludeEAE);
 
     const ast = asm.parseInput("test.pa", input);
     asm.assembleAll();

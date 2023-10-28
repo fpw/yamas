@@ -45,6 +45,20 @@ export function asciiStringToDec(text: string, terminate: boolean): number[] {
     return res;
 }
 
+export function asciiStringToOS8Name(str: string): number[] {
+    const [name, ext] = str.split(".");
+    const res: number[] = [];
+
+    res.push(...asciiStringToDec(name, name.length != 6));
+    if (ext) {
+        res.push(...asciiStringToDec(ext, false));
+    } else {
+        res.push(0);
+    }
+
+    return res;
+}
+
 export function decStringToAscii(dec: number[]): string {
     let res = "";
     for (const w of dec) {

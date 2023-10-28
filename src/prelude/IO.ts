@@ -19,14 +19,24 @@ export const PreludeIO = `
     PPC=6024
     PLS=6026
     / TELETYPE KEYBOARD
+    KCF=6030
     KSF=6031
     KCC=6032
     KRS=6034
+    KIE=6035
     KRB=6036
     / TELETYPE PUNCH
+    TFL=6040
     TSF=6041
     TCF=6042
     TPC=6044
     TLS=6046
+    / 8/E
+    CAF=6007
+    MQL=7421
+    MQA=7501
+    SWP=7521
+    ACL=7701
+    BSW=7002
     FIXTAB
 `;

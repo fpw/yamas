@@ -46,6 +46,7 @@ export enum NodeType {
     Comment,
     Eject,
     FixMri,
+    FileName,
 
     // Expression
     SymbolGroup,
@@ -72,7 +73,7 @@ export type Statement =
     ExpressionStatement | LabelDef | AssignStatement |
     DefineStatement | Invocation |
     TextStatement | DoubleIntList | FloatList | Comment | StatementSeparator |
-    EjectStatement | FixMriStatement;
+    EjectStatement | FixMriStatement | FilenameStatement;
 
 export type Expression =
     SymbolGroup | ParenExpr | BinaryOp |
@@ -173,6 +174,12 @@ export interface TextStatement extends BaseNode {
 export interface EjectStatement extends BaseNode {
     type: NodeType.Eject;
     token: Tokens.StringToken;
+}
+
+export interface FilenameStatement extends BaseNode {
+    type: NodeType.FileName;
+    name: Tokens.StringToken;
+    token: Tokens.SymbolToken; // on FILENAME
 }
 
 // /Comment
@@ -321,6 +328,8 @@ export function formatSingle(node: Node): string {
             return "CLC()";
         case NodeType.MacroBody:
             return `MacroBody("${replaceBlanks(Tokens.tokenToString(node.token))}")`;
+        case NodeType.FileName:
+            return `Filename("${node.name.str}")`;
         case NodeType.Eject:
             return `Eject("${node.token.str}")`;
         case NodeType.FixMri:

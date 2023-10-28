@@ -1,6 +1,5 @@
 /* eslint-disable max-lines-per-function */
 import { Assembler } from "../src/assembler/Assembler";
-import { dumpNode } from "../src/parser/Node";
 import { assemble } from "./util";
 
 describe("GIVEN an assembler", () => {
@@ -46,12 +45,12 @@ describe("GIVEN an assembler", () => {
 
     describe("WHEN evaluating assigned statements", () => {
         const data = assemble(`
-            CALLC=JMS I C
-            B, 0                / 200
-                CALLC           / 201
-            C, 0                / 202
-                JMP I C         / 203
-        `);
+                B, 0                / 200
+                    CALLC           / 201
+                C, 0                / 202
+                    JMP I C         / 203
+                CALLC=JMS I C
+            `);
         test("THEN they should support MRIs", () => {
             expect(data.symbols["CALLC"]).toEqual(0o4602);
             expect(data.memory[0o201]).toEqual(0o4602);

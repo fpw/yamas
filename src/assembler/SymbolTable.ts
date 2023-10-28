@@ -40,6 +40,14 @@ export class SymbolTable {
         });
     }
 
+    public defineFixedParameter(name: string, value: number) {
+        this.defineSymbol({
+            type: SymbolType.Fixed,
+            name: name,
+            value: value,
+        });
+    }
+
     public defineLabel(label: string, clc: number) {
         this.defineSymbol({
             type: SymbolType.Label,
@@ -98,7 +106,7 @@ export class SymbolTable {
             // redfining a param is okay
             const isParamRedefine =
                 (sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) &&
-                data.type == SymbolType.Param;
+                (data.type == SymbolType.Param || sym.type == SymbolType.Fixed);
 
             // some programs set locations as a param and still use a label later
             // this is only okay if they actually have the same value

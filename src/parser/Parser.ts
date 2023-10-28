@@ -11,6 +11,7 @@ export class Parser {
         "DEFINE",
         "DUBL", "FLTG",
         "EJECT",
+        "FIXMRI",
     ]);
     private inputName: string;
     private lexer: Lexer;
@@ -93,7 +94,7 @@ export class Parser {
             if (next.char == ",") {
                 return this.parseLabelDef(startSym, next);
             } else if (next.char == "=") {
-                return this.parseParameterDef(startSym, next);
+                return this.parseAssignment(startSym, next);
             }
         }
         this.lexer.unget(next);
@@ -127,6 +128,8 @@ export class Parser {
                 }
                 const [text, _] = this.lexer.nextStringLiteral(false);
                 return {type: Nodes.NodeType.Eject, token: text};
+            case "FIXMRI":
+                return this.parseFixMri(startSym);
             default:
                 throw Parser.mkTokError(`Unhandled keyword ${startSym.symbol}`, startSym);
         }
@@ -160,7 +163,7 @@ export class Parser {
         };
     }
 
-    private parseParameterDef(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.AssignStatement {
+    private parseAssignment(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.AssignStatement {
         return {
             type: Nodes.NodeType.Assignment,
             sym: {
@@ -170,6 +173,17 @@ export class Parser {
             val: this.parseExpr(),
             token: chr,
         };
+    }
+
+    private parseFixMri(startSym: Tokens.SymbolToken): Nodes.FixMriStatement {
+        const nextSym = this.lexer.nextNonBlank();
+        if (nextSym.type == Tokens.TokenType.Symbol) {
+            const assign = this.finishStatement(nextSym);
+            if (assign.type == Nodes.NodeType.Assignment) {
+                return { type: Nodes.NodeType.FixMri, assignment: assign, token: startSym };
+            }
+        }
+        throw Parser.mkTokError("FIXMRI must be followed by assignment statement", nextSym);
     }
 
     /**

@@ -25,4 +25,23 @@ describe("GIVEN an assembler", () => {
             expect(data.memory[0o202]).toEqual(0o1721);
         });
     });
+
+    describe("WHEN evaluating macros containing pseudos", () => {
+        const data = assemble(`
+            DEFINE FIX1 A<
+                FIXMRI A
+            >
+            DEFINE FIX2 A B<
+                FIXMRI A=B
+            >
+            FIX1 OP1=5000
+            FIX2 OP2, 5000
+            OP1 I 234
+            OP2 I 235
+        `);
+        test("THEN they should assemble as if the appeared at invocation time", () => {
+            expect(data.memory[0o200]).toEqual(0o5634);
+            expect(data.memory[0o201]).toEqual(0o5635);
+        });
+    });
 });

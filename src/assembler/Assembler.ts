@@ -23,16 +23,16 @@ export class Assembler {
     private readonly pseudos = [
         "NOPUNCH",  "ENPUNCH",
         "DECIMAL",  "OCTAL",
-        "EXPUNGE",  "FIXTAB",   "FIXMRI",
+        "EXPUNGE",  "FIXTAB",
         "PAGE",     "FIELD",    "RELOC",
         "ZBLOCK",
         "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
 
         // the following pseudos are handled by the parser, but we still
         // add them here to make the symbols defined
-        "DEFINE",   "TEXT",
-        "DUBL",     "FLTG",
-        "EJECT",
+        "DEFINE",
+        "TEXT",     "DUBL",     "FLTG",
+        "EJECT",    "FIXMRI",
     ];
 
     public constructor() {
@@ -126,6 +126,10 @@ export class Assembler {
                     this.syms.defineParameter(stmt.sym.token.symbol, paramVal);
                 }
                 break;
+            case Nodes.NodeType.FixMri:
+                const val = this.safeEval(ctx, stmt.assignment.val);
+                this.syms.defineFixedParameter(stmt.assignment.sym.token.symbol, val);
+                break;
             case Nodes.NodeType.Label:
                 this.syms.defineLabel(stmt.sym.token.symbol, ctx.clc);
                 break;
@@ -203,8 +207,6 @@ export class Assembler {
             case "PAGE":
                 this.handlePage(ctx, group);
                 break;
-            case "FIXMRI":
-                throw Error("FIXMRI not supported yet");
             case "RELOC":
                 throw Error("RELOC not supported yet");
             case "EXPUNG":

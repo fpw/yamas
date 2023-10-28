@@ -50,6 +50,16 @@ describe("GIVEN an assembler", () => {
         });
     });
 
+    describe("WHEN evaluating the FIXMRI statement", () => {
+        const data = assemble(`
+            FIXMRI OP=5000
+            OP I 234
+       `);
+        test("THEN it should result in a fixed MRI", () => {
+            expect(data.memory[0o200]).toEqual(0o5634);
+        });
+    });
+
     describe("WHEN using EXPUNGE", () => {
         const data = assemble(`
             A=10

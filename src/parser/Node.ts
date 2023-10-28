@@ -45,6 +45,7 @@ export enum NodeType {
     FloatList,
     Comment,
     Eject,
+    FixMri,
 
     // Expression
     SymbolGroup,
@@ -71,7 +72,7 @@ export type Statement =
     ExpressionStatement | LabelDef | AssignStatement |
     DefineStatement | Invocation |
     TextStatement | DoubleIntList | FloatList | Comment | StatementSeparator |
-    EjectStatement;
+    EjectStatement | FixMriStatement;
 
 export type Expression =
     SymbolGroup | ParenExpr | BinaryOp |
@@ -190,6 +191,12 @@ export interface SymbolGroup extends BaseNode {
 export interface ExpressionStatement extends BaseNode {
     type: NodeType.ExpressionStmt;
     expr: Expression;
+}
+
+export interface FixMriStatement extends BaseNode {
+    type: NodeType.FixMri;
+    assignment: AssignStatement;
+    token: Tokens.SymbolToken; // on FIXMRI
 }
 
 export interface ParenExpr extends BaseNode {
@@ -316,6 +323,8 @@ export function formatSingle(node: Node): string {
             return `MacroBody("${replaceBlanks(Tokens.tokenToString(node.token))}")`;
         case NodeType.Eject:
             return `Eject("${node.token.str}")`;
+        case NodeType.FixMri:
+            return `FixMri("${formatSingle(node.assignment)}")`;
         case NodeType.Invocation:
         case NodeType.Program:
             throw Error("Logic error");

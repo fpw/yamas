@@ -108,9 +108,13 @@ describe("GIVEN an assembler", () => {
     describe("WHEN the input contains a TAD with an immediate MRI", () => {
         const data = assemble(`
             TAD (JMP I 234)
+            TAD I [7600]
+
         `);
         test("THEN it should generate the MRI in a link and use it as operand", () => {
             expect(data.memory[0o200]).toEqual(0o1377);
+            expect(data.memory[0o201]).toEqual(0o1577);
+            expect(data.memory[0o177]).toEqual(0o7600);
             expect(data.memory[0o377]).toEqual(0o5634);
         });
     });

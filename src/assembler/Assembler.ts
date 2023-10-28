@@ -168,7 +168,7 @@ export class Assembler {
 
         switch (stmt.type) {
             case Nodes.NodeType.Origin:
-                newClc = this.safeEval(ctx, stmt.val) - ctx.reloc;
+                newClc = this.safeEval(ctx, stmt.val);
                 this.setClc(ctx, newClc, true);
                 this.punchOrigin(ctx);
                 return;
@@ -247,10 +247,10 @@ export class Assembler {
         } else if (group.exprs.length == 1) {
             newPage = this.safeEval(ctx, group.exprs[0]);
             if (newPage < 0 || newPage >= PDP8.NumPages) {
-                throw this.error(`Invalid page ${newPage}`, group);
+                throw this.mkError(`Invalid page ${newPage}`, group);
             }
         } else {
-            throw this.error("Expected zero or one parameter for PAGE", group);
+            throw this.mkError("Expected zero or one parameter for PAGE", group);
         }
         this.setClc(ctx, PDP8.firstAddrInPage(newPage), true);
         this.linkTable.checkOverlap(ctx.field, PDP8.calcPageNum(this.getClc(ctx, true)));
@@ -263,17 +263,20 @@ export class Assembler {
         if (group.exprs.length == 1) {
             const field = this.safeEval(ctx, group.exprs[0]);
             if (field < 0 || field >= PDP8.NumFields) {
-                throw this.error(`Invalid field ${field}`, group);
+                throw this.mkError(`Invalid field ${field}`, group);
             }
 
             ctx.field = field;
+            if (ctx.reloc) {
+                throw this.mkError("Changing FIELD with active reloc not supported", group);
+            }
             this.setClc(ctx, PDP8.firstAddrInPage(1), false);
             if (ctx.generateCode) {
                 this.punchField(ctx, field);
                 this.punchOrigin(ctx);
             }
         } else {
-            throw this.error("Expected one parameter for FIELD", group);
+            throw this.mkError("Expected one parameter for FIELD", group);
         }
     }
 
@@ -284,7 +287,7 @@ export class Assembler {
             const reloc = this.safeEval(ctx, group.exprs[0]);
             ctx.reloc = reloc - this.getClc(ctx, false);
         } else {
-            throw this.error("Expected zero or one parameter for RELOC", group);
+            throw this.mkError("Expected zero or one parameter for RELOC", group);
         }
     }
 
@@ -297,7 +300,7 @@ export class Assembler {
                 group.exprs[0].type != Nodes.NodeType.Symbol ||
                 group.exprs[1].type != Nodes.NodeType.MacroBody
             ) {
-                throw this.error("Invalid syntax: single symbol and body expected", group);
+                throw this.mkError("Invalid syntax: single symbol and body expected", group);
             }
 
             const sym = this.syms.tryLookup(group.exprs[0].token.symbol);
@@ -307,7 +310,7 @@ export class Assembler {
         } else if (op == "IFZERO" || op == "IFNZRO") {
             const last = group.exprs[group.exprs.length - 1];
             if (last.type != Nodes.NodeType.MacroBody) {
-                throw this.error("Invalid syntax: expression and body expected", group);
+                throw this.mkError("Invalid syntax: expression and body expected", group);
             }
 
             let val = 0;
@@ -340,7 +343,7 @@ export class Assembler {
     private safeEval(ctx: Context, expr: Nodes.Expression): number {
         const val = this.tryEval(ctx, expr);
         if (val === null) {
-            throw this.error("Undefined expression", expr);
+            throw this.mkError("Undefined expression", expr);
         }
         return val;
     }
@@ -364,7 +367,7 @@ export class Assembler {
             case Nodes.NodeType.BinaryOp:
                 return this.evalBinOp(ctx, expr);
             case Nodes.NodeType.MacroBody:
-                throw this.error("Trying to evaluate macro body", expr);
+                throw this.mkError("Trying to evaluate macro body", expr);
         }
     }
 
@@ -374,7 +377,7 @@ export class Assembler {
             return null;
         }
         if (sym.type == SymbolType.Macro || sym.type == SymbolType.Pseudo) {
-            throw this.error("Macro and pseudo symbols not allowed here", node);
+            throw this.mkError("Macro and pseudo symbols not allowed here", node);
         }
         return sym.value;
     }
@@ -401,6 +404,10 @@ export class Assembler {
         let mriVal = mri.value;
         let dst = 0;
 
+        if (!ctx.generateCode) {
+            return null;
+        }
+
         for (const ex of group.exprs) {
             if (ex.type == Nodes.NodeType.Symbol) {
                 const sym = this.syms.tryLookup(ex.token.symbol);
@@ -425,21 +432,17 @@ export class Assembler {
 
     private evalParenExpr(ctx: Context, expr: Nodes.ParenExpr): number | null {
         const val = this.tryEval(ctx, expr.expr);
-        if (val === null) {
+        if (val === null || !ctx.generateCode) {
             return null;
         }
 
         if (expr.paren == "(") {
-            const curPage = PDP8.calcPageNum(this.getClc(ctx, false));
-            const link = this.linkTable.enter(ctx.field, curPage, val);
-            const relocPage = PDP8.calcPageNum(this.getClc(ctx, true));
-            const addr = link - PDP8.firstAddrInPage(curPage) + PDP8.firstAddrInPage(relocPage);
-            return addr;
+            const linkPage = PDP8.calcPageNum(this.getClc(ctx, false));
+            return this.linkTable.enter(ctx, linkPage, val);
         } else if (expr.paren == "[") {
-            const link = this.linkTable.enter(ctx.field, 0, val);
-            return link;
+            return this.linkTable.enter(ctx, 0, val);
         } else {
-            throw this.error(`Invalid parentheses: "${expr.paren}"`, expr);
+            throw this.mkError(`Invalid parentheses: "${expr.paren}"`, expr);
         }
     }
 
@@ -464,7 +467,7 @@ export class Assembler {
         }
 
         if (binOp.operator == "%" && rhs == 0) {
-            throw this.error("Division by zero", binOp);
+            throw this.mkError("Division by zero", binOp);
         }
 
         switch (binOp.operator) {
@@ -509,7 +512,6 @@ export class Assembler {
 
         const effVal = mri | (dst & 0b1111111);
 
-        const curField = ctx.field;
         const curPage = PDP8.calcPageNum(this.getClc(ctx, true));
         const dstPage = PDP8.calcPageNum(dst);
         if (dstPage == 0) {
@@ -518,10 +520,10 @@ export class Assembler {
             return effVal | CUR;
         } else {
             if (mri & IND) {
-                throw this.error(`Double indirection on page ${curPage}"`, group);
+                throw this.mkError(`Double indirection on page ${curPage}"`, group);
             }
-            const page = PDP8.calcPageNum(this.getClc(ctx, false));
-            const indAddr = this.linkTable.enter(curField, page, dst);
+            const linkPage = PDP8.calcPageNum(this.getClc(ctx, false));
+            const indAddr = this.linkTable.enter(ctx, linkPage, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
         }
     }
@@ -544,7 +546,7 @@ export class Assembler {
                 newClc++;
             }
         } else {
-            throw this.error("Expected one parameter for ZBLOCK", group);
+            throw this.mkError("Expected one parameter for ZBLOCK", group);
         }
         this.setClc(ctx, newClc, false);
     }
@@ -590,13 +592,19 @@ export class Assembler {
 
     private outputLinks(ctx: Context) {
         let curField = ctx.field;
-        this.linkTable.visit((field, firstAddr, vals) => {
+        let curAddr = ctx.clc;
+        this.linkTable.visit((field, addr, val) => {
             if (field != curField) {
                 this.punchField(ctx, field);
                 curField = field;
+                curAddr = 0o200;
             }
-            this.punchOrigin(ctx, firstAddr);
-            vals.forEach((val, i) => this.punchData(ctx, firstAddr + i, val));
+            if (curAddr != addr) {
+                curAddr = addr;
+                this.punchOrigin(ctx, curAddr);
+            }
+            this.punchData(ctx, curAddr, val);
+            curAddr++;
         });
     }
 
@@ -627,7 +635,7 @@ export class Assembler {
         }
     }
 
-    private error(msg: string, node: Nodes.Node) {
+    private mkError(msg: string, node: Nodes.Node) {
         return Parser.mkNodeError(msg, node);
     }
 }

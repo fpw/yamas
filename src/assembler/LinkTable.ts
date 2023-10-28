@@ -1,4 +1,5 @@
 import * as PDP8 from "../utils/PDP8";
+import { Context } from "./Context";
 
 export class LinkTable {
     // [field][page][index]
@@ -13,14 +14,20 @@ export class LinkTable {
         }
     }
 
-    public has(field: number, page: number, value: number): boolean {
-        return this.tryLookup(field, page, value) !== undefined;
-    }
+    public enter(ctx: Context, page: number, value: number): number {
+        const field = ctx.field;
+        let delta = 0;
+        if (page != 0 && ctx.reloc != 0) {
+            const relocPage = PDP8.calcPageNum(ctx.clc + ctx.reloc);
+            delta = PDP8.firstAddrInPage(relocPage) - PDP8.firstAddrInPage(page);
+            if (delta % PDP8.PageSize != 0) {
+                throw Error("Relocating link tables to mid-page not supported");
+            }
+        }
 
-    public enter(field: number, page: number, value: number): number {
         const idx = this.tryLookup(field, page, value);
         if (idx !== undefined) {
-            return idx;
+            return idx + delta;
         }
 
         if (this.entries[field][page].length == PDP8.PageSize) {
@@ -28,7 +35,7 @@ export class LinkTable {
         }
 
         this.entries[field][page].push(value);
-        return this.indexToAddr(page, this.entries[field][page].length - 1);
+        return this.indexToAddr(page, this.entries[field][page].length - 1) + delta;
     }
 
     public checkOverlap(field: number, clc: number) {
@@ -57,15 +64,12 @@ export class LinkTable {
         return page * PDP8.PageSize + (PDP8.PageSize - 1 - idx);
     }
 
-    public visit(f: (field: number, addr: number, vals: number[]) => void) {
+    public visit(f: (field: number, addr: number, val: number) => void) {
         for (let field = 0; field < PDP8.NumFields; field++) {
             for (let page = 0; page < PDP8.NumPages; page++) {
+                const firstAddr = this.indexToAddr(page, this.entries[field][page].length - 1);
                 const vals = this.entries[field][page].toReversed();
-                if (!vals.length) {
-                    continue;
-                }
-                const firstAddr = this.indexToAddr(page, vals.length - 1);
-                f(field, firstAddr, vals);
+                vals.forEach((v, i) => f(field, firstAddr + i, v));
             }
         }
     }

@@ -101,7 +101,6 @@ export class Parser {
         return this.finishExprStatement(startSym);
     }
 
-    // eslint-disable-next-line max-lines-per-function
     private parseKeyword(startSym: Tokens.SymbolToken): Nodes.Statement {
         switch (startSym.symbol) {
             case "DEFINE":
@@ -109,11 +108,6 @@ export class Parser {
                 this.macros.set(def.name.token.symbol, def);
                 return def;
             case "TEXT":
-                const next = this.lexer.next();
-                if (next.type != Tokens.TokenType.Blank) {
-                    const got = Tokens.tokenToString(next);
-                    throw Parser.mkTokError(`Syntax error in TEXT: Expected blank, got ${got}`, next);
-                }
                 const [str, delimChr] = this.lexer.nextStringLiteral(true);
                 return {type: Nodes.NodeType.Text, token: str, delim: delimChr};
             case "DUBL":
@@ -121,11 +115,6 @@ export class Parser {
             case "FLTG":
                 return this.parseFltgList(startSym);
             case "EJECT":
-                const blank = this.lexer.next();
-                if (blank.type != Tokens.TokenType.Blank) {
-                    const got = Tokens.tokenToString(blank);
-                    throw Parser.mkTokError(`Syntax error in EJECT: Expected blank, got ${got}`, blank);
-                }
                 const [text, _] = this.lexer.nextStringLiteral(false);
                 return {type: Nodes.NodeType.Eject, token: text};
             case "FIXMRI":

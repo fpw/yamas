@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "fs";
 import { parse } from "ts-command-line-args";
 import { Options, Yamas } from "./Yamas";

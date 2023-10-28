@@ -6,7 +6,7 @@ describe("GIVEN an assembler", () => {
     describe("WHEN assembling an example program with a RELOC", () => {
         const data = assemble(`
             *200
-            RELOC 410
+            RELOC 400
             START,      TAD B
                         TAD (3
                         DCA LINK
@@ -20,6 +20,7 @@ describe("GIVEN an assembler", () => {
 
             LINK,       0
             B=LINK
+            RELOC
 
             FIELD 1
             FLD1,       TAD [2
@@ -32,33 +33,35 @@ describe("GIVEN an assembler", () => {
                         JMP START
 
         `);
-        test("THEN the output should match the one on the manual page", () => {
-            expect(data.memory[0o200]).toEqual(0o1222);
+        test("THEN the output should match the output of PAL8", () => {
+            expect(data.memory[0o200]).toEqual(0o1212);
             expect(data.memory[0o201]).toEqual(0o1377);
-            expect(data.memory[0o202]).toEqual(0o3222);
-            expect(data.memory[0o203]).toEqual(0o5214);
+            expect(data.memory[0o202]).toEqual(0o3212);
+            expect(data.memory[0o203]).toEqual(0o5204);
 
-            expect(data.memory[0o204]).toEqual(0o1222);
+            expect(data.memory[0o204]).toEqual(0o1212);
             expect(data.memory[0o205]).toEqual(0o1377);
             expect(data.memory[0o206]).toEqual(0o1177);
-            expect(data.memory[0o207]).toEqual(0o3222);
+            expect(data.memory[0o207]).toEqual(0o3212);
             expect(data.memory[0o210]).toEqual(0o6213);
-            expect(data.memory[0o211]).toEqual(0o5210);
+            expect(data.memory[0o211]).toEqual(0o5776);
             expect(data.memory[0o212]).toEqual(0o0000);
 
             expect(data.memory[0o10200]).toEqual(0o1177);
             expect(data.memory[0o10201]).toEqual(0o6223);
-            expect(data.memory[0o10202]).toEqual(0o5210);
+            expect(data.memory[0o10202]).toEqual(0o5200);
 
             expect(data.memory[0o20200]).toEqual(0o1177);
             expect(data.memory[0o20201]).toEqual(0o6203);
-            expect(data.memory[0o20202]).toEqual(0o5210);
+            expect(data.memory[0o20202]).toEqual(0o5777);
 
             // links
             expect(data.memory[0o177]).toEqual(0o0002);
+            expect(data.memory[0o376]).toEqual(0o0200);
             expect(data.memory[0o377]).toEqual(0o0003);
             expect(data.memory[0o10177]).toEqual(0o0002);
             expect(data.memory[0o20177]).toEqual(0o0003);
+            expect(data.memory[0o20377]).toEqual(0o0400);
 
             // Dumping a complex AST should not crash
             let ast = "";

@@ -64,6 +64,10 @@ export class Lexer {
         const startCursor = this.cursor;
         const data = this.data;
 
+        while (data[this.cursor.dataIdx] == " " || data[this.cursor.dataIdx] == "\t") {
+            this.advanceCursor(1);
+        }
+
         let delimChr: string | undefined;
         if (delim) {
             delimChr = data[this.cursor.dataIdx];

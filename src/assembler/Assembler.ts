@@ -62,7 +62,7 @@ export class Assembler {
 
         const asmCtx = this.createContext(true);
 
-        this.punchOrigin(asmCtx, asmCtx.clc);
+        this.punchOrigin(asmCtx);
         this.programs.forEach(p => this.assembleProgram(asmCtx, p));
 
         this.outputLinks(asmCtx);
@@ -70,8 +70,9 @@ export class Assembler {
 
     private createContext(generateCode: boolean): Context {
         return {
-            clc: PDP8.firstAddrInPage(1),
             field: 0,
+            clc: PDP8.firstAddrInPage(1),
+            reloc: 0,
             radix: 8,
             generateCode: generateCode,
             punchEnabled: true,
@@ -107,7 +108,7 @@ export class Assembler {
 
             if (generated) {
                 // we just put something at CLC - check if it overlaps with a link
-                this.linkTable.checkOverlap(ctx.field, ctx.clc);
+                this.linkTable.checkOverlap(ctx.field, this.getClc(ctx, false));
             }
 
             // symbols need to be updated here as well because it's possible to use
@@ -131,7 +132,7 @@ export class Assembler {
                 this.syms.defineFixedParameter(stmt.assignment.sym.token.symbol, val);
                 break;
             case Nodes.NodeType.Label:
-                this.syms.defineLabel(stmt.sym.token.symbol, ctx.clc);
+                this.syms.defineLabel(stmt.sym.token.symbol, this.getClc(ctx, true));
                 break;
             case Nodes.NodeType.Define:
                 if (!ctx.generateCode) {
@@ -158,31 +159,35 @@ export class Assembler {
             return false;
         }
         const val = this.safeEval(ctx, stmt.expr);
-        this.punchData(ctx, ctx.clc, val);
+        this.punchData(ctx, this.getClc(ctx, false), val);
         return true;
     }
 
     private updateCLC(ctx: Context, stmt: Nodes.Statement) {
+        let newClc = this.getClc(ctx, false);
+
         switch (stmt.type) {
             case Nodes.NodeType.Origin:
-                ctx.clc = this.safeEval(ctx, stmt.val);
-                this.punchOrigin(ctx, ctx.clc);
-                break;
+                newClc = this.safeEval(ctx, stmt.val) - ctx.reloc;
+                this.setClc(ctx, newClc, true);
+                this.punchOrigin(ctx);
+                return;
             case Nodes.NodeType.Text:
-                ctx.clc += CharSets.asciiStringToDec(stmt.token.str, true).length;
+                newClc += CharSets.asciiStringToDec(stmt.token.str, true).length;
                 break;
             case Nodes.NodeType.DoubleIntList:
-                ctx.clc += stmt.list.filter(x => x.type == Nodes.NodeType.DoubleInt).length * 2;
+                newClc += stmt.list.filter(x => x.type == Nodes.NodeType.DoubleInt).length * 2;
                 break;
             case Nodes.NodeType.FloatList:
-                ctx.clc += stmt.list.filter(x => x.type == Nodes.NodeType.Float).length * 3;
+                newClc += stmt.list.filter(x => x.type == Nodes.NodeType.Float).length * 3;
                 break;
             case Nodes.NodeType.ExpressionStmt:
                 if (!this.isPseudoExpr(stmt.expr)) {
-                    ctx.clc++;
+                    newClc++;
                 }
                 break;
         }
+        this.setClc(ctx, newClc, false);
     }
 
     // eslint-disable-next-line max-lines-per-function
@@ -208,14 +213,15 @@ export class Assembler {
                 this.handlePage(ctx, group);
                 break;
             case "RELOC":
-                throw Error("RELOC not supported yet");
+                this.handleReloc(ctx, group);
+                break;
             case "EXPUNG":
                 if (!ctx.generateCode) {
                     this.syms.expunge();
                 }
                 break;
             case "ZBLOCK":
-                this.handleZeroBlock(ctx, group);
+                this.outputZeroBlock(ctx, group);
                 break;
             case "IFNZRO":
             case "IFZERO":
@@ -232,36 +238,24 @@ export class Assembler {
         }
     }
 
-    private handleZeroBlock(ctx: Context, group: Nodes.SymbolGroup) {
-        if (group.exprs.length == 1) {
-            const num = this.safeEval(ctx, group.exprs[0]);
-            for (let i = 0; i < num; i++) {
-                if (ctx.generateCode) {
-                    this.punchData(ctx, ctx.clc, 0);
-                }
-                ctx.clc++;
-            }
-        } else {
-            throw this.error("Expected one parameter for ZBLOCK", group);
-        }
-    }
-
     private handlePage(ctx: Context, group: Nodes.SymbolGroup) {
+        let newPage: number;
         if (group.exprs.length == 0) {
             // subtracting 1 because the cursor is already at the next statement
-            const curPage = PDP8.calcPageNum(ctx.clc - 1);
-            ctx.clc = PDP8.firstAddrInPage(curPage + 1);
+            const curPage = PDP8.calcPageNum(this.getClc(ctx, true) - 1);
+            newPage = curPage + 1;
         } else if (group.exprs.length == 1) {
-            const page = this.safeEval(ctx, group.exprs[0]);
-            if (page < 0 || page >= PDP8.NumPages) {
-                throw this.error(`Invalid page ${page}`, group);
+            newPage = this.safeEval(ctx, group.exprs[0]);
+            if (newPage < 0 || newPage >= PDP8.NumPages) {
+                throw this.error(`Invalid page ${newPage}`, group);
             }
-            ctx.clc = PDP8.firstAddrInPage(page);
         } else {
             throw this.error("Expected zero or one parameter for PAGE", group);
         }
+        this.setClc(ctx, PDP8.firstAddrInPage(newPage), true);
+        this.linkTable.checkOverlap(ctx.field, PDP8.calcPageNum(this.getClc(ctx, true)));
         if (ctx.generateCode) {
-            this.punchOrigin(ctx, ctx.clc);
+            this.punchOrigin(ctx);
         }
     }
 
@@ -273,13 +267,24 @@ export class Assembler {
             }
 
             ctx.field = field;
-            ctx.clc = PDP8.firstAddrInPage(1);
+            this.setClc(ctx, PDP8.firstAddrInPage(1), false);
             if (ctx.generateCode) {
                 this.punchField(ctx, field);
-                this.punchOrigin(ctx, ctx.clc);
+                this.punchOrigin(ctx);
             }
         } else {
             throw this.error("Expected one parameter for FIELD", group);
+        }
+    }
+
+    private handleReloc(ctx: Context, group: Nodes.SymbolGroup) {
+        if (group.exprs.length == 0) {
+            ctx.reloc = 0;
+        } else if (group.exprs.length == 1) {
+            const reloc = this.safeEval(ctx, group.exprs[0]);
+            ctx.reloc = reloc - this.getClc(ctx, false);
+        } else {
+            throw this.error("Expected zero or one parameter for RELOC", group);
         }
     }
 
@@ -349,7 +354,7 @@ export class Assembler {
             case Nodes.NodeType.Symbol:
                 return this.evalSymbol(ctx, expr);
             case Nodes.NodeType.CLCValue:
-                return ctx.clc;
+                return this.getClc(ctx, true);
             case Nodes.NodeType.UnaryOp:
                 return this.evalUnary(ctx, expr);
             case Nodes.NodeType.ParenExpr:
@@ -425,9 +430,11 @@ export class Assembler {
         }
 
         if (expr.paren == "(") {
-            const curPage = PDP8.calcPageNum(ctx.clc);
+            const curPage = PDP8.calcPageNum(this.getClc(ctx, false));
             const link = this.linkTable.enter(ctx.field, curPage, val);
-            return link;
+            const relocPage = PDP8.calcPageNum(this.getClc(ctx, true));
+            const addr = link - PDP8.firstAddrInPage(curPage) + PDP8.firstAddrInPage(relocPage);
+            return addr;
         } else if (expr.paren == "[") {
             const link = this.linkTable.enter(ctx.field, 0, val);
             return link;
@@ -503,7 +510,7 @@ export class Assembler {
         const effVal = mri | (dst & 0b1111111);
 
         const curField = ctx.field;
-        const curPage = PDP8.calcPageNum(ctx.clc);
+        const curPage = PDP8.calcPageNum(this.getClc(ctx, true));
         const dstPage = PDP8.calcPageNum(dst);
         if (dstPage == 0) {
             return effVal;
@@ -513,15 +520,33 @@ export class Assembler {
             if (mri & IND) {
                 throw this.error(`Double indirection on page ${curPage}"`, group);
             }
-            const indAddr = this.linkTable.enter(curField, curPage, dst);
+            const page = PDP8.calcPageNum(this.getClc(ctx, false));
+            const indAddr = this.linkTable.enter(curField, page, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
         }
     }
 
     private outputText(ctx: Context, text: string): boolean {
         const outStr = CharSets.asciiStringToDec(text, true);
-        outStr.forEach((w, i) => this.punchData(ctx, ctx.clc + i, w));
+        const addr = this.getClc(ctx, false);
+        outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
         return true;
+    }
+
+    private outputZeroBlock(ctx: Context, group: Nodes.SymbolGroup) {
+        let newClc = this.getClc(ctx, false);
+        if (group.exprs.length == 1) {
+            const num = this.safeEval(ctx, group.exprs[0]);
+            for (let i = 0; i < num; i++) {
+                if (ctx.generateCode) {
+                    this.punchData(ctx, newClc, 0);
+                }
+                newClc++;
+            }
+        } else {
+            throw this.error("Expected one parameter for ZBLOCK", group);
+        }
+        this.setClc(ctx, newClc, false);
     }
 
     private outputDubl(ctx: Context, stmt: Nodes.DoubleIntList): boolean {
@@ -529,7 +554,7 @@ export class Assembler {
             return false;
         }
 
-        let loc = ctx.clc;
+        let loc = this.getClc(ctx, false);
         for (const dubl of stmt.list) {
             if (dubl.type != Nodes.NodeType.DoubleInt) {
                 continue;
@@ -549,7 +574,7 @@ export class Assembler {
             return false;
         }
 
-        let loc = ctx.clc;
+        let loc = this.getClc(ctx, false);
         for (const fltg of stmt.list) {
             if (fltg.type != Nodes.NodeType.Float) {
                 continue;
@@ -575,15 +600,24 @@ export class Assembler {
         });
     }
 
+    private getClc(ctx: Context, reloc: boolean) {
+        return (ctx.clc + (reloc ? ctx.reloc : 0)) & 0o7777;
+    }
+
+    private setClc(ctx: Context, clc: number, reloc: boolean) {
+        ctx.clc = (clc - (reloc ? ctx.reloc : 0)) & 0o7777;
+    }
+
     private punchData(ctx: Context, addr: number, val: number) {
         if (ctx.punchEnabled && this.outputHandler) {
             this.outputHandler.writeValue(addr, val);
         }
     }
 
-    private punchOrigin(ctx: Context, origin: number) {
+    private punchOrigin(ctx: Context, origin?: number) {
         if (ctx.punchEnabled && this.outputHandler) {
-            this.outputHandler.changeOrigin(origin);
+            const to = origin ?? this.getClc(ctx, false);
+            this.outputHandler.changeOrigin(to);
         }
     }
 

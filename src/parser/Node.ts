@@ -167,7 +167,6 @@ export interface Float extends BaseNode {
 // TEXT x...x
 export interface TextStatement extends BaseNode {
     type: NodeType.Text;
-    delim: string;
     token: Tokens.StringToken;
 }
 
@@ -296,7 +295,7 @@ export function formatSingle(node: Node): string {
         case NodeType.ExpressionStmt:
             return `ExprStmt(${formatSingle(node.expr)})`;
         case NodeType.Text:
-            return `Text(delim='${node.delim}', "${node.token.str}")`;
+            return `Text("${node.token.str}")`;
         case NodeType.Comment:
             return `Comment("${node.token.comment}")`;
         case NodeType.SymbolGroup:

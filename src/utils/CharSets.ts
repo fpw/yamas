@@ -1,3 +1,11 @@
+export function asciiCharTo7Bit(chr: string, markParity: boolean): number {
+    const code = chr.codePointAt(0);
+    if (code === undefined || code >= 0x80) {
+        throw Error("Invalid 7-bit ASCII");
+    }
+    return code | (markParity ? 0o200 : 0);
+}
+
 export function asciiCharToDec(chr: string): number {
     const res = chr.charCodeAt(0) & 0o77;
     if (decCharToAscii(res) != chr) {
@@ -12,14 +20,6 @@ export function decCharToAscii(chr: number): string {
         ascii |= 0o100;
     }
     return String.fromCharCode(ascii);
-}
-
-export function asciiCharTo7Bit(chr: string, markParity: boolean): number {
-    const code = chr.codePointAt(0);
-    if (code === undefined || code >= 0x80) {
-        throw Error("Invalid 7-bit ASCII");
-    }
-    return code | (markParity ? 0o200 : 0);
 }
 
 // convert from ASCII string to DEC 6-bit string, i.e. result contains 12 bit words with 2 chars each
@@ -45,23 +45,6 @@ export function asciiStringToDec(text: string, terminate: boolean): number[] {
     return res;
 }
 
-export function asciiStringToOS8Name(str: string): number[] {
-    const [name, ext] = str.split(".");
-    const namePart = name.padEnd(6, "\0");
-
-    let extPart;
-    if (ext) {
-        extPart = ext.padEnd(2, "\0");
-    } else {
-        extPart = "\0\0";
-    }
-
-    return [
-        ...asciiStringToDec(namePart, false),
-        ...asciiStringToDec(extPart, false),
-    ];
-}
-
 export function decStringToAscii(dec: number[]): string {
     let res = "";
     for (const w of dec) {
@@ -79,4 +62,34 @@ export function decStringToAscii(dec: number[]): string {
         }
     }
     return res;
+}
+
+export function asciiStringToOS8Name(str: string): number[] {
+    const [name, ext] = str.split(".");
+    const namePart = name.padEnd(6, "\0");
+
+    let extPart;
+    if (ext) {
+        extPart = ext.padEnd(2, "\0");
+    } else {
+        extPart = "\0\0";
+    }
+
+    return [
+        ...asciiStringToDec(namePart, false),
+        ...asciiStringToDec(extPart, false),
+    ];
+}
+
+export function os8NameToASCII(os8Name: number[]): string {
+    if (os8Name.length != 4) {
+        throw Error(`Invalid length for OS/8 name: ${os8Name.length}`);
+    }
+    const namePart = decStringToAscii([os8Name[0], os8Name[1], os8Name[2]]);
+    const extPart = decStringToAscii([os8Name[3]]);
+    if (extPart) {
+        return `${namePart}.${extPart}`;
+    } else {
+        return `${namePart}`;
+    }
 }

@@ -8,6 +8,7 @@ export const PreludeFamily8 = `
     JMP=5000
     IOT=6000
     OPR=7000
+
     / MICROINSTRUCTIONS
     NOP=7000
     CLA=7200
@@ -28,11 +29,13 @@ export const PreludeFamily8 = `
     SKP=7410
     OSR=7404
     HLT=7402
+
     / COMBINED MICROINSTRUCTIONS
     CIA=7041
     LAS=7604
     STA=7240
     STL=7120
     GLK=7204
+
     FIXTAB
 `;

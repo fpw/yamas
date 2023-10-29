@@ -76,6 +76,7 @@ export interface ASCIIToken extends BaseToken {
 export interface StringToken extends BaseToken {
     type: TokenType.String;
     str: string;
+    delims: string[];
 }
 
 export interface CommentToken extends BaseToken {

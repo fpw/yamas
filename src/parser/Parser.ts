@@ -108,15 +108,15 @@ export class Parser {
                 this.macros.set(def.name.token.symbol, def);
                 return def;
             case "TEXT":
-                const [str, delimChr] = this.lexer.nextStringLiteral(true);
-                return {type: Nodes.NodeType.Text, token: str, delim: delimChr};
+                const strTok = this.lexer.nextStringLiteral(true);
+                return {type: Nodes.NodeType.Text, token: strTok};
             case "DUBL":
                 return this.parseDublList(startSym);
             case "FLTG":
                 return this.parseFltgList(startSym);
             case "EJECT":
-                const [text, _] = this.lexer.nextStringLiteral(false);
-                return {type: Nodes.NodeType.Eject, token: text};
+                const ejectTxt = this.lexer.nextStringLiteral(false);
+                return {type: Nodes.NodeType.Eject, token: ejectTxt};
             case "FIXMRI":
                 return this.parseFixMri(startSym);
             case "FILENAME":
@@ -178,10 +178,9 @@ export class Parser {
     }
 
     private parseFilename(startSym: Tokens.SymbolToken): Nodes.FilenameStatement {
-        const [name] = this.lexer.nextStringLiteral(false);
         return {
             type: Nodes.NodeType.FileName,
-            name: name,
+            name: this.lexer.nextStringLiteral(false),
             token: startSym,
         };
     }
@@ -330,6 +329,7 @@ export class Parser {
         }
     }
 
+    // convert a list of (element, operator) tuples to left-associative expression tree
     private foldExpressionParts(parts: BinOpFragment[]): Nodes.BinaryOp {
         if (parts.length < 2) {
             throw Parser.mkNodeError("Unexpected end of expression", parts[0].elem);

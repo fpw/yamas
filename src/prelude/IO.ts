@@ -2,6 +2,7 @@ export const PreludeIO = `
     / PROGRAM INTERRUPT
     ION=6001
     IOF=6002
+
     / MEMORY EXTENSION
     RDF=6214
     RIF=6224
@@ -9,15 +10,18 @@ export const PreludeIO = `
     RIB=6234
     CDF=6201
     CIF=6202
+
     / HIGH SPEED TAPE READER
     RSF=6011
     RRB=6012
     RFC=6014
+
     / HIGH SPEED TAPE PUNCH
     PSF=6021
     PCF=6022
     PPC=6024
     PLS=6026
+
     / TELETYPE KEYBOARD
     KCF=6030
     KSF=6031
@@ -25,6 +29,7 @@ export const PreludeIO = `
     KRS=6034
     KIE=6035
     KRB=6036
+
     / TELETYPE PUNCH
     TFL=6040
     TSF=6041
@@ -32,5 +37,6 @@ export const PreludeIO = `
     TPC=6044
     TSK=6045
     TLS=6046
+
     FIXTAB
 `;

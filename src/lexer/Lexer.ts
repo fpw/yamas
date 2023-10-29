@@ -61,22 +61,23 @@ export class Lexer {
         }
     }
 
-    public nextStringLiteral(delim: boolean): [Tokens.StringToken, string] {
+    public nextStringLiteral(delim: boolean): Tokens.StringToken {
         const startCursor = this.cursor;
         const data = this.data;
+        const delims: string[] = [];
 
         this.skipBlank(data);
 
-        let delimChr: string | undefined;
         if (delim) {
-            delimChr = data[this.cursor.dataIdx];
+            delims[0] = data[this.cursor.dataIdx];
             this.advanceCursor(1);
         }
 
         let str = "";
         for (let i = this.cursor.dataIdx; i < data.length; i++) {
             this.advanceCursor(1);
-            if (data[i] === delimChr) {
+            if (data[i] === delims[0]) {
+                delims[1] = data[i];
                 break;
             } else if (data[i] == "/" && !delim) {
                 str = str.trim();
@@ -88,12 +89,12 @@ export class Lexer {
             str += data[i];
         }
 
-        const tok: Tokens.StringToken = {
+        return {
             type: Tokens.TokenType.String,
             str: str,
+            delims: delims,
             ...this.getTokenMeasurement(startCursor),
         };
-        return [tok, delimChr ?? ""];
     }
 
     private skipBlank(data: string) {

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { decStringToAscii } from "../../src/utils/CharSets";
+import { decStringToAscii, os8NameToASCII } from "../../src/utils/CharSets";
 import { assemble } from "./TestUtils";
 
 describe("GIVEN a program containing pseudo statements", () => {
@@ -159,11 +159,13 @@ describe("GIVEN a program containing pseudo statements", () => {
             expect(data.memory[0o201]).toEqual(0o2000);
             expect(data.memory[0o202]).toEqual(0o0000);
             expect(data.memory[0o203]).toEqual(0o2326);
+            expect(os8NameToASCII([0o2011, 0o2000, 0o0000, 0o2326])).toEqual("PIP.SV");
 
             expect(data.memory[0o204]).toEqual(0o2011);
             expect(data.memory[0o205]).toEqual(0o2000);
             expect(data.memory[0o206]).toEqual(0o0000);
             expect(data.memory[0o207]).toEqual(0o0000);
+            expect(os8NameToASCII([0o2011, 0o2000, 0o0000, 0o000])).toEqual("PIP");
         });
     });
 

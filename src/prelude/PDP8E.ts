@@ -15,4 +15,6 @@ export const Prelude8E = `
     MQA=7501
     SWP=7521
     ACL=7701
+
+    FIXTAB
 `;

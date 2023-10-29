@@ -57,9 +57,10 @@ export class LinkTable {
 
     public visit(f: (addr: number, val: number) => void) {
         for (let page = 0; page < PDP8.NumPages; page++) {
-            const firstAddr = this.indexToAddr(page, this.entries[page].length - 1);
-            const vals = this.entries[page].toReversed();
-            vals.forEach((v, i) => f(firstAddr + i, v));
+            for (let i = this.entries[page].length - 1; i >= 0; i--) {
+                const addr = this.indexToAddr(page, i);
+                f(addr, this.entries[page][i]);
+            }
         }
     }
 

@@ -1,10 +1,10 @@
-import { CodeError } from "../utils/CodeError";
-import { Lexer } from "../lexer/Lexer";
+import {CodeError} from "../utils/CodeError";
+import {Lexer} from "../lexer/Lexer";
 import * as Tokens from "../lexer/Token";
-import { TokenType } from "../lexer/Token";
+import {TokenType} from "../lexer/Token";
 import * as Nodes from "./Node";
-import { NodeType } from "./Node";
-import { normalizeSymbolName } from "../utils/Strings";
+import {NodeType} from "./Node";
+import {normalizeSymbolName} from "../utils/Strings";
 
 type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 type KeywordHandler = (symbol: Tokens.SymbolToken) => Nodes.Statement;
@@ -145,14 +145,14 @@ export class Parser {
 
     private parseSeparator(tok: Tokens.EOLToken | Tokens.SeparatorToken): Nodes.StatementSeparator {
         if (tok.type == TokenType.EOL) {
-            return { type: NodeType.Separator, separator: "\n", token: tok };
+            return {type: NodeType.Separator, separator: "\n", token: tok};
         } else {
             return {type: NodeType.Separator, separator: tok.char, token: tok};
         }
     }
 
     private parseComment(tok: Tokens.CommentToken): Nodes.Comment {
-        return { type: NodeType.Comment, token: tok };
+        return {type: NodeType.Comment, token: tok};
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
@@ -246,7 +246,7 @@ export class Parser {
         if (nextSym.type == TokenType.Symbol) {
             const assign = this.finishStatement(nextSym);
             if (assign.type == NodeType.Assignment) {
-                return { type: NodeType.FixMri, assignment: assign, token: startSym };
+                return {type: NodeType.FixMri, assignment: assign, token: startSym};
             }
         }
         throw Parser.mkTokError("FIXMRI must be followed by assignment statement", nextSym);
@@ -510,7 +510,7 @@ export class Parser {
     }
 
     private parseInteger(tok: Tokens.IntegerToken): Nodes.Integer {
-        return { type: NodeType.Integer, token: tok };
+        return {type: NodeType.Integer, token: tok};
     }
 
     private parseDublList(dublSym: Tokens.SymbolToken): Nodes.DoubleIntList {
@@ -548,7 +548,7 @@ export class Parser {
                     if (nextInt.type != TokenType.Integer) {
                         throw Parser.mkTokError("Unexpected unary operand", nextInt);
                     }
-                    return { type: NodeType.DoubleInt, unaryOp: next, token: nextInt};
+                    return {type: NodeType.DoubleInt, unaryOp: next, token: nextInt};
                 } else {
                     this.lexer.unget(next);
                     return undefined;
@@ -621,7 +621,7 @@ export class Parser {
             }
         }
 
-        const def: Nodes.DefineStatement = { type: NodeType.Define, name, body, params, token };
+        const def: Nodes.DefineStatement = {type: NodeType.Define, name, body, params, token};
         this.macros.set(name.token.symbol, def);
         return def;
     }

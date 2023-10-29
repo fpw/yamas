@@ -1,6 +1,6 @@
-import { CodeError } from "../utils/CodeError";
-import { replaceBlanks } from "../utils/Strings";
-import { TokenType } from "./Token";
+import {CodeError} from "../utils/CodeError";
+import {replaceBlanks} from "../utils/Strings";
+import {TokenType} from "./Token";
 import * as Tokens from "./Token";
 
 export interface Cursor {

@@ -1,11 +1,11 @@
-import { existsSync, readFileSync, readdirSync } from "fs";
-import path, { basename } from "path";
-import { parse } from "ts-command-line-args";
-import { Options, Yamas } from "./Yamas";
-import { BinTapeReader } from "./tapeformats/BinTapeReader";
-import { CodeError } from "./utils/CodeError";
-import { MemSize } from "./utils/PDP8";
-import { numToOctal } from "./utils/Strings";
+import {existsSync, readFileSync, readdirSync} from "fs";
+import path, {basename} from "path";
+import {parse} from "ts-command-line-args";
+import {Options, Yamas} from "./Yamas";
+import {BinTapeReader} from "./tapeformats/BinTapeReader";
+import {CodeError} from "./utils/CodeError";
+import {MemSize} from "./utils/PDP8";
+import {numToOctal} from "./utils/Strings";
 
 interface CliArgs {
     help?: boolean;

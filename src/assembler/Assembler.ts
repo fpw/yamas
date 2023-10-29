@@ -1,14 +1,14 @@
 import * as Nodes from "../parser/Node";
-import { NodeType } from "../parser/Node";
-import { Parser } from "../parser/Parser";
+import {NodeType} from "../parser/Node";
+import {Parser} from "../parser/Parser";
 import * as CharSets from "../utils/CharSets";
-import { CodeError } from "../utils/CodeError";
-import { toDECFloat } from "../utils/Floats";
+import {CodeError} from "../utils/CodeError";
+import {toDECFloat} from "../utils/Floats";
 import * as PDP8 from "../utils/PDP8";
-import { parseIntSafe } from "../utils/Strings";
-import { Context } from "./Context";
-import { LinkTable } from "./LinkTable";
-import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable";
+import {parseIntSafe} from "../utils/Strings";
+import {Context} from "./Context";
+import {LinkTable} from "./LinkTable";
+import {SymbolData, SymbolTable, SymbolType} from "./SymbolTable";
 
 export interface OutputHandler {
     changeOrigin(clc: number): void;

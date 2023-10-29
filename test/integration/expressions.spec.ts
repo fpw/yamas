@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { assemble } from "./TestUtils";
+import {assemble} from "./TestUtils";
 
 describe("GIVEN a program with expressions", () => {
     describe("WHEN evaluating binary operators", () => {

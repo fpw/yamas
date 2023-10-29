@@ -1,4 +1,4 @@
-import { normalizeSymbolName } from "../utils/Strings";
+import {normalizeSymbolName} from "../utils/Strings";
 
 export enum SymbolType {
     Param,      // A=x

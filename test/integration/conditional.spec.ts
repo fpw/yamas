@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { assemble, assembleWithErrors } from "./TestUtils";
+import {assemble, assembleWithErrors} from "./TestUtils";
 
 describe("GIVEN a program with conditional statements", () => {
     describe("WHEN evaluating conditional statements with various syntax variations", () => {

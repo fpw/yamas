@@ -19,93 +19,15 @@
     "ts-command-line-args": "^2.5.1"
   },
   "devDependencies": {
+    "@stylistic/eslint-plugin": "^0.1.2",
     "@types/node": "^20.8.9",
     "@typescript-eslint/eslint-plugin": "^6.9.0",
-    "@typescript-eslint/parser": "^6.9.0",
+    "@stylistic/parser": "^6.9.0",
     "@vitest/coverage-v8": "^0.34.6",
     "eslint": "^8.52.0",
     "tsx": "^3.14.0",
     "typescript": "^5.2.2",
     "vitest": "^0.34.6"
   },
-  "types": "dist/src/index.d.ts",
-  "eslintConfig": {
-    "plugins": [
-      "@typescript-eslint"
-    ],
-    "extends": [
-      "plugin:@typescript-eslint/strict",
-      "plugin:@typescript-eslint/recommended-requiring-type-checking"
-    ],
-    "parser": "@typescript-eslint/parser",
-    "parserOptions": {
-      "project": [
-        "./tsconfig.json"
-      ]
-    },
-    "rules": {
-      "@typescript-eslint/brace-style": [
-        "error",
-        "1tbs",
-        {
-          "allowSingleLine": true
-        }
-      ],
-      "max-len": [
-        "error",
-        {
-          "code": 120
-        }
-      ],
-      "max-lines-per-function": [
-        "error",
-        35
-      ],
-      "@typescript-eslint/comma-spacing": "error",
-      "@typescript-eslint/require-await": "off",
-      "@typescript-eslint/no-non-null-assertion": "off",
-      "@typescript-eslint/keyword-spacing": "error",
-      "@typescript-eslint/func-call-spacing": "error",
-      "@typescript-eslint/space-before-blocks": "error",
-      "@typescript-eslint/space-before-function-paren": [
-        "error",
-        "never"
-      ],
-      "@typescript-eslint/restrict-template-expressions": "off",
-      "@typescript-eslint/space-infix-ops": "error",
-      "@typescript-eslint/type-annotation-spacing": "error",
-      "@typescript-eslint/indent": [
-        "error",
-        4,
-        {
-          "SwitchCase": 1,
-          "ignoredNodes": [
-            "PropertyDefinition[decorators]",
-            "TSUnionType"
-          ]
-        }
-      ],
-      "jsx-quotes": [
-        "error",
-        "prefer-double"
-      ],
-      "@typescript-eslint/quotes": [
-        "error",
-        "double",
-        {
-          "avoidEscape": true
-        }
-      ],
-      "eqeqeq": "off",
-      "@typescript-eslint/semi": "error",
-      "@typescript-eslint/no-unnecessary-condition": "off",
-      "@typescript-eslint/no-unused-vars": "off"
-    },
-    "ignorePatterns": [
-      "public/",
-      "coverage/",
-      "dist/",
-      "node_modules/"
-    ]
-  }
+  "types": "dist/src/index.d.ts"
 }

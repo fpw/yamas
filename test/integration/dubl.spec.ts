@@ -1,4 +1,4 @@
-import { assemble } from "./TestUtils";
+import {assemble} from "./TestUtils";
 
 describe("GIVEN a program with DUBL statements", () => {
     describe("WHEN evaluating DUBL statements", () => {

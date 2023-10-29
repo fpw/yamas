@@ -1,5 +1,5 @@
-import { asciiCharToDec, decCharToAscii } from "../../src/utils/CharSets";
-import { replaceBlanks } from "../../src/utils/Strings";
+import {asciiCharToDec, decCharToAscii} from "../../src/utils/CharSets";
+import {replaceBlanks} from "../../src/utils/Strings";
 
 describe("WHEN converting character sets", () => {
     const expectations: [string, number][] = [

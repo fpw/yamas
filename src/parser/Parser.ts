@@ -263,7 +263,7 @@ export class Parser {
                     paren: first.char,
                     expr: expr,
                     token: first,
-                }
+                };
             }
         } else if (first.type == Tokens.TokenType.MacroBody) {
             return {
@@ -407,7 +407,7 @@ export class Parser {
                         operator: tok.char,
                         elem: this.parseElement(),
                         token: tok,
-                    }
+                    };
                 }
                 break;
         }

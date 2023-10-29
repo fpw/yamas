@@ -30,13 +30,7 @@ export const PreludeIO = `
     TSF=6041
     TCF=6042
     TPC=6044
+    TSK=6045
     TLS=6046
-    / 8/E
-    CAF=6007
-    MQL=7421
-    MQA=7501
-    SWP=7521
-    ACL=7701
-    BSW=7002
     FIXTAB
 `;

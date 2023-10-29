@@ -1,7 +1,7 @@
 /* eslint-disable max-lines-per-function */
-import { assemble } from "./util";
+import { assemble } from "./TestUtils";
 
-describe("GIVEN an assembler", () => {
+describe("GIVEN a program with expressions", () => {
     describe("WHEN evaluating binary operators", () => {
         const data = assemble(`
             DECIMAL
@@ -34,6 +34,18 @@ describe("GIVEN an assembler", () => {
         `);
         test("THEN it should generate mark parity", () => {
             expect(data.symbols["OUT"]).toEqual("A".charCodeAt(0) | 0o200);
+        });
+    });
+
+    describe("WHEN evaluating a symbol group followed by a binary op", () => {
+        const data = assemble(`
+            T=1600
+            T 220-200 / Must evaluate as (1600 or 220) - 200
+            T 220-200 7-1 / Must evaluate as ((((1600 or 220) - 200) or 7) - 1)
+        `);
+        test("THEN it should evaluate as left-associative OR", () => {
+            expect(data.memory[0o200]).toEqual(0o1420);
+            expect(data.memory[0o201]).toEqual(0o1426);
         });
     });
 });

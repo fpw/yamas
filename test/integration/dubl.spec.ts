@@ -1,6 +1,6 @@
-import { assemble } from "./util";
+import { assemble } from "./TestUtils";
 
-describe("GIVEN an assembler", () => {
+describe("GIVEN a program with DUBL statements", () => {
     describe("WHEN evaluating DUBL statements", () => {
         const data = assemble(`
             *400

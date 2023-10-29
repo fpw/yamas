@@ -97,6 +97,7 @@
         }
       ],
       "eqeqeq": "off",
+      "@typescript-eslint/semi": "error",
       "@typescript-eslint/no-unnecessary-condition": "off",
       "@typescript-eslint/no-unused-vars": "off"
     },

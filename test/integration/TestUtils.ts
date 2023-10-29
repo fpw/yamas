@@ -1,8 +1,9 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../src/assembler/Assembler";
-import { Program } from "../src/parser/Node";
-import { PreludeFamily8 } from "../src/prelude/Family8";
-import { PreludeIO } from "../src/prelude/IO";
+import { Assembler } from "../../src/assembler/Assembler";
+import { Program } from "../../src/parser/Node";
+import { PreludeFamily8 } from "../../src/prelude/Family8";
+import { PreludeIO } from "../../src/prelude/IO";
+import { Prelude8E } from "../../src/prelude/PDP8E";
 
 export interface TestData {
     asm: Assembler;
@@ -28,10 +29,11 @@ export function assemble(input: string): TestData {
         writeValue(clc, val) {
             memory[field * 4096 + clc] = val;
         },
-    })
+    });
 
     asm.parseInput("prelude/family8.pa", PreludeFamily8);
     asm.parseInput("prelude/iot.pa", PreludeIO);
+    asm.parseInput("prelude/pdp8e.pa", Prelude8E);
 
     const ast = asm.parseInput("test.pa", input);
     asm.assembleAll();

@@ -61,14 +61,11 @@ export class Lexer {
         }
     }
 
-    // eslint-disable-next-line max-lines-per-function
     public nextStringLiteral(delim: boolean): [Tokens.StringToken, string] {
         const startCursor = this.cursor;
         const data = this.data;
 
-        while (data[this.cursor.dataIdx] == " " || data[this.cursor.dataIdx] == "\t") {
-            this.advanceCursor(1);
-        }
+        this.skipBlank(data);
 
         let delimChr: string | undefined;
         if (delim) {
@@ -86,9 +83,6 @@ export class Lexer {
                 this.cursor.dataIdx--;
                 break;
             } else if (this.isLineBreak(data[i])) {
-                if (delim) {
-                    throw Lexer.mkError("Unterminated delimiter string", startCursor);
-                }
                 break;
             }
             str += data[i];
@@ -100,6 +94,12 @@ export class Lexer {
             ...this.getTokenMeasurement(startCursor),
         };
         return [tok, delimChr ?? ""];
+    }
+
+    private skipBlank(data: string) {
+        while (data[this.cursor.dataIdx] == " " || data[this.cursor.dataIdx] == "\t") {
+            this.advanceCursor(1);
+        }
     }
 
     private floatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([eE][-+]?\d+)?/;

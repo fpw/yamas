@@ -26,7 +26,7 @@ function main() {
             continue;
         }
         const filePath = args.dir + "/" + fileName;
-        const bnPath = path.format({...path.parse(filePath), base: "", ext: ".bn"})
+        const bnPath = path.format({...path.parse(filePath), base: "", ext: ".bn"});
         if (!existsSync(bnPath)) {
             continue;
         }

@@ -2,6 +2,7 @@ import { Assembler } from "./assembler/Assembler";
 import { dumpNode } from "./parser/Node";
 import { PreludeFamily8 } from "./prelude/Family8";
 import { PreludeIO } from "./prelude/IO";
+import { Prelude8E } from "./prelude/PDP8E";
 import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
 
 export interface Options {
@@ -25,6 +26,7 @@ export class Yamas {
         if (opts.loadPrelude) {
             this.asm.parseInput("prelude/family8.pa", PreludeFamily8);
             this.asm.parseInput("prelude/iot.pa", PreludeIO);
+            this.asm.parseInput("prelude/pdp8e.pa", Prelude8E);
         }
     }
 

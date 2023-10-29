@@ -1,7 +1,7 @@
 /* eslint-disable max-lines-per-function */
-import { assemble } from "./util";
+import { assemble } from "./TestUtils";
 
-describe("GIVEN an assembler", () => {
+describe("GIVEN a program with macros", () => {
     describe("WHEN evaluating macros with strange arguments", () => {
         const data = assemble(`
             DEFINE ADD A B <

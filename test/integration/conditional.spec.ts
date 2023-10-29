@@ -1,8 +1,8 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../src/assembler/Assembler";
-import { assemble } from "./util";
+import { Assembler } from "../../src/assembler/Assembler";
+import { assemble } from "./TestUtils";
 
-describe("GIVEN an assembler", () => {
+describe("GIVEN a program with conditional statements", () => {
     describe("WHEN evaluating conditional statements with various syntax variations", () => {
         const data = assemble(`
             / Testing different syntax variations

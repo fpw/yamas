@@ -1,8 +1,8 @@
 /* eslint-disable max-lines-per-function */
-import { decStringToAscii } from "../src/utils/CharSets";
-import { assemble } from "./util";
+import { decStringToAscii } from "../../src/utils/CharSets";
+import { assemble } from "./TestUtils";
 
-describe("GIVEN an assembler", () => {
+describe("GIVEN a program containing pseudo statements", () => {
     describe("WHEN evaluating PAGE statements with parameters", () => {
         const data = assemble(`
             PAGE 0
@@ -143,6 +143,41 @@ describe("GIVEN an assembler", () => {
             EJECT THIS IS A TEST STRING
        `);
         test("THEN it should ignore it", () => {
+        });
+    });
+    describe("WHEN evaluating the FILENAME statement", () => {
+        const data = assemble(`
+            FILENAME PIP.SV
+            TAG,
+            FILENAME PIP
+       `);
+        test("THEN it should generate names according to spec", () => {
+            // Spec: DEC-S8-OSSMB-A-D, page 1-7
+            expect(data.symbols["TAG"]).toEqual(0o204);
+
+            expect(data.memory[0o200]).toEqual(0o2011);
+            expect(data.memory[0o201]).toEqual(0o2000);
+            expect(data.memory[0o202]).toEqual(0o0000);
+            expect(data.memory[0o203]).toEqual(0o2326);
+
+            expect(data.memory[0o204]).toEqual(0o2011);
+            expect(data.memory[0o205]).toEqual(0o2000);
+            expect(data.memory[0o206]).toEqual(0o0000);
+            expect(data.memory[0o207]).toEqual(0o0000);
+        });
+    });
+
+    describe("WHEN evaluating the DEVICE statement", () => {
+        const data = assemble(`
+            DEVICE DTA1
+            TAG,
+       `);
+        test("THEN it should generate names according to spec", () => {
+            // Spec: DEC-S8-OSSMB-A-D, page 1-7
+            expect(data.symbols["TAG"]).toEqual(0o202);
+
+            expect(data.memory[0o200]).toEqual(0o0424);
+            expect(data.memory[0o201]).toEqual(0o0161);
         });
     });
 });

@@ -3,7 +3,7 @@ import { Parser } from "../parser/Parser";
 import * as CharSets from "../utils/CharSets";
 import { toDECFloat } from "../utils/Floats";
 import * as PDP8 from "../utils/PDP8";
-import { numToOctal, parseIntSafe } from "../utils/Strings";
+import { parseIntSafe } from "../utils/Strings";
 import { Context } from "./Context";
 import { LinkTable } from "./LinkTable";
 import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable";
@@ -25,7 +25,7 @@ export class Assembler {
         "DECIMAL",  "OCTAL",
         "EXPUNGE",  "FIXTAB",
         "PAGE",     "FIELD",    "RELOC",
-        "ZBLOCK",
+        "ZBLOCK",   "DEVICE",
         "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
 
         // the following pseudos are handled by the parser, but we still
@@ -111,7 +111,7 @@ export class Assembler {
 
             if (generated) {
                 // we just put something at CLC - check if it overlaps with a link
-                this.linkTable.checkOverlap(ctx.field, this.getClc(ctx, false));
+                this.linkTable.checkOverlap(this.getClc(ctx, false));
             }
 
             // symbols need to be updated here as well because it's possible to use
@@ -170,7 +170,7 @@ export class Assembler {
                 newClc += CharSets.asciiStringToDec(stmt.token.str, true).length;
                 break;
             case Nodes.NodeType.FileName:
-                newClc += CharSets.asciiStringToOS8Name(stmt.name.str).length;
+                newClc += 4;
                 break;
             case Nodes.NodeType.DoubleIntList:
                 newClc += stmt.list.filter(x => x.type == Nodes.NodeType.DoubleInt).length * 2;
@@ -187,53 +187,25 @@ export class Assembler {
         this.setClc(ctx, newClc, false);
     }
 
-    // eslint-disable-next-line max-lines-per-function
     private handlePseudo(ctx: Context, group: Nodes.SymbolGroup) {
         const pseudo = this.syms.lookup(group.first.token.symbol).name;
 
         switch (pseudo) {
-            case "DECIMA":
-                ctx.radix = 10;
-                break;
-            case "OCTAL":
-                ctx.radix = 8;
-                break;
-            case "FIXTAB":
-                if (!ctx.generateCode) {
-                    this.syms.fix();
-                }
-                break;
-            case "FIELD":
-                this.handleField(ctx, group);
-                break;
-            case "PAGE":
-                this.handlePage(ctx, group);
-                break;
-            case "RELOC":
-                this.handleReloc(ctx, group);
-                break;
-            case "EXPUNG":
-                if (!ctx.generateCode) {
-                    this.syms.expunge();
-                }
-                break;
-            case "ZBLOCK":
-                this.outputZeroBlock(ctx, group);
-                break;
-            case "IFNZRO":
-            case "IFZERO":
-                this.handleIfZero(ctx, group, pseudo);
-                break;
-            case "IFDEF":
-            case "IFNDEF":
-                this.handleIfDef(ctx, group, pseudo);
-                break;
-            case "NOPUNC":
-                ctx.punchEnabled = false;
-                break;
-            case "ENPUNC":
-                ctx.punchEnabled = true;
-                break;
+            case "ENPUNC":  ctx.punchEnabled = true; break;
+            case "NOPUNC":  ctx.punchEnabled = false; break;
+            case "DECIMA":  ctx.radix = 10; break;
+            case "OCTAL":   ctx.radix = 8; break;
+            case "FIELD":   this.handleField(ctx, group); break;
+            case "PAGE":    this.handlePage(ctx, group); break;
+            case "RELOC":   this.handleReloc(ctx, group); break;
+            case "ZBLOCK":  this.handleZeroBlock(ctx, group); break;
+            case "DEVICE":  this.handleDeviceName(ctx, group); break;
+            case "IFNZRO":  this.handleIfZero(ctx, group, pseudo); break;
+            case "IFZERO":  this.handleIfZero(ctx, group, pseudo); break;
+            case "IFDEF":   this.handleIfDef(ctx, group, pseudo); break;
+            case "IFNDEF":  this.handleIfDef(ctx, group, pseudo); break;
+            case "FIXTAB":  this.handleFixTab(ctx, group); break;
+            case "EXPUNG":  this.handleExpunge(ctx, group); break;
         }
     }
 
@@ -252,7 +224,7 @@ export class Assembler {
             throw this.mkError("Expected zero or one parameter for PAGE", group);
         }
         this.setClc(ctx, PDP8.firstAddrInPage(newPage), true);
-        this.linkTable.checkOverlap(ctx.field, PDP8.calcPageNum(this.getClc(ctx, true)));
+        this.linkTable.checkOverlap(PDP8.calcPageNum(this.getClc(ctx, true)));
         if (ctx.generateCode) {
             this.punchOrigin(ctx);
         }
@@ -354,6 +326,18 @@ export class Assembler {
         }
     }
 
+    private handleFixTab(ctx: Context, group: Nodes.SymbolGroup) {
+        if (!ctx.generateCode) {
+            this.syms.fix();
+        }
+    }
+
+    private handleExpunge(ctx: Context, group: Nodes.SymbolGroup) {
+        if (!ctx.generateCode) {
+            this.syms.expunge();
+        }
+    }
+
     private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): boolean {
         if (this.isPseudoExpr(stmt.expr)) {
             return false;
@@ -411,11 +395,16 @@ export class Assembler {
         } else {
             let acc = this.tryEval(ctx, group.first);
             for (const e of group.exprs) {
-                const val = this.tryEval(ctx, e);
-                if (val === null || acc === null) {
-                    acc = null;
+                let val;
+                if (e.type == Nodes.NodeType.BinaryOp && acc !== null) {
+                    acc = this.evalBinOpAcc(ctx, e, acc);
                 } else {
-                    acc |= val;
+                    val = this.tryEval(ctx, e);
+                    if (val === null || acc === null) {
+                        acc = null;
+                    } else {
+                        acc |= val;
+                    }
                 }
             }
             return acc;
@@ -482,7 +471,25 @@ export class Assembler {
     private evalBinOp(ctx: Context, binOp: Nodes.BinaryOp): number | null {
         const lhs = this.tryEval(ctx, binOp.lhs);
         const rhs = this.tryEval(ctx, binOp.rhs);
+        return this.calcOp(binOp, lhs, rhs);
+    }
 
+    // the accumulator input is used for a syntax like CDF 1+1 -> must eval as ((CFD OR 1) + 1)
+    private evalBinOpAcc(ctx: Context, binOp: Nodes.BinaryOp, acc: number): number | null {
+        let lhs;
+        if (binOp.lhs.type == Nodes.NodeType.BinaryOp) {
+            lhs = this.evalBinOpAcc(ctx, binOp.lhs, acc);
+        } else {
+            lhs = this.tryEval(ctx, binOp.lhs);
+            if (lhs !== null) {
+                lhs |= acc;
+            }
+        }
+        const rhs = this.tryEval(ctx, binOp.rhs);
+        return this.calcOp(binOp, lhs, rhs);
+    }
+
+    private calcOp(binOp: Nodes.BinaryOp, lhs: number | null, rhs: number | null): number | null {
         if (lhs === null || rhs === null) {
             return null;
         }
@@ -561,7 +568,7 @@ export class Assembler {
         return true;
     }
 
-    private outputZeroBlock(ctx: Context, group: Nodes.SymbolGroup) {
+    private handleZeroBlock(ctx: Context, group: Nodes.SymbolGroup) {
         let newClc = this.getClc(ctx, false);
         if (group.exprs.length == 1) {
             const num = this.safeEval(ctx, group.exprs[0]);
@@ -575,6 +582,18 @@ export class Assembler {
             throw this.mkError("Expected one parameter for ZBLOCK", group);
         }
         this.setClc(ctx, newClc, false);
+    }
+
+    private handleDeviceName(ctx: Context, group: Nodes.SymbolGroup) {
+        if (group.exprs.length != 1 || group.exprs[0].type != Nodes.NodeType.Symbol) {
+            throw this.mkError("Expected one symbolic parameter for DEVICE", group);
+        }
+
+        const dev = group.exprs[0].token.symbol.padEnd(4, "\0");
+        const outStr = CharSets.asciiStringToDec(dev, false);
+        const addr = this.getClc(ctx, false);
+        outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
+        this.setClc(ctx, addr + 2, false);
     }
 
     private outputDubl(ctx: Context, stmt: Nodes.DoubleIntList): boolean {
@@ -617,14 +636,8 @@ export class Assembler {
     }
 
     private outputLinks(ctx: Context) {
-        let curField = ctx.field;
         let curAddr = ctx.clc;
-        this.linkTable.visit((field, addr, val) => {
-            if (field != curField) {
-                this.punchField(ctx, field);
-                curField = field;
-                curAddr = 0o200;
-            }
+        this.linkTable.visit((addr, val) => {
             if (curAddr != addr) {
                 curAddr = addr;
                 this.punchOrigin(ctx, curAddr);

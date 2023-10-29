@@ -1,8 +1,8 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../src/assembler/Assembler";
-import { assemble } from "./util";
+import { Assembler } from "../../src/assembler/Assembler";
+import { assemble } from "./TestUtils";
 
-describe("GIVEN an assembler", () => {
+describe("GIVEN a program containing statements", () => {
     describe("WHEN evaluating expression statements", () => {
         const data = assemble(`
             osr     / Non-MRI, also test lowercase
@@ -108,13 +108,24 @@ describe("GIVEN an assembler", () => {
         const data = assemble(`
             TAD (JMP I 234)
             TAD I [7600]
-
         `);
         test("THEN it should generate the MRI in a link and use it as operand", () => {
             expect(data.memory[0o200]).toEqual(0o1377);
             expect(data.memory[0o201]).toEqual(0o1577);
             expect(data.memory[0o177]).toEqual(0o7600);
             expect(data.memory[0o377]).toEqual(0o5634);
+        });
+    });
+
+    describe("WHEN the input contains a TAD with a misplaced I", () => {
+        const data = assemble(`
+            JMP I 100
+            JMP 100 I / Interpreted as JMP 500 -> off page
+        `);
+        test("THEN it should generate the MRI in a link and use it as operand", () => {
+            expect(data.memory[0o200]).toEqual(0o5500);
+            expect(data.memory[0o201]).toEqual(0o5777);
+            expect(data.memory[0o377]).toEqual(0o0500);
         });
     });
 
@@ -127,6 +138,24 @@ describe("GIVEN an assembler", () => {
             expect(data.memory[0o200]).toEqual(0o1377);
             expect(data.memory[0o201]).toEqual(0o1377);
             expect(data.memory[0o377]).toEqual(0o1577);
+        });
+    });
+
+    describe("WHEN the multiple fields with link tables", () => {
+        const data = assemble(`
+            PAGE 2
+            TAD (10     / Creates link in 00777
+
+            FIELD 3
+            PAGE 2
+            TAD (20     / Creates link in 40777
+
+            FIELD 0
+            *610
+            TAD (30     / Must create link 00777 again
+        `);
+        test("THEN it should generate the MRI in a link and use it as operand", () => {
+            expect(data.memory[0o0777]).toEqual(0o30);
         });
     });
 });

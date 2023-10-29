@@ -1,6 +1,6 @@
-import { assemble } from "./util";
+import { assemble } from "./TestUtils";
 
-describe("GIVEN an assembler", () => {
+describe("GIVEN a program with origin statements", () => {
     describe("WHEN evaluating the origin statement", () => {
         const data = assemble(`
             A=.

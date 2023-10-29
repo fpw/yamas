@@ -1,4 +1,3 @@
-import { numToOctal } from "../utils/Strings";
 
 export enum SymbolType {
     Param,      // A=x
@@ -118,7 +117,12 @@ export class SymbolTable {
                 (sym.type == SymbolType.Param || sym.type == SymbolType.Label) &&
                 (data.type == SymbolType.Label && sym.value == data.value);
 
-            if (isParamRedefine || isLabelCheck) {
+            // TODO: Generate warning
+            const isFixRedefine =
+                    (sym.type == SymbolType.Fixed &&
+                    (data.type == SymbolType.Param || data.type == SymbolType.Label));
+
+            if (isParamRedefine || isLabelCheck || isFixRedefine) {
                 sym.value = data.value;
                 return;
             } else {

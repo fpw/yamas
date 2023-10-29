@@ -39,21 +39,35 @@ export enum NodeType {
     Assignment,
     Separator,
     ExpressionStmt,
-    Define,
     Invocation,
+    Comment,
+
+    // Pseudos
     Text,
     DoubleIntList,
     FloatList,
-    Comment,
+    Define,
     Eject,
     FixMri,
     FileName,
+    Radix,
+    PunchControl,
+    FixTab,
+    Expunge,
+    ChangePage,
+    ChangeField,
+    Reloc,
+    IfDef,
+    IfNotDef,
+    IfZero,
+    IfNotZero,
+    ZeroBlock,
+    DeviceName,
 
     // Expression
     SymbolGroup,
     ParenExpr,
     BinaryOp,
-    MacroBody,
 
     // Element
     UnaryOp,
@@ -65,9 +79,12 @@ export enum NodeType {
     // Leaf only
     DoubleInt,
     Float,
+    MacroBody,
 }
 
-export type Node = Program | Statement | Expression | Element;
+export type Node =
+    Program | Statement | Expression | Element |
+    MacroBody | DoubleInt | Float;
 
 export type Statement =
     PseudoStatement |
@@ -77,15 +94,17 @@ export type Statement =
 
 export type PseudoStatement =
     DataStatement |
-    DefineStatement | EjectStatement | FixMriStatement;
+    DefineStatement | EjectStatement | FixMriStatement |
+    RadixStatement | PunchCtrlStatement | FixTabStatement | ExpungeStatement |
+    IfZeroStatement | IfNotZeroStatement | IfDefStatement | IfNotDefStatement |
+    ChangeFieldStatement | ChangePageStatement | RelocStatement;
 
 export type DataStatement =
-    TextStatement | FilenameStatement |
-    DoubleIntList | FloatList;
+    TextStatement | FilenameStatement | DevNameStatement |
+    ZBlockStatement | DoubleIntList | FloatList;
 
 export type Expression =
-    SymbolGroup | ParenExpr | BinaryOp |
-    MacroBody | Element;
+    SymbolGroup | ParenExpr | BinaryOp | Element;
 
 export type Element = UnaryOp | Integer | ASCIIChar | SymbolNode | CLCValue;
 
@@ -179,6 +198,35 @@ export interface TextStatement extends BaseNode {
     token: Tokens.StringToken;
 }
 
+export interface IfDefStatement extends BaseNode {
+    type: NodeType.IfDef;
+    symbol: SymbolNode;
+    body: MacroBody;
+    token: Tokens.SymbolToken;
+}
+
+export interface IfNotDefStatement extends BaseNode {
+    type: NodeType.IfNotDef;
+    symbol: SymbolNode;
+    body: MacroBody;
+    token: Tokens.SymbolToken;
+}
+
+export interface IfZeroStatement extends BaseNode {
+    type: NodeType.IfZero;
+    expr: Expression;
+    body: MacroBody;
+    token: Tokens.SymbolToken;
+}
+
+export interface IfNotZeroStatement extends BaseNode {
+    type: NodeType.IfNotZero;
+    expr: Expression;
+    body: MacroBody;
+    token: Tokens.SymbolToken;
+}
+
+
 export interface EjectStatement extends BaseNode {
     type: NodeType.Eject;
     token: Tokens.StringToken;
@@ -188,6 +236,48 @@ export interface FilenameStatement extends BaseNode {
     type: NodeType.FileName;
     name: Tokens.StringToken;
     token: Tokens.SymbolToken; // on FILENAME
+}
+
+export interface RadixStatement extends BaseNode {
+    type: NodeType.Radix;
+    radix: 8 | 10;
+    token: Tokens.SymbolToken; // on OCTAL / DECIMAL
+}
+
+export interface ZBlockStatement extends BaseNode {
+    type: NodeType.ZeroBlock;
+    expr: Expression;
+    token: Tokens.SymbolToken; // on ZBLOCK
+}
+
+export interface DevNameStatement extends BaseNode {
+    type: NodeType.DeviceName;
+    name: SymbolNode;
+    token: Tokens.SymbolToken; // on DEVICE
+}
+
+export interface ChangeFieldStatement extends BaseNode {
+    type: NodeType.ChangeField;
+    expr: Expression;
+    token: Tokens.SymbolToken; // on FIELD
+}
+
+export interface ChangePageStatement extends BaseNode {
+    type: NodeType.ChangePage;
+    expr?: Expression;
+    token: Tokens.SymbolToken; // on PAGE
+}
+
+export interface RelocStatement extends BaseNode {
+    type: NodeType.Reloc;
+    expr?: Expression;
+    token: Tokens.SymbolToken; // on RELOC
+}
+
+export interface PunchCtrlStatement extends BaseNode {
+    type: NodeType.PunchControl;
+    enable: boolean;
+    token: Tokens.SymbolToken; // on ENPUNCH / NOPUNCH
 }
 
 // /Comment
@@ -212,6 +302,16 @@ export interface FixMriStatement extends BaseNode {
     type: NodeType.FixMri;
     assignment: AssignStatement;
     token: Tokens.SymbolToken; // on FIXMRI
+}
+
+export interface FixTabStatement extends BaseNode {
+    type: NodeType.FixTab;
+    token: Tokens.SymbolToken;
+}
+
+export interface ExpungeStatement extends BaseNode {
+    type: NodeType.Expunge;
+    token: Tokens.SymbolToken;
 }
 
 export interface ParenExpr extends BaseNode {
@@ -318,6 +418,14 @@ export function formatNode(node: Node): string {
         case NodeType.Define:
             const params = node.params.map(a => formatNode(a)).join(", ");
             return `Define(${formatNode(node.name)}, [${params}], ${formatNode(node.body)})`;
+        case NodeType.IfDef:
+            return `IfDef(${formatNode(node.symbol)}, ${formatNode(node.body)})`;
+        case NodeType.IfNotDef:
+            return `IfNotDef(${formatNode(node.symbol)}, ${formatNode(node.body)})`;
+        case NodeType.IfZero:
+            return `IfZero(${formatNode(node.expr)}, ${formatNode(node.body)})`;
+        case NodeType.IfNotZero:
+            return `IfZero(${formatNode(node.expr)}, ${formatNode(node.body)})`;
         case NodeType.BinaryOp:
             return `BinOp(${formatNode(node.lhs)}, '${node.operator}', ${formatNode(node.rhs)})`;
         case NodeType.UnaryOp:
@@ -329,9 +437,17 @@ export function formatNode(node: Node): string {
         case NodeType.Symbol:
             return `Symbol("${node.token.symbol}")`;
         case NodeType.DoubleIntList:
-            return `Dubl([${node.list.map(x => Tokens.tokenToString(x.token))}])`;
+            return `DublList([${node.list.map(x => formatNode(x))}])`;
+        case NodeType.DoubleInt:
+            return `Dubl(${node.unaryOp ? node.unaryOp.char : ""}${node.token.value})`;
         case NodeType.FloatList:
-            return `Fltg([${node.list.map(x => Tokens.tokenToString(x.token))}}])`;
+            return `FltgList([${node.list.map(x => formatNode(x))}}])`;
+        case NodeType.Float:
+            return `Float(${node.token.float})`;
+        case NodeType.ZeroBlock:
+            return `ZeroBlock(${formatNode(node.expr)})`;
+        case NodeType.DeviceName:
+            return `DeviceName("${node.name.token.symbol}")`;
         case NodeType.CLCValue:
             return "CLC()";
         case NodeType.MacroBody:
@@ -340,6 +456,20 @@ export function formatNode(node: Node): string {
             return `Filename("${node.name.str}")`;
         case NodeType.Eject:
             return `Eject("${node.token.str}")`;
+        case NodeType.Radix:
+            return `Radix(${node.radix})`;
+        case NodeType.FixTab:
+            return "FixTab()";
+        case NodeType.ChangeField:
+            return `ChangeField(${formatNode(node.expr)})`;
+        case NodeType.ChangePage:
+            return `ChangePage(${node.expr ? formatNode(node.expr) : ""})`;
+        case NodeType.Reloc:
+            return `Reloc(${node.expr ? formatNode(node.expr) : ""})`;
+        case NodeType.Expunge:
+            return "Expunge()";
+        case NodeType.PunchControl:
+            return `PunchCtrl(enable=${node.enable})`;
         case NodeType.FixMri:
             return `FixMri("${formatNode(node.assignment)}")`;
         case NodeType.Invocation:

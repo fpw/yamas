@@ -24,3 +24,7 @@ export function parseIntSafe(str: string, radix: 8 | 10 | 16): number {
 
     return Number.parseInt(str, radix);
 }
+
+export function normalizeSymbolName(name: string) {
+    return name.toUpperCase().substring(0, 6);
+}

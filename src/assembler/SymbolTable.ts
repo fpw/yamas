@@ -1,3 +1,4 @@
+import { normalizeSymbolName } from "../utils/Strings";
 
 export enum SymbolType {
     Param,      // A=x
@@ -68,7 +69,7 @@ export class SymbolTable {
     }
 
     public tryLookup(name: string): SymbolData | undefined {
-        const normName = this.normalizeName(name);
+        const normName = normalizeSymbolName(name);
         return this.symbols.get(normName);
     }
 
@@ -102,7 +103,7 @@ export class SymbolTable {
     }
 
     private defineSymbol(data: SymbolData) {
-        const normName = this.normalizeName(data.name);
+        const normName = normalizeSymbolName(data.name);
         const sym = this.tryLookup(normName);
 
         if (sym) {
@@ -131,9 +132,5 @@ export class SymbolTable {
         }
 
         this.symbols.set(normName, {...data, name: normName});
-    }
-
-    private normalizeName(name: string) {
-        return name.toUpperCase().substring(0, 6);
     }
 }

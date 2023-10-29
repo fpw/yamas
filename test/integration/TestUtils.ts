@@ -16,6 +16,14 @@ export interface TestData {
 }
 
 export function assemble(input: string): TestData {
+    const data = assembleWithErrors(input);
+    if (data.errors.length > 0) {
+        throw data.errors[0];
+    }
+    return data;
+}
+
+export function assembleWithErrors(input: string): TestData {
     const memory: number[] = [];
     const orgs: number[] = [];
     const asm = new Assembler();

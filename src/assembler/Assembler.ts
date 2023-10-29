@@ -22,23 +22,8 @@ export class Assembler {
     private programs: Nodes.Program[] = [];
     private outputHandler?: OutputHandler;
 
-    private readonly pseudos = [
-        "NOPUNCH",  "ENPUNCH",
-        "DECIMAL",  "OCTAL",
-        "EXPUNGE",  "FIXTAB",
-        "PAGE",     "FIELD",    "RELOC",
-        "ZBLOCK",   "DEVICE",
-        "IFDEF",    "IFNDEF",   "IFNZRO",   "IFZERO",
-
-        // the following pseudos are handled by the parser, but we still
-        // add them here to make the symbols defined
-        "DEFINE",
-        "TEXT",     "DUBL",     "FLTG",
-        "EJECT",    "FIXMRI",   "FILENAME",
-    ];
-
     public constructor() {
-        this.pseudos.forEach(p => this.syms.definePseudo(p));
+        Parser.keywords.forEach(k => this.syms.definePseudo(k));
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
     }
@@ -124,25 +109,15 @@ export class Assembler {
     }
 
     private assembleStatement(ctx: Context, stmt: Nodes.Statement) {
-        let generated: boolean;
+        let generated = false;
         switch (stmt.type) {
-            case NodeType.Text:
-                generated = this.outputText(ctx, stmt.token.str, false);
-                break;
-            case NodeType.FileName:
-                generated = this.outputText(ctx, stmt.name.str, true);
-                break;
-            case NodeType.DoubleIntList:
-                generated = this.outputDubl(ctx, stmt);
-                break;
-            case NodeType.FloatList:
-                generated = this.outputFltg(ctx, stmt);
-                break;
-            case NodeType.ExpressionStmt:
-                generated = this.handleExprStmt(ctx, stmt);
-                break;
-            default:
-                generated = false;
+            case NodeType.ZeroBlock:        generated = this.outputZBlock(ctx, stmt); break;
+            case NodeType.Text:             generated = this.outputText(ctx, stmt.token.str); break;
+            case NodeType.DoubleIntList:    generated = this.outputDubl(ctx, stmt); break;
+            case NodeType.FloatList:        generated = this.outputFltg(ctx, stmt); break;
+            case NodeType.DeviceName:       generated = this.outputDeviceName(ctx, stmt.name.token.symbol); break;
+            case NodeType.FileName:         generated = this.outputFileName(ctx, stmt.name.str); break;
+            case NodeType.ExpressionStmt:   generated = this.handleExprStmt(ctx, stmt); break;
         }
 
         if (generated) {
@@ -156,6 +131,7 @@ export class Assembler {
         this.updateCLC(ctx, stmt);
     }
 
+    // eslint-disable-next-line max-lines-per-function
     private updateSymbols(ctx: Context, stmt: Nodes.Statement) {
         switch (stmt.type) {
             case NodeType.Assignment:
@@ -178,16 +154,37 @@ export class Assembler {
                     this.syms.defineMacro(stmt.name.token.symbol);
                 }
                 break;
-            case NodeType.Invocation: {
+            case NodeType.IfDef:
+            case NodeType.IfNotDef:
+                this.handleIfDef(ctx, stmt);
+                break;
+            case NodeType.IfZero:
+            case NodeType.IfNotZero:
+                this.handleIfZero(ctx, stmt);
+                break;
+            case NodeType.Invocation:
                 this.handleSubProgram(ctx, stmt.program);
                 break;
-            }
-            case NodeType.ExpressionStmt:
-                // need to handle pseudos because they can change the radix or CLC,
-                // affecting expression parsing for symbol definitions
-                if (this.isPseudoExpr(stmt.expr)) {
-                    this.handlePseudo(ctx, stmt.expr as Nodes.SymbolGroup);
-                }
+            case NodeType.Radix:
+                ctx.radix = stmt.radix;
+                break;
+            case NodeType.PunchControl:
+                ctx.punchEnabled = stmt.enable;
+                break;
+            case NodeType.FixTab:
+                this.handleFixTab(ctx);
+                break;
+            case NodeType.Expunge:
+                this.handleExpunge(ctx);
+                break;
+            case NodeType.ChangePage:
+                this.handlePage(ctx, stmt);
+                break;
+            case NodeType.ChangeField:
+                this.handleField(ctx, stmt);
+                break;
+            case NodeType.Reloc:
+                this.handleReloc(ctx, stmt);
                 break;
         }
     }
@@ -201,8 +198,14 @@ export class Assembler {
                 this.setClc(ctx, newClc, true);
                 this.punchOrigin(ctx);
                 return;
+            case NodeType.ZeroBlock:
+                newClc += this.safeEval(ctx, stmt.expr);
+                break;
             case NodeType.Text:
                 newClc += CharSets.asciiStringToDec(stmt.token.str, true).length;
+                break;
+            case NodeType.DeviceName:
+                newClc += 2;
                 break;
             case NodeType.FileName:
                 newClc += 4;
@@ -214,49 +217,23 @@ export class Assembler {
                 newClc += stmt.list.filter(x => x.type == NodeType.Float).length * 3;
                 break;
             case NodeType.ExpressionStmt:
-                if (!this.isPseudoExpr(stmt.expr)) {
-                    newClc++;
-                }
+                newClc++;
                 break;
         }
         this.setClc(ctx, newClc, false);
     }
 
-    private handlePseudo(ctx: Context, group: Nodes.SymbolGroup) {
-        const pseudo = this.syms.lookup(group.first.token.symbol).name;
-
-        switch (pseudo) {
-            case "ENPUNC":  ctx.punchEnabled = true; break;
-            case "NOPUNC":  ctx.punchEnabled = false; break;
-            case "DECIMA":  ctx.radix = 10; break;
-            case "OCTAL":   ctx.radix = 8; break;
-            case "FIELD":   this.handleField(ctx, group); break;
-            case "PAGE":    this.handlePage(ctx, group); break;
-            case "RELOC":   this.handleReloc(ctx, group); break;
-            case "ZBLOCK":  this.handleZeroBlock(ctx, group); break;
-            case "DEVICE":  this.handleDeviceName(ctx, group); break;
-            case "IFNZRO":  this.handleIfZero(ctx, group, pseudo); break;
-            case "IFZERO":  this.handleIfZero(ctx, group, pseudo); break;
-            case "IFDEF":   this.handleIfDef(ctx, group, pseudo); break;
-            case "IFNDEF":  this.handleIfDef(ctx, group, pseudo); break;
-            case "FIXTAB":  this.handleFixTab(ctx, group); break;
-            case "EXPUNG":  this.handleExpunge(ctx, group); break;
-        }
-    }
-
-    private handlePage(ctx: Context, group: Nodes.SymbolGroup) {
+    private handlePage(ctx: Context, stmt: Nodes.ChangePageStatement) {
         let newPage: number;
-        if (group.exprs.length == 0) {
+        if (!stmt.expr) {
             // subtracting 1 because the cursor is already at the next statement
             const curPage = PDP8.calcPageNum(this.getClc(ctx, true) - 1);
             newPage = curPage + 1;
-        } else if (group.exprs.length == 1) {
-            newPage = this.safeEval(ctx, group.exprs[0]);
-            if (newPage < 0 || newPage >= PDP8.NumPages) {
-                throw this.mkError(`Invalid page ${newPage}`, group);
-            }
         } else {
-            throw this.mkError("Expected zero or one parameter for PAGE", group);
+            newPage = this.safeEval(ctx, stmt.expr);
+            if (newPage < 0 || newPage >= PDP8.NumPages) {
+                throw this.mkError(`Invalid page ${newPage}`, stmt);
+            }
         }
         this.setClc(ctx, PDP8.firstAddrInPage(newPage), true);
         this.linkTable.checkOverlap(PDP8.calcPageNum(this.getClc(ctx, true)));
@@ -265,77 +242,55 @@ export class Assembler {
         }
     }
 
-    private handleField(ctx: Context, group: Nodes.SymbolGroup) {
-        if (group.exprs.length == 1) {
-            const field = this.safeEval(ctx, group.exprs[0]);
-            if (field < 0 || field >= PDP8.NumFields) {
-                throw this.mkError(`Invalid field ${field}`, group);
-            }
+    private handleField(ctx: Context, stmt: Nodes.ChangeFieldStatement) {
+        const field = this.safeEval(ctx, stmt.expr);
+        if (field < 0 || field >= PDP8.NumFields) {
+            throw this.mkError(`Invalid field ${field}`, stmt);
+        }
 
-            ctx.field = field;
-            if (ctx.reloc) {
-                throw this.mkError("Changing FIELD with active reloc not supported", group);
-            }
-            this.setClc(ctx, PDP8.firstAddrInPage(1), false);
-            if (ctx.generateCode) {
-                this.outputLinks(ctx);
-                this.linkTable.clear();
-                this.punchField(ctx, field);
-                this.punchOrigin(ctx);
-            }
-        } else {
-            throw this.mkError("Expected one parameter for FIELD", group);
+        ctx.field = field;
+        if (ctx.reloc) {
+            throw this.mkError("Changing FIELD with active reloc not supported", stmt);
+        }
+        this.setClc(ctx, PDP8.firstAddrInPage(1), false);
+        if (ctx.generateCode) {
+            this.outputLinks(ctx);
+            this.linkTable.clear();
+            this.punchField(ctx, field);
+            this.punchOrigin(ctx);
         }
     }
 
-    private handleReloc(ctx: Context, group: Nodes.SymbolGroup) {
-        if (group.exprs.length == 0) {
+    private handleReloc(ctx: Context, stmt: Nodes.RelocStatement) {
+        if (!stmt.expr) {
             ctx.reloc = 0;
-        } else if (group.exprs.length == 1) {
-            const reloc = this.safeEval(ctx, group.exprs[0]);
-            ctx.reloc = reloc - this.getClc(ctx, false);
         } else {
-            throw this.mkError("Expected zero or one parameter for RELOC", group);
+            const reloc = this.safeEval(ctx, stmt.expr);
+            ctx.reloc = reloc - this.getClc(ctx, false);
         }
     }
 
-    private handleIfDef(ctx: Context, group: Nodes.SymbolGroup, op: "IFDEF" | "IFNDEF") {
-        if (group.exprs.length != 2 ||
-            group.exprs[0].type != NodeType.Symbol ||
-            group.exprs[1].type != NodeType.MacroBody) {
-            throw this.mkError("Invalid syntax: single symbol and body expected", group);
-        }
-
-        const sym = this.syms.tryLookup(group.exprs[0].token.symbol);
-        if ((sym && op == "IFDEF") || (!sym && op == "IFNDEF")) {
-            this.handleConditionBody(ctx, group.exprs[1]);
+    private handleIfDef(ctx: Context, stmt: Nodes.IfDefStatement | Nodes.IfNotDefStatement) {
+        const sym = this.syms.tryLookup(stmt.symbol.token.symbol);
+        if ((sym && stmt.type == NodeType.IfDef) || (!sym && stmt.type == NodeType.IfNotDef)) {
+            this.handleConditionBody(ctx, stmt.body);
         }
     }
 
-    private handleIfZero(ctx: Context, group: Nodes.SymbolGroup, op: "IFNZRO" | "IFZERO") {
-        const body = group.exprs[group.exprs.length - 1];
-        if (body.type != NodeType.MacroBody) {
-            throw this.mkError("Invalid syntax: expression and body expected", group);
-        }
-
+    private handleIfZero(ctx: Context, stmt: Nodes.IfZeroStatement | Nodes.IfNotZeroStatement) {
         // It's allowed to use IFZERO with undefined expressions if they are later defined
         // However, that only makes sense if the bodies don't generate code.
         // Otherwise, we would get different CLCs after the body in pass 1 vs 2.
         // We will notice that later because parsing happens in pass 1 and execution in pass 2 where the body
         // will be unparsed if this happens.
-        let val = 0;
-        for (let i = 0; i < group.exprs.length - 1; i++) {
-            const exVal = this.tryEval(ctx, group.exprs[i]);;
-            if (exVal !== null) {
-                val |= exVal;
-            }
-        }
+        const exVal = this.tryEval(ctx, stmt.expr);
+        const val = (exVal === null ? 0 : exVal);
 
-        if ((val != 0 && op == "IFNZRO") || (val == 0 && op == "IFZERO")) {
-            this.handleConditionBody(ctx, body);
+        if ((val == 0 && stmt.type == NodeType.IfZero) || (val != 0 && stmt.type == NodeType.IfNotZero)) {
+            this.handleConditionBody(ctx, stmt.body);
         } else {
-            if (body.parsed) {
-                throw this.mkError("Condition was true in pass 1, now false -> Illegal", body);
+            if (stmt.body.parsed) {
+                throw this.mkError("Condition was true in pass 1, now false -> Illegal", stmt.body);
             }
         }
     }
@@ -365,22 +320,19 @@ export class Assembler {
         }
     }
 
-    private handleFixTab(ctx: Context, group: Nodes.SymbolGroup) {
+    private handleFixTab(ctx: Context) {
         if (!ctx.generateCode) {
             this.syms.fix();
         }
     }
 
-    private handleExpunge(ctx: Context, group: Nodes.SymbolGroup) {
+    private handleExpunge(ctx: Context) {
         if (!ctx.generateCode) {
             this.syms.expunge();
         }
     }
 
     private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): boolean {
-        if (this.isPseudoExpr(stmt.expr)) {
-            return false;
-        }
         const val = this.safeEval(ctx, stmt.expr);
         this.punchData(ctx, this.getClc(ctx, false), val);
         return true;
@@ -404,7 +356,6 @@ export class Assembler {
             case NodeType.ParenExpr:      return this.evalParenExpr(ctx, expr);
             case NodeType.SymbolGroup:    return this.evalSymbolGroup(ctx, expr);
             case NodeType.BinaryOp:       return this.evalBinOp(ctx, expr);
-            case NodeType.MacroBody:      throw this.mkError("Trying to evaluate macro body", expr);
         }
     }
 
@@ -538,17 +489,6 @@ export class Assembler {
         }
     }
 
-    private isPseudoExpr(expr: Nodes.Expression): boolean {
-        if (expr.type != NodeType.SymbolGroup) {
-            return false;
-        }
-        const sym = this.syms.tryLookup(expr.first.token.symbol);
-        if (!sym) {
-            return false;
-        }
-        return sym.type == SymbolType.Pseudo;
-    }
-
     private isMRIExpr(expr: Nodes.Expression): boolean {
         // An MRI expression needs to start with an MRI op followed by a space -> group
         if (expr.type != NodeType.SymbolGroup) {
@@ -586,44 +526,36 @@ export class Assembler {
         }
     }
 
-    private outputText(ctx: Context, text: string, fileName: boolean): boolean {
-        let outStr;
-        if (fileName) {
-            outStr = CharSets.asciiStringToOS8Name(text);
-        } else {
-            outStr = CharSets.asciiStringToDec(text, true);
+    private outputZBlock(ctx: Context, stmt: Nodes.ZBlockStatement): boolean {
+        let loc = this.getClc(ctx, false);
+        const num = this.safeEval(ctx, stmt.expr);
+        for (let i = 0; i < num; i++) {
+            this.punchData(ctx, loc, 0);
+            loc++;
         }
+        return true;
+    }
+
+    private outputText(ctx: Context, text: string): boolean {
+        const outStr = CharSets.asciiStringToDec(text, true);
         const addr = this.getClc(ctx, false);
         outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
         return true;
     }
 
-    private handleZeroBlock(ctx: Context, group: Nodes.SymbolGroup) {
-        let newClc = this.getClc(ctx, false);
-        if (group.exprs.length == 1) {
-            const num = this.safeEval(ctx, group.exprs[0]);
-            for (let i = 0; i < num; i++) {
-                if (ctx.generateCode) {
-                    this.punchData(ctx, newClc, 0);
-                }
-                newClc++;
-            }
-        } else {
-            throw this.mkError("Expected one parameter for ZBLOCK", group);
-        }
-        this.setClc(ctx, newClc, false);
+    private outputFileName(ctx: Context, text: string): boolean {
+        const outStr = CharSets.asciiStringToOS8Name(text);
+        const addr = this.getClc(ctx, false);
+        outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
+        return true;
     }
 
-    private handleDeviceName(ctx: Context, group: Nodes.SymbolGroup) {
-        if (group.exprs.length != 1 || group.exprs[0].type != NodeType.Symbol) {
-            throw this.mkError("Expected one symbolic parameter for DEVICE", group);
-        }
-
-        const dev = group.exprs[0].token.symbol.padEnd(4, "\0");
+    private outputDeviceName(ctx: Context, name: string): boolean {
+        const dev = name.padEnd(4, "\0");
         const outStr = CharSets.asciiStringToDec(dev, false);
         const addr = this.getClc(ctx, false);
         outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
-        this.setClc(ctx, addr + 2, false);
+        return true;
     }
 
     private outputDubl(ctx: Context, stmt: Nodes.DoubleIntList): boolean {

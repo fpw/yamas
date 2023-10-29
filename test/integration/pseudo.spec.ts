@@ -141,8 +141,13 @@ describe("GIVEN a program containing pseudo statements", () => {
     describe("WHEN evaluating the EJECT statement", () => {
         const data = assemble(`
             EJECT THIS IS A TEST STRING
+            TAD 2
+            EJECT
+            TAD 3
        `);
         test("THEN it should ignore it", () => {
+            expect(data.memory[0o200]).toEqual(0o1002);
+            expect(data.memory[0o201]).toEqual(0o1003);
         });
     });
     describe("WHEN evaluating the FILENAME statement", () => {

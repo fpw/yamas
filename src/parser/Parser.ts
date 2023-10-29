@@ -4,17 +4,20 @@ import * as Tokens from "../lexer/Token";
 import { TokenType } from "../lexer/Token";
 import * as Nodes from "./Node";
 import { NodeType } from "./Node";
+import { normalizeSymbolName } from "../utils/Strings";
 
 type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
 
 export class Parser {
-    private keywords = new Set([
-        "TEXT", "FILENAME",
-        "DEFINE",
-        "DUBL", "FLTG",
+    public static readonly keywords = new Set([
+        "PAGE",     "FIELD",        "RELOC",
+        "IFDEF",    "IFNDEF",       "IFNZRO",   "IFZERO",   "DEFINE",
+        "TEXT",     "ZBLOCK",       "DUBL",     "FLTG",     "DEVICE",   "FILENAME",
+        "EXPUNGE",  "FIXTAB",       "FIXMRI",
+        "DECIMAL",  "OCTAL",
+        "NOPUNCH",  "ENPUNCH",
         "EJECT",
-        "FIXMRI",
-    ]);
+    ].map(k => normalizeSymbolName(k)));
     private inputName: string;
     private lexer: Lexer;
     private macros = new Map<string, Nodes.DefineStatement>();
@@ -94,7 +97,7 @@ export class Parser {
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
-        if (this.keywords.has(startSym.symbol)) {
+        if (Parser.keywords.has(normalizeSymbolName(startSym.symbol))) {
             return this.parseKeyword(startSym);
         } else if (this.macros.has(startSym.symbol)) {
             this.lexer.unget(startSym);
@@ -113,28 +116,59 @@ export class Parser {
         return this.finishExprStatement(startSym);
     }
 
-    private parseKeyword(startSym: Tokens.SymbolToken): Nodes.Statement {
-        switch (startSym.symbol) {
+    // eslint-disable-next-line max-lines-per-function
+    private parseKeyword(token: Tokens.SymbolToken): Nodes.Statement {
+        switch (normalizeSymbolName(token.symbol)) {
             case "DEFINE":
-                const def = this.parseDefine(startSym);
+                const def = this.parseDefine(token);
                 this.macros.set(def.name.token.symbol, def);
                 return def;
+            case "IFDEF":
+                return {type: NodeType.IfDef, symbol: this.parseSymbol(), body: this.parseMacroBody(), token};
+            case "IFNDEF":
+                return {type: NodeType.IfNotDef, symbol: this.parseSymbol(), body: this.parseMacroBody(), token};
+            case "IFZERO":
+                return {type: NodeType.IfZero, expr: this.parseExpr(), body: this.parseMacroBody(), token};
+            case "IFNZRO":
+                return {type: NodeType.IfNotZero, expr: this.parseExpr(), body: this.parseMacroBody(), token};
             case "TEXT":
                 const strTok = this.lexer.nextStringLiteral(true);
                 return {type: NodeType.Text, token: strTok};
             case "DUBL":
-                return this.parseDublList(startSym);
+                return this.parseDublList(token);
             case "FLTG":
-                return this.parseFltgList(startSym);
+                return this.parseFltgList(token);
+            case "ZBLOCK":
+                return {type: NodeType.ZeroBlock, expr: this.parseParam(token), token};
+            case "DEVICE":
+                return {type: NodeType.DeviceName, name: this.parseSymbol(), token};
             case "EJECT":
                 const ejectTxt = this.lexer.nextStringLiteral(false);
                 return {type: NodeType.Eject, token: ejectTxt};
             case "FIXMRI":
-                return this.parseFixMri(startSym);
-            case "FILENAME":
-                return this.parseFilename(startSym);
+                return this.parseFixMri(token);
+            case "FILENA":
+                return this.parseFilename(token);
+            case "FIELD":
+                return {type: NodeType.ChangeField, expr: this.parseParam(token), token};
+            case "PAGE":
+                return {type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token};
+            case "RELOC":
+                return {type: NodeType.Reloc, expr: this.parseOptionalParam(token), token};
+            case "DECIMA":
+                return {type: NodeType.Radix, radix: 10, token};
+            case "OCTAL":
+                return {type: NodeType.Radix, radix: 8, token};
+            case "ENPUNC":
+                return {type: NodeType.PunchControl, enable: true, token};
+            case "NOPUNC":
+                return {type: NodeType.PunchControl, enable: false, token};
+            case "FIXTAB":
+                return {type: NodeType.FixTab, token};
+            case "EXPUNG":
+                return {type: NodeType.Expunge, token};
             default:
-                throw Parser.mkTokError(`Unhandled keyword ${startSym.symbol}`, startSym);
+                throw Parser.mkTokError(`Unhandled keyword ${token.symbol}`, token);
         }
     }
 
@@ -146,6 +180,31 @@ export class Parser {
         } as Nodes.ExpressionStatement;
     };
 
+    private parseParam(startSym: Tokens.SymbolToken): Nodes.Expression {
+        const expr = this.parseOptionalParam(startSym);
+        if (!expr) {
+            throw Parser.mkTokError("Parameter expected", startSym);
+        }
+        return expr;
+    }
+
+    private parseOptionalParam(startSym: Tokens.SymbolToken): Nodes.Expression | undefined {
+        this.lexer.unget(startSym);
+        const expr = this.parseExpr();
+        if (expr.type != NodeType.SymbolGroup) {
+            throw Parser.mkNodeError("Symbol group expected", expr);
+        }
+
+        if (expr.exprs.length == 0) {
+            return undefined;
+        }
+
+        if (expr.exprs.length != 1) {
+            throw Parser.mkNodeError("Too many arguments", expr);
+        }
+
+        return expr.exprs[0];
+    }
 
     private parseOriginStatement(sym: Tokens.CharToken): Nodes.OriginStatement {
         return {
@@ -275,16 +334,26 @@ export class Parser {
                     token: first,
                 };
             }
-        } else if (first.type == TokenType.MacroBody) {
-            return {
-                type: NodeType.MacroBody,
-                token: first,
-            };
         }
 
         // no special case - must be single element or element with operators
         this.lexer.unget(first);
         return this.parseBinOpOrElement();
+    }
+
+    private parseMacroBody(gotTok?: Tokens.MacroBodyToken): Nodes.MacroBody {
+        if (!gotTok) {
+            const next = this.lexer.nextNonBlank();
+            if (next.type != TokenType.MacroBody) {
+                throw Error("Macro body expected");
+            }
+            gotTok = next;
+        }
+
+        return {
+            type: NodeType.MacroBody,
+            token: gotTok,
+        };
     }
 
     private parseBinOpOrElement(): Nodes.BinaryOp | Nodes.Element {
@@ -386,7 +455,6 @@ export class Parser {
             case TokenType.Integer:
             case TokenType.ASCII:
             case TokenType.Symbol:
-            case TokenType.MacroBody:
             case TokenType.Char:
                 return true;
             case TokenType.Comment:
@@ -395,6 +463,7 @@ export class Parser {
             case TokenType.Float:
             case TokenType.EOF:
             case TokenType.EOL:
+            case TokenType.MacroBody:
                 return false;
         }
     }
@@ -534,17 +603,17 @@ export class Parser {
         const nameElem = this.parseSymbol();
         const name = nameElem;
         const params: Nodes.SymbolNode[] = [];
-        let body: Nodes.MacroBody | undefined;
+        let body: Nodes.MacroBody;
 
         while (true) {
-            const next = this.parseExpressionPart();
-            if (next.type == NodeType.Symbol) {
-                params.push(next);
-            } else if (next.type == NodeType.MacroBody) {
-                body = next;
+            const next = this.lexer.nextNonBlank();
+            if (next.type == TokenType.Symbol) {
+                params.push(this.parseSymbol(next));
+            } else if (next.type == TokenType.MacroBody) {
+                body = this.parseMacroBody(next);
                 break;
             } else {
-                throw Parser.mkNodeError("Invalid DEFINE syntax: Expecting symbols and body", next);
+                throw Parser.mkTokError("Invalid DEFINE syntax: Expecting symbols and body", next);
             }
         }
 

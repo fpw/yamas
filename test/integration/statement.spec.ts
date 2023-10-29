@@ -1,6 +1,6 @@
 /* eslint-disable max-lines-per-function */
 import { Assembler } from "../../src/assembler/Assembler";
-import { assemble } from "./TestUtils";
+import { assemble, assembleWithErrors } from "./TestUtils";
 
 describe("GIVEN a program containing statements", () => {
     describe("WHEN evaluating expression statements", () => {
@@ -79,7 +79,7 @@ describe("GIVEN a program containing statements", () => {
     });
 
     describe("WHEN overlapping data and links", () => {
-        const data = assemble(`
+        const data = assembleWithErrors(`
             / We have no prelude in this test
             TAD=1000
             FIXTAB

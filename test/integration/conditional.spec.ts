@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { assemble } from "./TestUtils";
+import { assemble, assembleWithErrors } from "./TestUtils";
 
 describe("GIVEN a program with conditional statements", () => {
     describe("WHEN evaluating conditional statements with various syntax variations", () => {
@@ -57,7 +57,7 @@ describe("GIVEN a program with conditional statements", () => {
     });
 
     describe("WHEN accessing undefined symbols in condition bodies", () => {
-        const data = assemble(`
+        const data = assembleWithErrors(`
             IFNDEF A <GLITCH>
         `);
         test("THEN it should generate an error", () => {
@@ -67,7 +67,7 @@ describe("GIVEN a program with conditional statements", () => {
 
     describe("WHEN evaluating undefined symbols that evaluate differently in pass 1 and 2", () => {
         describe("WHEN IFNZRO doesn't run in pass 1 but in pass 2", () => {
-            const data = assemble(`
+            const data = assembleWithErrors(`
                 IFNZRO A <B=1>
                 A=1
             `);
@@ -77,7 +77,7 @@ describe("GIVEN a program with conditional statements", () => {
         });
 
         describe("WHEN IFZERO runs in pass 1 but not in pass 2", () => {
-            const data = assemble(`
+            const data = assembleWithErrors(`
                 IFZERO A <TAD>
                 A=1
             `);

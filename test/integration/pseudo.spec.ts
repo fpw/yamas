@@ -92,7 +92,7 @@ describe("GIVEN a program containing pseudo statements", () => {
             TEXT "HELLO" / Odd length -> null termination in last symbol
             A=.
 
-            TEXT "WORLD!" / Even length -> must add word for null termination
+            TEXT /WORLD!/ / Even length -> must add word for null termination
             B=.
        `);
         test("THEN it should generate a null terminator depending on the length", () => {

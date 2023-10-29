@@ -7,9 +7,10 @@ import { NodeType } from "./Node";
 import { normalizeSymbolName } from "../utils/Strings";
 
 type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
+type KeywordHandler = (symbol: Tokens.SymbolToken) => Nodes.Statement;
 
 export class Parser {
-    public static readonly keywords = new Set([
+    public static readonly SupportedKeywords = [
         "PAGE",     "FIELD",        "RELOC",
         "IFDEF",    "IFNDEF",       "IFNZRO",   "IFZERO",   "DEFINE",
         "TEXT",     "ZBLOCK",       "DUBL",     "FLTG",     "DEVICE",   "FILENAME",
@@ -17,7 +18,8 @@ export class Parser {
         "DECIMAL",  "OCTAL",
         "NOPUNCH",  "ENPUNCH",
         "EJECT",
-    ].map(k => normalizeSymbolName(k)));
+    ];
+    private keywordActions = new Map<string, KeywordHandler>();
     private inputName: string;
     private lexer: Lexer;
     private macros = new Map<string, Nodes.DefineStatement>();
@@ -25,6 +27,63 @@ export class Parser {
     public constructor(inputName: string, input: string) {
         this.inputName = inputName;
         this.lexer = new Lexer(inputName, input);
+
+        this.registerKeywords((keyword, action) => {
+            // make sure the table actually contains all unnormalized keywords form since
+            // they are visible to the outside
+            if (!Parser.SupportedKeywords.includes(keyword)) {
+                throw Error("Unsupported keyword added");
+            }
+            this.keywordActions.set(normalizeSymbolName(keyword), action);
+        });
+    }
+
+    private registerKeywords(mkKeyword: (keyword: string, action: KeywordHandler) => void) {
+        mkKeyword("PAGE", token => ({type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token}));
+        mkKeyword("FIELD", token => ({type: NodeType.ChangeField, expr: this.parseParam(token), token}));
+        mkKeyword("RELOC", token => ({type: NodeType.Reloc, expr: this.parseOptionalParam(token), token}));
+
+        mkKeyword("FIXMRI", token => this.parseFixMri(token));
+        mkKeyword("FIXTAB", token => ({type: NodeType.FixTab, token}));
+        mkKeyword("EXPUNGE", token => ({type: NodeType.Expunge, token}));
+
+        mkKeyword("DEFINE", token => this.parseDefine(token));
+        mkKeyword("IFDEF", token => this.parseIfDef(token, false));
+        mkKeyword("IFNDEF", token => this.parseIfDef(token, true));
+        mkKeyword("IFZERO", token => this.parseIfZero(token, false));
+        mkKeyword("IFNZRO", token => this.parseIfZero(token, true));
+
+        mkKeyword("DECIMAL", token => ({type: NodeType.Radix, radix: 10, token}));
+        mkKeyword("OCTAL", token => ({type: NodeType.Radix, radix: 8, token}));
+
+        mkKeyword("ZBLOCK", token => ({type: NodeType.ZeroBlock, expr: this.parseParam(token), token}));
+        mkKeyword("TEXT", token => ({type: NodeType.Text, str: this.lexer.nextStringLiteral(true), token}));
+        mkKeyword("DUBL", token => this.parseDublList(token));
+        mkKeyword("FLTG", token => this.parseFltgList(token));
+        mkKeyword("DEVICE", token => ({type: NodeType.DeviceName, name: this.parseSymbol(), token}));
+        mkKeyword("FILENAME", token => this.parseFilename(token));
+
+        mkKeyword("EJECT", token => ({type: NodeType.Eject, str: this.lexer.nextStringLiteral(false), token}));
+        mkKeyword("ENPUNCH", token => ({type: NodeType.PunchControl, enable: true, token}));
+        mkKeyword("NOPUNCH", token => ({type: NodeType.PunchControl, enable: false, token}));
+    }
+
+    private parseIfZero(token: Tokens.SymbolToken, invert: boolean): Nodes.Statement {
+        return {
+            type: invert ? NodeType.IfNotZero : NodeType.IfZero,
+            expr: this.parseExpr(),
+            body: this.parseMacroBody(),
+            token,
+        };
+    }
+
+    private parseIfDef(token: Tokens.SymbolToken, invert: boolean): Nodes.Statement {
+        return {
+            type: invert ? NodeType.IfNotDef : NodeType.IfDef,
+            symbol: this.parseSymbol(),
+            body: this.parseMacroBody(),
+            token,
+        };
     }
 
     public parseProgram(): Nodes.Program {
@@ -97,8 +156,9 @@ export class Parser {
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
-        if (Parser.keywords.has(normalizeSymbolName(startSym.symbol))) {
-            return this.parseKeyword(startSym);
+        const handler = this.keywordActions.get(normalizeSymbolName(startSym.symbol));
+        if (handler) {
+            return handler(startSym);
         } else if (this.macros.has(startSym.symbol)) {
             this.lexer.unget(startSym);
             return this.parseInvocation();
@@ -114,62 +174,6 @@ export class Parser {
         }
         this.lexer.unget(next);
         return this.finishExprStatement(startSym);
-    }
-
-    // eslint-disable-next-line max-lines-per-function
-    private parseKeyword(token: Tokens.SymbolToken): Nodes.Statement {
-        switch (normalizeSymbolName(token.symbol)) {
-            case "DEFINE":
-                const def = this.parseDefine(token);
-                this.macros.set(def.name.token.symbol, def);
-                return def;
-            case "IFDEF":
-                return {type: NodeType.IfDef, symbol: this.parseSymbol(), body: this.parseMacroBody(), token};
-            case "IFNDEF":
-                return {type: NodeType.IfNotDef, symbol: this.parseSymbol(), body: this.parseMacroBody(), token};
-            case "IFZERO":
-                return {type: NodeType.IfZero, expr: this.parseExpr(), body: this.parseMacroBody(), token};
-            case "IFNZRO":
-                return {type: NodeType.IfNotZero, expr: this.parseExpr(), body: this.parseMacroBody(), token};
-            case "TEXT":
-                const strTok = this.lexer.nextStringLiteral(true);
-                return {type: NodeType.Text, token: strTok};
-            case "DUBL":
-                return this.parseDublList(token);
-            case "FLTG":
-                return this.parseFltgList(token);
-            case "ZBLOCK":
-                return {type: NodeType.ZeroBlock, expr: this.parseParam(token), token};
-            case "DEVICE":
-                return {type: NodeType.DeviceName, name: this.parseSymbol(), token};
-            case "EJECT":
-                const ejectTxt = this.lexer.nextStringLiteral(false);
-                return {type: NodeType.Eject, token: ejectTxt};
-            case "FIXMRI":
-                return this.parseFixMri(token);
-            case "FILENA":
-                return this.parseFilename(token);
-            case "FIELD":
-                return {type: NodeType.ChangeField, expr: this.parseParam(token), token};
-            case "PAGE":
-                return {type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token};
-            case "RELOC":
-                return {type: NodeType.Reloc, expr: this.parseOptionalParam(token), token};
-            case "DECIMA":
-                return {type: NodeType.Radix, radix: 10, token};
-            case "OCTAL":
-                return {type: NodeType.Radix, radix: 8, token};
-            case "ENPUNC":
-                return {type: NodeType.PunchControl, enable: true, token};
-            case "NOPUNC":
-                return {type: NodeType.PunchControl, enable: false, token};
-            case "FIXTAB":
-                return {type: NodeType.FixTab, token};
-            case "EXPUNG":
-                return {type: NodeType.Expunge, token};
-            default:
-                throw Parser.mkTokError(`Unhandled keyword ${token.symbol}`, token);
-        }
     }
 
     private finishExprStatement(start: Tokens.Token): Nodes.ExpressionStatement {
@@ -617,9 +621,9 @@ export class Parser {
             }
         }
 
-        return {
-            type: NodeType.Define, name, body, params: params, token
-        };
+        const def: Nodes.DefineStatement = { type: NodeType.Define, name, body, params, token };
+        this.macros.set(name.token.symbol, def);
+        return def;
     }
 
     private parseInvocation(): Nodes.Invocation {

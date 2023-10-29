@@ -9,6 +9,13 @@ import { CodeError } from "./utils/CodeError";
 export interface Options {
     loadPrelude?: boolean;
     outputAst?: (inputName: string, line: string) => void;
+
+    // Ideas:
+    keepLinksInFieldSwitch?: boolean; // to not delete link table when switching fields
+
+    // to disable given pseudos, e.g. to assemble code that uses DEFINE as symbol
+    // implementation idea: keep an array of LinKTables in Assembler
+    disablePseudos?: string[];
 };
 
 export class Yamas {

@@ -23,7 +23,7 @@ export class Assembler {
     private outputHandler?: OutputHandler;
 
     public constructor() {
-        Parser.keywords.forEach(k => this.syms.definePseudo(k));
+        Parser.SupportedKeywords.forEach(k => this.syms.definePseudo(k));
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
     }
@@ -112,7 +112,7 @@ export class Assembler {
         let generated = false;
         switch (stmt.type) {
             case NodeType.ZeroBlock:        generated = this.outputZBlock(ctx, stmt); break;
-            case NodeType.Text:             generated = this.outputText(ctx, stmt.token.str); break;
+            case NodeType.Text:             generated = this.outputText(ctx, stmt.str.str); break;
             case NodeType.DoubleIntList:    generated = this.outputDubl(ctx, stmt); break;
             case NodeType.FloatList:        generated = this.outputFltg(ctx, stmt); break;
             case NodeType.DeviceName:       generated = this.outputDeviceName(ctx, stmt.name.token.symbol); break;
@@ -202,7 +202,7 @@ export class Assembler {
                 newClc += this.safeEval(ctx, stmt.expr);
                 break;
             case NodeType.Text:
-                newClc += CharSets.asciiStringToDec(stmt.token.str, true).length;
+                newClc += CharSets.asciiStringToDec(stmt.str.str, true).length;
                 break;
             case NodeType.DeviceName:
                 newClc += 2;
@@ -373,28 +373,34 @@ export class Assembler {
     private evalSymbolGroup(ctx: Context, group: Nodes.SymbolGroup): number | null {
         if (this.isMRIExpr(group)) {
             return this.evalMRI(ctx, group);
-        } else {
-            let acc = this.tryEval(ctx, group.first);
-            for (const e of group.exprs) {
-                let val;
-                if (e.type == NodeType.BinaryOp && acc !== null) {
-                    acc = this.evalBinOpAcc(ctx, e, acc);
+        }
+
+        // OR all operands
+        let acc = this.tryEval(ctx, group.first);
+        for (const e of group.exprs) {
+            let val;
+            if (e.type == NodeType.BinaryOp && acc !== null) {
+                // the accumulator input is used for a syntax like CDF 1+1 -> must eval as ((CFD OR 1) + 1)
+                acc = this.evalBinOpAcc(ctx, e, acc);
+            } else {
+                val = this.tryEval(ctx, e);
+                if (val === null || acc === null) {
+                    acc = null;
                 } else {
-                    val = this.tryEval(ctx, e);
-                    if (val === null || acc === null) {
-                        acc = null;
-                    } else {
-                        acc |= val;
-                    }
+                    acc |= val;
                 }
             }
-            return acc;
         }
+        return acc;
     }
 
     private evalMRI(ctx: Context, group: Nodes.SymbolGroup): number | null {
         const mri = this.syms.lookup(group.first.token.symbol);
+
+        // upper 5 bits
         let mriVal = mri.value;
+
+        // full 12 bits destination
         let dst = 0;
 
         for (let i = 0; i < group.exprs.length; i++) {
@@ -455,7 +461,6 @@ export class Assembler {
         return this.calcOp(binOp, lhs, rhs);
     }
 
-    // the accumulator input is used for a syntax like CDF 1+1 -> must eval as ((CFD OR 1) + 1)
     private evalBinOpAcc(ctx: Context, binOp: Nodes.BinaryOp, acc: number): number | null {
         let lhs;
         if (binOp.lhs.type == NodeType.BinaryOp) {
@@ -504,6 +509,7 @@ export class Assembler {
         return sym.forceMri || PDP8.isMRIOp(sym.value);
     }
 
+    // 5 bits MRI + 12 bits destination to 5 + 7 bits by adding links or dst being on page or on page zero
     private genMRI(ctx: Context, group: Nodes.SymbolGroup, mri: number, dst: number): number {
         const IND   = 0b000100000000;
         const CUR   = 0b000010000000;

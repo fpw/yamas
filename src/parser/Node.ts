@@ -195,7 +195,8 @@ export interface Float extends BaseNode {
 // TEXT x...x
 export interface TextStatement extends BaseNode {
     type: NodeType.Text;
-    token: Tokens.StringToken;
+    str: Tokens.StringToken;
+    token: Tokens.SymbolToken;
 }
 
 export interface IfDefStatement extends BaseNode {
@@ -229,7 +230,8 @@ export interface IfNotZeroStatement extends BaseNode {
 
 export interface EjectStatement extends BaseNode {
     type: NodeType.Eject;
-    token: Tokens.StringToken;
+    str: Tokens.StringToken;
+    token: Tokens.SymbolToken;
 }
 
 export interface FilenameStatement extends BaseNode {
@@ -404,7 +406,7 @@ export function formatNode(node: Node): string {
         case NodeType.ExpressionStmt:
             return `ExprStmt(${formatNode(node.expr)})`;
         case NodeType.Text:
-            return `Text("${node.token.str}")`;
+            return `Text("${node.str.str}")`;
         case NodeType.Comment:
             return `Comment("${node.token.comment}")`;
         case NodeType.SymbolGroup:
@@ -455,7 +457,7 @@ export function formatNode(node: Node): string {
         case NodeType.FileName:
             return `Filename("${node.name.str}")`;
         case NodeType.Eject:
-            return `Eject("${node.token.str}")`;
+            return `Eject("${node.str.str}")`;
         case NodeType.Radix:
             return `Radix(${node.radix})`;
         case NodeType.FixTab:

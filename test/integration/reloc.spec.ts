@@ -1,5 +1,4 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../../src/assembler/Assembler";
 import { dumpNode } from "../../src/parser/Node";
 import { assemble } from "./TestUtils";
 
@@ -72,14 +71,13 @@ describe("GIVEN a program containing reloc statements", () => {
     });
 
     describe("WHEN assembling an example program with a RELOC that causes the link table to move mid-page", () => {
-        const asm = new Assembler();
-        asm.parseInput("test.pa", `
+        const data = assemble(`
             *200
             RELOC 410
             TAD (3
         `);
-        test("THEN the output should match the output of PAL8", () => {
-            expect(() => asm.assembleAll()).toThrow();
+        test("THEN assembling should fail", () => {
+            expect(data.errors.length).toBeGreaterThan(0);
         });
     });
 });

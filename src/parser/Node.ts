@@ -27,6 +27,7 @@
 
 import { replaceBlanks } from "../utils/Strings";
 import * as Tokens from "../lexer/Token";
+import { CodeError } from "../utils/CodeError";
 
 export enum NodeType {
     // Program
@@ -61,7 +62,7 @@ export enum NodeType {
     Symbol,
     CLCValue,
 
-    // Specials
+    // Leaf only
     DoubleInt,
     Float,
 }
@@ -69,11 +70,18 @@ export enum NodeType {
 export type Node = Program | Statement | Expression | Element;
 
 export type Statement =
-    OriginStatement |
-    ExpressionStatement | LabelDef | AssignStatement |
-    DefineStatement | Invocation |
-    TextStatement | DoubleIntList | FloatList | Comment | StatementSeparator |
-    EjectStatement | FixMriStatement | FilenameStatement;
+    PseudoStatement |
+    OriginStatement | LabelDef | AssignStatement |
+    ExpressionStatement | Invocation |
+    Comment | StatementSeparator;
+
+export type PseudoStatement =
+    DataStatement |
+    DefineStatement | EjectStatement | FixMriStatement;
+
+export type DataStatement =
+    TextStatement | FilenameStatement |
+    DoubleIntList | FloatList;
 
 export type Expression =
     SymbolGroup | ParenExpr | BinaryOp |
@@ -87,8 +95,9 @@ export interface BaseNode {
 
 export interface Program extends BaseNode {
     type: NodeType.Program;
-    stmts: Statement[];
     inputName: string;
+    stmts: Statement[];
+    errors: CodeError[];
 }
 
 // *200
@@ -269,50 +278,50 @@ export function dumpNode(prog: Program, write: (line: string) => void, indent = 
         switch (node.type) {
             case NodeType.Invocation:
                 const args = node.args.map(a => Tokens.tokenToString(a)).join(", ");
-                w(`Invoke(${formatSingle(node.name)}, [${args}], program=`, indent);
+                w(`Invoke(${formatNode(node.name)}, [${args}], program=`, indent);
                 dumpNode(node.program, write, indent + 1);
                 w(")", indent);
                 break;
             default:
-                w(formatSingle(node), indent + 1);
+                w(formatNode(node), indent + 1);
         }
     }
     w(")", indent);
 }
 
 // eslint-disable-next-line max-lines-per-function
-export function formatSingle(node: Node): string {
+export function formatNode(node: Node): string {
     let str;
     switch (node.type) {
         case NodeType.Origin:
-            return `Origin(${formatSingle(node.val)})`;
+            return `Origin(${formatNode(node.val)})`;
         case NodeType.Label:
-            return `Label(${formatSingle(node.sym)})`;
+            return `Label(${formatNode(node.sym)})`;
         case NodeType.Assignment:
-            return `Assign(${formatSingle(node.sym)}, ${formatSingle(node.val)})`;
+            return `Assign(${formatNode(node.sym)}, ${formatNode(node.val)})`;
         case NodeType.Separator:
             return `Separator('${replaceBlanks(node.separator)}')`;
         case NodeType.ExpressionStmt:
-            return `ExprStmt(${formatSingle(node.expr)})`;
+            return `ExprStmt(${formatNode(node.expr)})`;
         case NodeType.Text:
             return `Text("${node.token.str}")`;
         case NodeType.Comment:
             return `Comment("${node.token.comment}")`;
         case NodeType.SymbolGroup:
             str = "Group(";
-            str += `${formatSingle(node.first)}, [`;
-            str += node.exprs.map(n => formatSingle(n)).join(", ");
+            str += `${formatNode(node.first)}, [`;
+            str += node.exprs.map(n => formatNode(n)).join(", ");
             str += "])";
             return str;
         case NodeType.ParenExpr:
-            return `Paren('${node.paren}', ${formatSingle(node.expr)})`;
+            return `Paren('${node.paren}', ${formatNode(node.expr)})`;
         case NodeType.Define:
-            const params = node.params.map(a => formatSingle(a)).join(", ");
-            return `Define(${formatSingle(node.name)}, [${params}], ${formatSingle(node.body)})`;
+            const params = node.params.map(a => formatNode(a)).join(", ");
+            return `Define(${formatNode(node.name)}, [${params}], ${formatNode(node.body)})`;
         case NodeType.BinaryOp:
-            return `BinOp(${formatSingle(node.lhs)}, '${node.operator}', ${formatSingle(node.rhs)})`;
+            return `BinOp(${formatNode(node.lhs)}, '${node.operator}', ${formatNode(node.rhs)})`;
         case NodeType.UnaryOp:
-            return `Unary(${node.operator}, ${formatSingle(node.elem)})`;
+            return `Unary(${node.operator}, ${formatNode(node.elem)})`;
         case NodeType.Integer:
             return `Integer(${node.token.value})`;
         case NodeType.ASCIIChar:
@@ -332,9 +341,9 @@ export function formatSingle(node: Node): string {
         case NodeType.Eject:
             return `Eject("${node.token.str}")`;
         case NodeType.FixMri:
-            return `FixMri("${formatSingle(node.assignment)}")`;
+            return `FixMri("${formatNode(node.assignment)}")`;
         case NodeType.Invocation:
         case NodeType.Program:
-            throw Error("Logic error");
+            throw Error("Can't handle compound");
     }
 }

@@ -2,6 +2,7 @@ import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "fs"
 import { basename } from "path";
 import { parse } from "ts-command-line-args";
 import { Options, Yamas } from "./Yamas";
+import { formatCodeError } from "./utils/CodeError";
 
 interface CliArgs {
     help?: boolean;
@@ -37,8 +38,12 @@ function main() {
         const src = readFileSync(file, "ascii");
         yamas.addInput(file, src);
     }
-    const bin = yamas.run();
-    writeFileSync("out.bin", bin);
+
+    const output = yamas.run();
+    output.errors.forEach(e => console.error(formatCodeError(e)));
+    if (output.errors.length == 0) {
+        writeFileSync("out.bin", output.binary);
+    }
 
     astFiles.forEach(fd => closeSync(fd));
 }

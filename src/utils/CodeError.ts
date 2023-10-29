@@ -12,3 +12,7 @@ export class CodeError extends Error {
         this.col = col;
     }
 }
+
+export function formatCodeError(error: CodeError) {
+    return `${error.inputName}:${error.line}:${error.col}: ${error.message}`;
+}

@@ -4,6 +4,7 @@ import { PreludeFamily8 } from "./prelude/Family8";
 import { PreludeIO } from "./prelude/IO";
 import { Prelude8E } from "./prelude/PDP8E";
 import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
+import { CodeError } from "./utils/CodeError";
 
 export interface Options {
     loadPrelude?: boolean;
@@ -37,9 +38,9 @@ export class Yamas {
         }
     }
 
-    public run(): Uint8Array {
-        this.asm.assembleAll();
-        const bin = this.binTape.finish();
-        return bin;
+    public run(): {binary: Uint8Array, errors: CodeError[]} {
+        const errors = this.asm.assembleAll();
+        const binary = this.binTape.finish();
+        return { binary, errors };
     }
 }

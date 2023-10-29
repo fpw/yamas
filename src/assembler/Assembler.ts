@@ -1,6 +1,8 @@
 import * as Nodes from "../parser/Node";
+import { NodeType } from "../parser/Node";
 import { Parser } from "../parser/Parser";
 import * as CharSets from "../utils/CharSets";
+import { CodeError } from "../utils/CodeError";
 import { toDECFloat } from "../utils/Floats";
 import * as PDP8 from "../utils/PDP8";
 import { parseIntSafe } from "../utils/Strings";
@@ -56,16 +58,25 @@ export class Assembler {
         return this.syms.getSymbols();
     }
 
-    public assembleAll() {
+    public assembleAll(): CodeError[] {
+        const errors: CodeError[] = this.programs.map(p => p.errors).flat();
+
         const symCtx = this.createContext(false);
-        this.programs.forEach(p => this.assignSymbols(symCtx, p));
+        for (const prog of this.programs) {
+            const symErrors = this.assignSymbols(symCtx, prog);
+            errors.push(...symErrors);
+        }
 
         const asmCtx = this.createContext(true);
-
         this.punchOrigin(asmCtx);
-        this.programs.forEach(p => this.assembleProgram(asmCtx, p));
+        for (const prog of this.programs) {
+            const asmErrors = this.assembleProgram(asmCtx, prog);
+            errors.push(...asmErrors);
+        }
 
         this.outputLinks(asmCtx);
+
+        return errors;
     }
 
     private createContext(generateCode: boolean): Context {
@@ -79,75 +90,99 @@ export class Assembler {
         };
     }
 
-    private assignSymbols(ctx: Context, prog: Nodes.Program) {
+    private assignSymbols(ctx: Context, prog: Nodes.Program): CodeError[] {
+        const errors: CodeError[] = [];
         for (const stmt of prog.stmts) {
-            this.updateSymbols(ctx, stmt);
-            this.updateCLC(ctx, stmt);
+            try {
+                this.updateSymbols(ctx, stmt);
+                this.updateCLC(ctx, stmt);
+            } catch (e) {
+                if (e instanceof CodeError) {
+                    errors.push(e);
+                } else if (e instanceof Error) {
+                    errors.push(new CodeError(e.message, prog.inputName, 0, 0));
+                }
+            }
         }
+        return errors;
     }
 
-    private assembleProgram(ctx: Context, prog: Nodes.Program) {
+    private assembleProgram(ctx: Context, prog: Nodes.Program): CodeError[] {
+        const errors: CodeError[] = [];
         for (const stmt of prog.stmts) {
-            let generated: boolean;
-            switch (stmt.type) {
-                case Nodes.NodeType.Text:
-                    generated = this.outputText(ctx, stmt.token.str, false);
-                    break;
-                case Nodes.NodeType.FileName:
-                    generated = this.outputText(ctx, stmt.name.str, true);
-                    break;
-                case Nodes.NodeType.DoubleIntList:
-                    generated = this.outputDubl(ctx, stmt);
-                    break;
-                case Nodes.NodeType.FloatList:
-                    generated = this.outputFltg(ctx, stmt);
-                    break;
-                case Nodes.NodeType.ExpressionStmt:
-                    generated = this.handleExprStmt(ctx, stmt);
-                    break;
-                default:
-                    generated = false;
+            try {
+                this.assembleStatement(ctx, stmt);
+            } catch (e) {
+                if (e instanceof CodeError) {
+                    errors.push(e);
+                } else if (e instanceof Error) {
+                    errors.push(new CodeError(e.message, prog.inputName, 0, 0));
+                }
             }
-
-            if (generated) {
-                // we just put something at CLC - check if it overlaps with a link
-                this.linkTable.checkOverlap(this.getClc(ctx, false));
-            }
-
-            // symbols need to be updated here as well because it's possible to use
-            // undefined symbols on the right hand side of A=B in pass 1
-            this.updateSymbols(ctx, stmt);
-            this.updateCLC(ctx, stmt);
         }
+        return errors;
+    }
+
+    private assembleStatement(ctx: Context, stmt: Nodes.Statement) {
+        let generated: boolean;
+        switch (stmt.type) {
+            case NodeType.Text:
+                generated = this.outputText(ctx, stmt.token.str, false);
+                break;
+            case NodeType.FileName:
+                generated = this.outputText(ctx, stmt.name.str, true);
+                break;
+            case NodeType.DoubleIntList:
+                generated = this.outputDubl(ctx, stmt);
+                break;
+            case NodeType.FloatList:
+                generated = this.outputFltg(ctx, stmt);
+                break;
+            case NodeType.ExpressionStmt:
+                generated = this.handleExprStmt(ctx, stmt);
+                break;
+            default:
+                generated = false;
+        }
+
+        if (generated) {
+            // we just put something at CLC - check if it overlaps with a link
+            this.linkTable.checkOverlap(this.getClc(ctx, false));
+        }
+
+        // symbols need to be updated here as well because it's possible to use
+        // undefined symbols on the right hand side of A=B in pass 1
+        this.updateSymbols(ctx, stmt);
+        this.updateCLC(ctx, stmt);
     }
 
     private updateSymbols(ctx: Context, stmt: Nodes.Statement) {
         switch (stmt.type) {
-            case Nodes.NodeType.Assignment:
+            case NodeType.Assignment:
                 const paramVal = this.tryEval(ctx, stmt.val);
                 // undefined expressions lead to undefined symbols
                 if (paramVal !== null) {
                     this.syms.defineParameter(stmt.sym.token.symbol, paramVal);
                 }
                 break;
-            case Nodes.NodeType.FixMri:
+            case NodeType.FixMri:
                 const val = this.safeEval(ctx, stmt.assignment.val);
                 this.syms.defineForcedMri(stmt.assignment.sym.token.symbol, val);
                 break;
-            case Nodes.NodeType.Label:
+            case NodeType.Label:
                 this.syms.defineLabel(stmt.sym.token.symbol, this.getClc(ctx, true));
                 break;
-            case Nodes.NodeType.Define:
+            case NodeType.Define:
                 if (!ctx.generateCode) {
                     // define macros only once so we don't get duplicates in next pass
                     this.syms.defineMacro(stmt.name.token.symbol);
                 }
                 break;
-            case Nodes.NodeType.Invocation: {
+            case NodeType.Invocation: {
                 this.handleSubProgram(ctx, stmt.program);
                 break;
             }
-            case Nodes.NodeType.ExpressionStmt:
+            case NodeType.ExpressionStmt:
                 // need to handle pseudos because they can change the radix or CLC,
                 // affecting expression parsing for symbol definitions
                 if (this.isPseudoExpr(stmt.expr)) {
@@ -161,24 +196,24 @@ export class Assembler {
         let newClc = this.getClc(ctx, false);
 
         switch (stmt.type) {
-            case Nodes.NodeType.Origin:
+            case NodeType.Origin:
                 newClc = this.safeEval(ctx, stmt.val);
                 this.setClc(ctx, newClc, true);
                 this.punchOrigin(ctx);
                 return;
-            case Nodes.NodeType.Text:
+            case NodeType.Text:
                 newClc += CharSets.asciiStringToDec(stmt.token.str, true).length;
                 break;
-            case Nodes.NodeType.FileName:
+            case NodeType.FileName:
                 newClc += 4;
                 break;
-            case Nodes.NodeType.DoubleIntList:
-                newClc += stmt.list.filter(x => x.type == Nodes.NodeType.DoubleInt).length * 2;
+            case NodeType.DoubleIntList:
+                newClc += stmt.list.filter(x => x.type == NodeType.DoubleInt).length * 2;
                 break;
-            case Nodes.NodeType.FloatList:
-                newClc += stmt.list.filter(x => x.type == Nodes.NodeType.Float).length * 3;
+            case NodeType.FloatList:
+                newClc += stmt.list.filter(x => x.type == NodeType.Float).length * 3;
                 break;
-            case Nodes.NodeType.ExpressionStmt:
+            case NodeType.ExpressionStmt:
                 if (!this.isPseudoExpr(stmt.expr)) {
                     newClc++;
                 }
@@ -266,8 +301,8 @@ export class Assembler {
 
     private handleIfDef(ctx: Context, group: Nodes.SymbolGroup, op: "IFDEF" | "IFNDEF") {
         if (group.exprs.length != 2 ||
-            group.exprs[0].type != Nodes.NodeType.Symbol ||
-            group.exprs[1].type != Nodes.NodeType.MacroBody) {
+            group.exprs[0].type != NodeType.Symbol ||
+            group.exprs[1].type != NodeType.MacroBody) {
             throw this.mkError("Invalid syntax: single symbol and body expected", group);
         }
 
@@ -279,7 +314,7 @@ export class Assembler {
 
     private handleIfZero(ctx: Context, group: Nodes.SymbolGroup, op: "IFNZRO" | "IFZERO") {
         const body = group.exprs[group.exprs.length - 1];
-        if (body.type != Nodes.NodeType.MacroBody) {
+        if (body.type != NodeType.MacroBody) {
             throw this.mkError("Invalid syntax: expression and body expected", group);
         }
 
@@ -315,14 +350,18 @@ export class Assembler {
                 throw this.mkError("Condition was false in pass 1, now true -> Illegal", body);
             }
         }
-        this.handleSubProgram(ctx, body.parsed);
+        const errors = this.handleSubProgram(ctx, body.parsed);
+        if (errors.length > 0) {
+            // TODO: We can't pass errors upwards yet, so just rethrow the first one
+            throw errors[0];
+        }
     }
 
-    private handleSubProgram(ctx: Context, program: Nodes.Program) {
+    private handleSubProgram(ctx: Context, program: Nodes.Program): CodeError[] {
         if (!ctx.generateCode) {
-            this.assignSymbols(ctx, program);
+            return this.assignSymbols(ctx, program);
         } else {
-            this.assembleProgram(ctx, program);
+            return this.assembleProgram(ctx, program);
         }
     }
 
@@ -357,24 +396,15 @@ export class Assembler {
 
     private tryEval(ctx: Context, expr: Nodes.Expression): number | null {
         switch (expr.type) {
-            case Nodes.NodeType.Integer:
-                return parseIntSafe(expr.token.value, ctx.radix) & 0o7777;
-            case Nodes.NodeType.ASCIIChar:
-                return CharSets.asciiCharTo7Bit(expr.token.char, true);
-            case Nodes.NodeType.Symbol:
-                return this.evalSymbol(ctx, expr);
-            case Nodes.NodeType.CLCValue:
-                return this.getClc(ctx, true);
-            case Nodes.NodeType.UnaryOp:
-                return this.evalUnary(ctx, expr);
-            case Nodes.NodeType.ParenExpr:
-                return this.evalParenExpr(ctx, expr);
-            case Nodes.NodeType.SymbolGroup:
-                return this.evalSymbolGroup(ctx, expr);
-            case Nodes.NodeType.BinaryOp:
-                return this.evalBinOp(ctx, expr);
-            case Nodes.NodeType.MacroBody:
-                throw this.mkError("Trying to evaluate macro body", expr);
+            case NodeType.Integer:        return parseIntSafe(expr.token.value, ctx.radix) & 0o7777;
+            case NodeType.ASCIIChar:      return CharSets.asciiCharTo7Bit(expr.token.char, true);
+            case NodeType.Symbol:         return this.evalSymbol(ctx, expr);
+            case NodeType.CLCValue:       return this.getClc(ctx, true);
+            case NodeType.UnaryOp:        return this.evalUnary(ctx, expr);
+            case NodeType.ParenExpr:      return this.evalParenExpr(ctx, expr);
+            case NodeType.SymbolGroup:    return this.evalSymbolGroup(ctx, expr);
+            case NodeType.BinaryOp:       return this.evalBinOp(ctx, expr);
+            case NodeType.MacroBody:      throw this.mkError("Trying to evaluate macro body", expr);
         }
     }
 
@@ -396,7 +426,7 @@ export class Assembler {
             let acc = this.tryEval(ctx, group.first);
             for (const e of group.exprs) {
                 let val;
-                if (e.type == Nodes.NodeType.BinaryOp && acc !== null) {
+                if (e.type == NodeType.BinaryOp && acc !== null) {
                     acc = this.evalBinOpAcc(ctx, e, acc);
                 } else {
                     val = this.tryEval(ctx, e);
@@ -418,7 +448,7 @@ export class Assembler {
 
         for (let i = 0; i < group.exprs.length; i++) {
             const ex = group.exprs[i];
-            if (ex.type == Nodes.NodeType.Symbol) {
+            if (ex.type == NodeType.Symbol) {
                 const sym = this.syms.tryLookup(ex.token.symbol);
                 if (!sym) {
                     return null;
@@ -477,7 +507,7 @@ export class Assembler {
     // the accumulator input is used for a syntax like CDF 1+1 -> must eval as ((CFD OR 1) + 1)
     private evalBinOpAcc(ctx: Context, binOp: Nodes.BinaryOp, acc: number): number | null {
         let lhs;
-        if (binOp.lhs.type == Nodes.NodeType.BinaryOp) {
+        if (binOp.lhs.type == NodeType.BinaryOp) {
             lhs = this.evalBinOpAcc(ctx, binOp.lhs, acc);
         } else {
             lhs = this.tryEval(ctx, binOp.lhs);
@@ -509,7 +539,7 @@ export class Assembler {
     }
 
     private isPseudoExpr(expr: Nodes.Expression): boolean {
-        if (expr.type != Nodes.NodeType.SymbolGroup) {
+        if (expr.type != NodeType.SymbolGroup) {
             return false;
         }
         const sym = this.syms.tryLookup(expr.first.token.symbol);
@@ -521,7 +551,7 @@ export class Assembler {
 
     private isMRIExpr(expr: Nodes.Expression): boolean {
         // An MRI expression needs to start with an MRI op followed by a space -> group
-        if (expr.type != Nodes.NodeType.SymbolGroup) {
+        if (expr.type != NodeType.SymbolGroup) {
             return false;
         }
 
@@ -585,7 +615,7 @@ export class Assembler {
     }
 
     private handleDeviceName(ctx: Context, group: Nodes.SymbolGroup) {
-        if (group.exprs.length != 1 || group.exprs[0].type != Nodes.NodeType.Symbol) {
+        if (group.exprs.length != 1 || group.exprs[0].type != NodeType.Symbol) {
             throw this.mkError("Expected one symbolic parameter for DEVICE", group);
         }
 
@@ -603,7 +633,7 @@ export class Assembler {
 
         let loc = this.getClc(ctx, false);
         for (const dubl of stmt.list) {
-            if (dubl.type != Nodes.NodeType.DoubleInt) {
+            if (dubl.type != NodeType.DoubleInt) {
                 continue;
             }
             let num = parseIntSafe(dubl.token.value, 10);
@@ -623,7 +653,7 @@ export class Assembler {
 
         let loc = this.getClc(ctx, false);
         for (const fltg of stmt.list) {
-            if (fltg.type != Nodes.NodeType.Float) {
+            if (fltg.type != NodeType.Float) {
                 continue;
             }
 

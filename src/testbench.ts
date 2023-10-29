@@ -46,12 +46,13 @@ function testOne(srcPath: string, bnPath: string): boolean {
     try {
         const yamas = new Yamas(opts);
         yamas.addInput(`${basename(srcPath)}`, src);
-        const isBin = yamas.run();
-        return compareBin(`${basename(bnPath)}`, isBin, shouldBin);
-    } catch (e) {
-        if (e instanceof CodeError) {
-            console.error(`${e.inputName}:${e.line}:${e.col}: ${e.message}`);
+        const output = yamas.run();
+        if (output.errors.length > 0) {
+            output.errors.forEach(e => console.error(e));
+            return false;
         }
+        return compareBin(`${basename(bnPath)}`, output.binary, shouldBin);
+    } catch (e) {
         console.error(e);
         return false;
     }

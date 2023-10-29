@@ -6,6 +6,9 @@ export type ParenChr =  "(" | ")" | "[" | "]";
 export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
 export type UnaryOpChr = "-" | "+";
 
+export type LineBreakChr = "\r" | "\n";
+export type BlankChr = " " | "\t" | "\f";
+
 export const OperatorChars = [
     ".", ",", "=", "*",
     "(", ")", "[", "]",
@@ -40,12 +43,12 @@ export interface BaseToken {
 
 export interface BlankToken extends BaseToken {
     type: TokenType.Blank;
-    char: " " | "\t";
+    char: BlankChr;
 }
 
 export interface EOLToken extends BaseToken {
     type: TokenType.EOL;
-    char: "\r" | "\n" | "\f";
+    char: LineBreakChr;
 }
 
 export interface SymbolToken extends BaseToken {

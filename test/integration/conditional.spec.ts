@@ -1,5 +1,4 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../../src/assembler/Assembler";
 import { assemble } from "./TestUtils";
 
 describe("GIVEN a program with conditional statements", () => {
@@ -58,35 +57,32 @@ describe("GIVEN a program with conditional statements", () => {
     });
 
     describe("WHEN accessing undefined symbols in condition bodies", () => {
-        const asm = new Assembler();
-        asm.parseInput("test.pa", `
+        const data = assemble(`
             IFNDEF A <GLITCH>
         `);
         test("THEN it should generate an error", () => {
-            expect(() => asm.assembleAll()).toThrow();
+            expect(data.errors.length).toBeGreaterThan(0);
         });
     });
 
     describe("WHEN evaluating undefined symbols that evaluate differently in pass 1 and 2", () => {
         describe("WHEN IFNZRO doesn't run in pass 1 but in pass 2", () => {
-            const asm = new Assembler();
-            asm.parseInput("test.pa", `
+            const data = assemble(`
                 IFNZRO A <B=1>
                 A=1
             `);
             test("THEN it should generate an error", () => {
-                expect(() => asm.assembleAll()).toThrow();
+                expect(data.errors.length).toBeGreaterThan(0);
             });
         });
 
         describe("WHEN IFZERO runs in pass 1 but not in pass 2", () => {
-            const asm = new Assembler();
-            asm.parseInput("test.pa", `
+            const data = assemble(`
                 IFZERO A <TAD>
                 A=1
             `);
             test("THEN it should generate an error", () => {
-                expect(() => asm.assembleAll()).toThrow();
+                expect(data.errors.length).toBeGreaterThan(0);
             });
         });
     });

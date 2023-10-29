@@ -79,8 +79,7 @@ describe("GIVEN a program containing statements", () => {
     });
 
     describe("WHEN overlapping data and links", () => {
-        const asm = new Assembler();
-        asm.parseInput("test.pa", `
+        const data = assemble(`
             / We have no prelude in this test
             TAD=1000
             FIXTAB
@@ -88,7 +87,7 @@ describe("GIVEN a program containing statements", () => {
             TAD (1234)
         `);
         test("THEN assembling should fail", () => {
-            expect(() => asm.assembleAll()).toThrow();
+            expect(data.errors.length).toBeGreaterThan(0);
         });
     });
 

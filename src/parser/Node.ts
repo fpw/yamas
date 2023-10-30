@@ -42,6 +42,18 @@ export enum NodeType {
     Invocation,
     Comment,
 
+    // Expression
+    SymbolGroup,
+    ParenExpr,
+    BinaryOp,
+
+    // Element
+    UnaryOp,
+    Integer,
+    ASCIIChar,
+    Symbol,
+    CLCValue,
+
     // Pseudos
     Text,
     DoubleIntList,
@@ -63,18 +75,6 @@ export enum NodeType {
     IfNotZero,
     ZeroBlock,
     DeviceName,
-
-    // Expression
-    SymbolGroup,
-    ParenExpr,
-    BinaryOp,
-
-    // Element
-    UnaryOp,
-    Integer,
-    ASCIIChar,
-    Symbol,
-    CLCValue,
 
     // Leaf only
     DoubleInt,
@@ -226,7 +226,6 @@ export interface IfNotZeroStatement extends BaseNode {
     body: MacroBody;
     token: Tokens.SymbolToken;
 }
-
 
 export interface EjectStatement extends BaseNode {
     type: NodeType.Eject;

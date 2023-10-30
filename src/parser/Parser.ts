@@ -1,12 +1,12 @@
-import {Lexer} from "../lexer/Lexer";
+import { Lexer } from "../lexer/Lexer";
 import * as Tokens from "../lexer/Token";
-import {TokenType} from "../lexer/Token";
-import {CodeError} from "../utils/CodeError";
-import {ExprParser} from "./parsers/ExprParser";
-import {LeafParser} from "./parsers/LeafParser";
+import { TokenType } from "../lexer/Token";
+import { CodeError } from "../utils/CodeError";
+import { ExprParser } from "./parsers/ExprParser";
+import { LeafParser } from "./parsers/LeafParser";
 import * as Nodes from "./Node";
-import {NodeType} from "./Node";
-import {PseudoParser} from "./parsers/PseudoParser";
+import { NodeType } from "./Node";
+import { PseudoParser } from "./parsers/PseudoParser";
 
 export class Parser {
     public static readonly SupportedKeywords = [

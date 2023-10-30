@@ -1,4 +1,4 @@
-import {normalizeSymbolName} from "../utils/Strings";
+import { normalizeSymbolName } from "../utils/Strings";
 
 export enum SymbolType {
     Param,      // A=x
@@ -131,6 +131,6 @@ export class SymbolTable {
             }
         }
 
-        this.symbols.set(normName, {...data, name: normName});
+        this.symbols.set(normName, { ...data, name: normName });
     }
 }

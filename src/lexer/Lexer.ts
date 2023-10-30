@@ -1,6 +1,6 @@
-import {CodeError} from "../utils/CodeError";
-import {replaceBlanks} from "../utils/Strings";
-import {TokenType} from "./Token";
+import { CodeError } from "../utils/CodeError";
+import { replaceBlanks } from "../utils/Strings";
+import { TokenType } from "./Token";
 import * as Tokens from "./Token";
 
 export interface Cursor {
@@ -392,7 +392,7 @@ export class Lexer {
     private advanceCursor(step: number) {
         const data = this.getData();
         // make sure to create a new object so that the references in next() keep their state
-        const newCursor = {...this.cursor};
+        const newCursor = { ...this.cursor };
 
         for (let i = 0; i < step; i++) {
             if (this.cursor.dataIdx < data.length) {
@@ -419,7 +419,7 @@ export class Lexer {
         return chr == " " || chr == "\t" || chr == "\f";
     }
 
-    private getTokenMeasurement(start: Cursor): {cursor: Cursor, width: number} {
+    private getTokenMeasurement(start: Cursor): { cursor: Cursor, width: number } {
         const end = this.cursor;
 
         return {

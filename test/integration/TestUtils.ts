@@ -1,10 +1,10 @@
 /* eslint-disable max-lines-per-function */
-import {Assembler} from "../../src/assembler/Assembler";
-import {Program} from "../../src/parser/Node";
-import {PreludeFamily8} from "../../src/prelude/Family8";
-import {PreludeIO} from "../../src/prelude/IO";
-import {Prelude8E} from "../../src/prelude/PDP8E";
-import {CodeError} from "../../src/utils/CodeError";
+import { Assembler } from "../../src/assembler/Assembler";
+import { Program } from "../../src/parser/Node";
+import { PreludeFamily8 } from "../../src/prelude/Family8";
+import { PreludeIO } from "../../src/prelude/IO";
+import { Prelude8E } from "../../src/prelude/PDP8E";
+import { CodeError } from "../../src/utils/CodeError";
 
 export interface TestData {
     asm: Assembler;
@@ -51,5 +51,5 @@ export function assembleWithErrors(input: string): TestData {
     const symbols: Record<string, number> = {};
     asm.getSymbols().forEach(sym => symbols[sym.name] = sym.value);
 
-    return {asm, errors, ast, symbols, orgs, memory};
+    return { asm, errors, ast, symbols, orgs, memory };
 }

@@ -1,12 +1,12 @@
-import {Lexer} from "../../lexer/Lexer";
+import { Lexer } from "../../lexer/Lexer";
 import * as Tokens from "../../lexer/Token";
-import {TokenType} from "../../lexer/Token";
-import {LeafParser} from "./LeafParser";
+import { TokenType } from "../../lexer/Token";
+import { LeafParser } from "./LeafParser";
 import * as Nodes from "../Node";
-import {NodeType} from "../Node";
-import {Parser} from "../Parser";
+import { NodeType } from "../Node";
+import { Parser } from "../Parser";
 
-type BinOpFragment = {elem: Nodes.Element, op?: Tokens.CharToken};
+type BinOpFragment = { elem: Nodes.Element, op?: Tokens.CharToken };
 
 export class ExprParser {
     public constructor(private lexer: Lexer, private leafParser: LeafParser) {
@@ -149,7 +149,7 @@ export class ExprParser {
         const nextTok = this.lexer.next();
         if (!this.couldBeInExpr(nextTok)) {
             this.lexer.unget(nextTok);
-            return {elem: firstElem};
+            return { elem: firstElem };
         }
 
         switch (nextTok.type) {
@@ -161,16 +161,16 @@ export class ExprParser {
                     case "%":
                     case "!":
                     case "&":
-                        return {elem: firstElem, op: nextTok};
+                        return { elem: firstElem, op: nextTok };
                     case ")":
                     case "]":
-                        return {elem: firstElem};
+                        return { elem: firstElem };
                     default:
                         throw Parser.mkTokError(`Unexpected operator in expression: '${nextTok.char}'`, nextTok);
                 }
             default:
                 this.lexer.unget(nextTok);
-                return {elem: firstElem};
+                return { elem: firstElem };
         }
     }
 

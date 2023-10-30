@@ -1,11 +1,11 @@
-import {existsSync, readFileSync, readdirSync} from "fs";
-import path, {basename} from "path";
-import {parse} from "ts-command-line-args";
-import {Options, Yamas} from "./Yamas";
-import {BinTapeReader} from "./tapeformats/BinTapeReader";
-import {CodeError} from "./utils/CodeError";
-import {MemSize} from "./utils/PDP8";
-import {numToOctal} from "./utils/Strings";
+import { existsSync, readFileSync, readdirSync } from "fs";
+import path, { basename } from "path";
+import { parse } from "ts-command-line-args";
+import { Options, Yamas } from "./Yamas";
+import { BinTapeReader } from "./tapeformats/BinTapeReader";
+import { CodeError } from "./utils/CodeError";
+import { MemSize } from "./utils/PDP8";
+import { numToOctal } from "./utils/Strings";
 
 interface CliArgs {
     help?: boolean;
@@ -14,8 +14,8 @@ interface CliArgs {
 
 function main() {
     const args = parse<CliArgs>({
-        help: {type: Boolean, optional: true, description: "Show usage help"},
-        dir: {type: String, defaultOption: true, description: "Input directory"},
+        help: { type: Boolean, optional: true, description: "Show usage help" },
+        dir: { type: String, defaultOption: true, description: "Input directory" },
     },
     {
         helpArg: "help",
@@ -26,7 +26,7 @@ function main() {
             continue;
         }
         const filePath = args.dir + "/" + fileName;
-        const bnPath = path.format({...path.parse(filePath), base: "", ext: ".bn"});
+        const bnPath = path.format({ ...path.parse(filePath), base: "", ext: ".bn" });
         if (!existsSync(bnPath)) {
             continue;
         }

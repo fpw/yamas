@@ -1,5 +1,5 @@
-import {replaceBlanks} from "../utils/Strings";
-import {Cursor} from "./Lexer";
+import { replaceBlanks } from "../utils/Strings";
+import { Cursor } from "./Lexer";
 
 export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";
 export type ParenChr =  "(" | ")" | "[" | "]";

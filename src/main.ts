@@ -1,8 +1,8 @@
-import {closeSync, openSync, readFileSync, writeFileSync, writeSync} from "fs";
-import {basename} from "path";
-import {parse} from "ts-command-line-args";
-import {Options, Yamas} from "./Yamas";
-import {formatCodeError} from "./utils/CodeError";
+import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "fs";
+import { basename } from "path";
+import { parse } from "ts-command-line-args";
+import { Options, Yamas } from "./Yamas";
+import { formatCodeError } from "./utils/CodeError";
 
 interface CliArgs {
     help?: boolean;
@@ -14,11 +14,11 @@ interface CliArgs {
 
 function main() {
     const args = parse<CliArgs>({
-        help: {type: Boolean, optional: true, description: "Show usage help"},
-        noPrelude: {type: Boolean, optional: true, defaultValue: false, description: "Do not define common symbols"},
-        files: {type: String, multiple: true, defaultOption: true, description: "Input files"},
-        compare: {type: String, optional: true, alias: "c", description: "Compare output with a given bin file"},
-        outputAst: {type: Boolean, optional: true, alias: "a", description: "Write abstract syntrax tree"},
+        help: { type: Boolean, optional: true, description: "Show usage help" },
+        noPrelude: { type: Boolean, optional: true, defaultValue: false, description: "Do not define common symbols" },
+        files: { type: String, multiple: true, defaultOption: true, description: "Input files" },
+        compare: { type: String, optional: true, alias: "c", description: "Compare output with a given bin file" },
+        outputAst: { type: Boolean, optional: true, alias: "a", description: "Write abstract syntrax tree" },
     }, {
         helpArg: "help",
     });

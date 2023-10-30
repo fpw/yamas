@@ -25,9 +25,9 @@
  *
  */
 
-import {replaceBlanks} from "../utils/Strings";
+import { replaceBlanks } from "../utils/Strings";
 import * as Tokens from "../lexer/Token";
-import {CodeError} from "../utils/CodeError";
+import { CodeError } from "../utils/CodeError";
 
 export enum NodeType {
     // Program

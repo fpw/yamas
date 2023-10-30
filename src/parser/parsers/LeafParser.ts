@@ -1,9 +1,9 @@
-import {Lexer} from "../../lexer/Lexer";
+import { Lexer } from "../../lexer/Lexer";
 import * as Tokens from "../../lexer/Token";
-import {TokenType} from "../../lexer/Token";
+import { TokenType } from "../../lexer/Token";
 import * as Nodes from "../Node";
-import {NodeType} from "../Node";
-import {Parser} from "../Parser";
+import { NodeType } from "../Node";
+import { Parser } from "../Parser";
 
 export class LeafParser {
     public constructor(private lexer: Lexer) {
@@ -13,12 +13,12 @@ export class LeafParser {
         const tok = this.lexer.nextNonBlank();
 
         switch (tok.type) {
-            case TokenType.ASCII:   return {type: NodeType.ASCIIChar, token: tok};
+            case TokenType.ASCII:   return { type: NodeType.ASCIIChar, token: tok };
             case TokenType.Symbol:  return this.parseSymbol(tok);
             case TokenType.Integer: return this.parseInteger(tok);
             case TokenType.Char:
                 if (tok.char == ".") {
-                    return {type: NodeType.CLCValue, token: tok};
+                    return { type: NodeType.CLCValue, token: tok };
                 } else if (tok.char == "+" || tok.char == "-") {
                     return {
                         type: NodeType.UnaryOp,
@@ -40,23 +40,23 @@ export class LeafParser {
             }
             gotTok = next;
         }
-        return {type: NodeType.Symbol, token: gotTok};
+        return { type: NodeType.Symbol, token: gotTok };
     }
 
     public parseInteger(tok: Tokens.IntegerToken): Nodes.Integer {
-        return {type: NodeType.Integer, token: tok};
+        return { type: NodeType.Integer, token: tok };
     }
 
     public parseSeparator(tok: Tokens.EOLToken | Tokens.SeparatorToken): Nodes.StatementSeparator {
         if (tok.type == TokenType.EOL) {
-            return {type: NodeType.Separator, separator: "\n", token: tok};
+            return { type: NodeType.Separator, separator: "\n", token: tok };
         } else {
-            return {type: NodeType.Separator, separator: tok.char, token: tok};
+            return { type: NodeType.Separator, separator: tok.char, token: tok };
         }
     }
 
     public parseComment(tok: Tokens.CommentToken): Nodes.Comment {
-        return {type: NodeType.Comment, token: tok};
+        return { type: NodeType.Comment, token: tok };
     }
 
     public parseDubl(): Nodes.DublListMember | undefined {
@@ -68,14 +68,14 @@ export class LeafParser {
             case TokenType.EOL:
                 return this.parseSeparator(next);
             case TokenType.Integer:
-                return {type: NodeType.DoubleInt, token: next};
+                return { type: NodeType.DoubleInt, token: next };
             case TokenType.Char:
                 if (next.char == "+" || next.char == "-") {
                     const nextInt = this.lexer.next();
                     if (nextInt.type != TokenType.Integer) {
                         throw Parser.mkTokError("Unexpected unary operand", nextInt);
                     }
-                    return {type: NodeType.DoubleInt, unaryOp: next, token: nextInt};
+                    return { type: NodeType.DoubleInt, unaryOp: next, token: nextInt };
                 } else {
                     this.lexer.unget(next);
                     return undefined;
@@ -96,11 +96,11 @@ export class LeafParser {
                 return this.parseSeparator(next);
             case TokenType.Integer:
                 this.lexer.unget(next);
-                return {type: NodeType.Float, token: this.lexer.nextFloat()};
+                return { type: NodeType.Float, token: this.lexer.nextFloat() };
             case TokenType.Char:
                 if (["-", "+", "."].includes(next.char) || (next.char >= "0" && next.char <= "9")) {
                     this.lexer.unget(next);
-                    return {type: NodeType.Float, token: this.lexer.nextFloat()};
+                    return { type: NodeType.Float, token: this.lexer.nextFloat() };
                 } else {
                     this.lexer.unget(next);
                     return undefined;

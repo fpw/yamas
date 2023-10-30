@@ -1,4 +1,4 @@
-import {BinTapeWriter} from "./BinTapeWriter";
+import { BinTapeWriter } from "./BinTapeWriter";
 
 enum BinSymType {
     Checksum,

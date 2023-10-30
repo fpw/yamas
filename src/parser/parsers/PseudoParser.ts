@@ -1,12 +1,12 @@
-import {Lexer} from "../../lexer/Lexer";
+import { Lexer } from "../../lexer/Lexer";
 import * as Tokens from "../../lexer/Token";
-import {TokenType} from "../../lexer/Token";
-import {normalizeSymbolName} from "../../utils/Strings";
-import {ExprParser} from "./ExprParser";
-import {LeafParser} from "./LeafParser";
+import { TokenType } from "../../lexer/Token";
+import { normalizeSymbolName } from "../../utils/Strings";
+import { ExprParser } from "./ExprParser";
+import { LeafParser } from "./LeafParser";
 import * as Nodes from "../Node";
-import {NodeType} from "../Node";
-import {Parser} from "../Parser";
+import { NodeType } from "../Node";
+import { Parser } from "../Parser";
 
 type KeywordHandler = (symbol: Tokens.SymbolToken) => Nodes.Statement;
 
@@ -25,13 +25,13 @@ export class PseudoParser {
     }
 
     private registerKeywords(mkKeyword: (keyword: string, action: KeywordHandler) => void) {
-        mkKeyword("PAGE", token => ({type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token}));
-        mkKeyword("FIELD", token => ({type: NodeType.ChangeField, expr: this.parseParam(token), token}));
-        mkKeyword("RELOC", token => ({type: NodeType.Reloc, expr: this.parseOptionalParam(token), token}));
+        mkKeyword("PAGE", token => ({ type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token }));
+        mkKeyword("FIELD", token => ({ type: NodeType.ChangeField, expr: this.parseParam(token), token }));
+        mkKeyword("RELOC", token => ({ type: NodeType.Reloc, expr: this.parseOptionalParam(token), token }));
 
         mkKeyword("FIXMRI", token => this.parseFixMri(token));
-        mkKeyword("FIXTAB", token => ({type: NodeType.FixTab, token}));
-        mkKeyword("EXPUNGE", token => ({type: NodeType.Expunge, token}));
+        mkKeyword("FIXTAB", token => ({ type: NodeType.FixTab, token }));
+        mkKeyword("EXPUNGE", token => ({ type: NodeType.Expunge, token }));
 
         mkKeyword("DEFINE", token => this.parseDefine(token));
         mkKeyword("IFDEF", token => this.parseIfDef(token, false));
@@ -39,19 +39,19 @@ export class PseudoParser {
         mkKeyword("IFZERO", token => this.parseIfZero(token, false));
         mkKeyword("IFNZRO", token => this.parseIfZero(token, true));
 
-        mkKeyword("DECIMAL", token => ({type: NodeType.Radix, radix: 10, token}));
-        mkKeyword("OCTAL", token => ({type: NodeType.Radix, radix: 8, token}));
+        mkKeyword("DECIMAL", token => ({ type: NodeType.Radix, radix: 10, token }));
+        mkKeyword("OCTAL", token => ({ type: NodeType.Radix, radix: 8, token }));
 
-        mkKeyword("ZBLOCK", token => ({type: NodeType.ZeroBlock, expr: this.parseParam(token), token}));
-        mkKeyword("TEXT", token => ({type: NodeType.Text, str: this.lexer.nextStringLiteral(true), token}));
+        mkKeyword("ZBLOCK", token => ({ type: NodeType.ZeroBlock, expr: this.parseParam(token), token }));
+        mkKeyword("TEXT", token => ({ type: NodeType.Text, str: this.lexer.nextStringLiteral(true), token }));
         mkKeyword("DUBL", token => this.parseDublList(token));
         mkKeyword("FLTG", token => this.parseFltgList(token));
-        mkKeyword("DEVICE", token => ({type: NodeType.DeviceName, name: this.leafParser.parseSymbol(), token}));
+        mkKeyword("DEVICE", token => ({ type: NodeType.DeviceName, name: this.leafParser.parseSymbol(), token }));
         mkKeyword("FILENAME", token => this.parseFilename(token));
 
-        mkKeyword("EJECT", token => ({type: NodeType.Eject, str: this.lexer.nextStringLiteral(false), token}));
-        mkKeyword("ENPUNCH", token => ({type: NodeType.PunchControl, enable: true, token}));
-        mkKeyword("NOPUNCH", token => ({type: NodeType.PunchControl, enable: false, token}));
+        mkKeyword("EJECT", token => ({ type: NodeType.Eject, str: this.lexer.nextStringLiteral(false), token }));
+        mkKeyword("ENPUNCH", token => ({ type: NodeType.PunchControl, enable: true, token }));
+        mkKeyword("NOPUNCH", token => ({ type: NodeType.PunchControl, enable: false, token }));
     }
 
     public tryHandleKeyword(startSym: Tokens.SymbolToken): Nodes.Statement | undefined {
@@ -124,7 +124,7 @@ export class PseudoParser {
             }
         }
 
-        return {type: NodeType.Define, name, body, params, token};
+        return { type: NodeType.Define, name, body, params, token };
     }
 
     private parseFixMri(startSym: Tokens.SymbolToken): Nodes.FixMriStatement {
@@ -138,7 +138,7 @@ export class PseudoParser {
                     val: this.exprParser.parseExpr(),
                     token: op,
                 };
-                return {type: NodeType.FixMri, assignment: assign, token: startSym};
+                return { type: NodeType.FixMri, assignment: assign, token: startSym };
             }
         }
         throw Parser.mkTokError("FIXMRI must be followed by assignment statement", startSym);

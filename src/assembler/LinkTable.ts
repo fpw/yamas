@@ -1,5 +1,5 @@
 import * as PDP8 from "../utils/PDP8";
-import {Context} from "./Context";
+import { Context } from "./Context";
 
 export class LinkTable {
     // [page][index]

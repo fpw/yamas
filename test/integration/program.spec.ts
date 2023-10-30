@@ -1,6 +1,6 @@
 /* eslint-disable max-lines-per-function */
-import {dumpNode} from "../../src/parser/Node";
-import {assemble} from "./TestUtils";
+import { dumpNode } from "../../src/parser/Node";
+import { assemble } from "./TestUtils";
 
 describe("GIVEN a full example listing", () => {
     describe("WHEN assembling the example program", () => {

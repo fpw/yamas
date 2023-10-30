@@ -16,16 +16,26 @@ export interface OutputHandler {
     writeValue(clc: number, val: number): void;
 }
 
+export interface AssemblerOptions {
+    disabledPseudos?: string[];
+}
+
 export class Assembler {
+    private opts: AssemblerOptions;
     private syms = new SymbolTable();
     private linkTable = new LinkTable();
     private programs: Nodes.Program[] = [];
     private outputHandler?: OutputHandler;
 
-    public constructor() {
-        Parser.SupportedKeywords.forEach(k => this.syms.definePseudo(k));
+    public constructor(options?: AssemblerOptions) {
+        this.opts = options ?? {};
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
+
+        // register pseudos as such so that we get errors if code redefines them
+        Parser.SupportedPseudos
+            .filter(k => !this.opts.disabledPseudos?.includes(k))
+            .forEach(k => this.syms.definePseudo(k));
     }
 
     public setOutputHandler(out: OutputHandler) {
@@ -33,7 +43,7 @@ export class Assembler {
     }
 
     public parseInput(name: string, input: string): Nodes.Program {
-        const parser = new Parser(name, input);
+        const parser = this.createParser(name, input);
         const prog = parser.parseProgram();
         this.programs.push(prog);
         return prog;
@@ -62,6 +72,12 @@ export class Assembler {
         this.outputLinks(asmCtx);
 
         return errors;
+    }
+
+    private createParser(input: string, data: string): Parser {
+        const parser = new Parser(input, data);
+        this.opts.disabledPseudos?.forEach(p => parser.disablePseudo(p));
+        return parser;
     }
 
     private createContext(generateCode: boolean): Context {
@@ -298,7 +314,7 @@ export class Assembler {
     private handleConditionBody(ctx: Context, body: Nodes.MacroBody) {
         if (!ctx.generateCode) {
             const name = body.token.cursor.inputName + `:ConditionOnLine${body.token.cursor.lineIdx + 1}`;
-            const parser = new Parser(name, body.token.body);
+            const parser = this.createParser(name, body.token.body);
             body.parsed = parser.parseProgram();
         } else {
             if (!body.parsed) {

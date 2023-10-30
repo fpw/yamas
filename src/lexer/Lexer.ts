@@ -285,14 +285,14 @@ export class Lexer {
     private scanComment(data: string): Tokens.CommentToken {
         const startCursor = this.cursor;
         let comment = "";
-        this.advanceCursor(1);
-        for (let i = this.cursor.dataIdx; i < data.length; i++) {
-            if (this.isLineBreak(data[i])) {
+        this.advanceCursor(1); // skip over '/'
+        for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
+            const c = data[this.cursor.dataIdx];
+            if (this.isLineBreak(c)) {
                 break;
             }
-            comment += data[i];
+            comment += c;
         }
-        this.advanceCursor(comment.length);
         return {
             type: TokenType.Comment,
             comment: comment,
@@ -300,39 +300,39 @@ export class Lexer {
         };
     }
 
-    private scanMacroBody(data: string, allowEndInsideComment = false): Tokens.MacroBodyToken {
+    private scanMacroBody(data: string): Tokens.MacroBodyToken {
         const startCursor = this.cursor;
+        this.advanceCursor(1); // skip first '<'
         let body = "";
-        this.advanceCursor(1);
-        let remain = 1;
-        while (remain > 0 && this.cursor.dataIdx < data.length) {
-            for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
-                const pos = this.cursor.dataIdx;
-                if (data[pos] == ">") {
-                    remain--;
-                    if (remain == 0) {
-                        this.advanceCursor(1);
-                        break;
+        let level = 1;
+        let inComment = false;
+        for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
+            const c = data[this.cursor.dataIdx];
+            if (c == ">") {
+                level--;
+                if (level == 0) {
+                    this.advanceCursor(1); // skip last '>'
+                    // if the macro ends due to a ">" inside a comment, we still need to treat the comment as such
+                    if (inComment) {
+                        const str = this.nextStringLiteral(false);
+                        body += str.str;
                     }
-                } else if (data[pos] == "<") {
-                    remain++;
-                } else if (data[pos] == "/" && !allowEndInsideComment) {
-                    body += this.skipToLineBreak(data);
-                    continue;
+                    break;
                 }
-                body += data[pos];
+            } else if (c == "<") {
+                level++;
+            } else if (c == "/") {
+                inComment = true;
+            } else if (this.isLineBreak(c)) {
+                inComment = false;
             }
+            body += c;
         }
 
-        if (remain && this.cursor.dataIdx >= data.length) {
+        if (level != 0) {
             throw Lexer.mkError("Unterminated macro body", startCursor);
         }
-
-        return {
-            type: TokenType.MacroBody,
-            body: body,
-            ...this.getTokenMeasurement(startCursor),
-        };
+        return { type: TokenType.MacroBody, body, ...this.getTokenMeasurement(startCursor) };
     }
 
     private skipToLineBreak(data: string): string {
@@ -397,6 +397,7 @@ export class Lexer {
         for (let i = 0; i < step; i++) {
             if (this.cursor.dataIdx < data.length) {
                 if (data[this.cursor.dataIdx] == "\n") {
+                    newCursor.lineIdx++;
                     newCursor.colIdx = 0;
                 }
             }

@@ -99,4 +99,47 @@ describe("GIVEN a program with conditional statements", () => {
             });
         });
     });
+
+    describe("WHEN evaluating conditions with comments containing >", () => {
+        describe("WHEN IFZERO does not match and contains a comment containing '>'", () => {
+            const data = assemble(`
+                NOCHK=0
+                IFZERO 1 <I/O ERROR>
+                IFZERO NOCHK < 1 /IS K.B. FLAG SET >
+                IFZERO NOCHK < 2 >
+                3
+            `);
+            test("THEN it should assemble successfully", () => {
+                expect(data.memory[0o200]).toEqual(1);
+                expect(data.memory[0o201]).toEqual(2);
+                expect(data.memory[0o202]).toEqual(3);
+            });
+        });
+
+        describe("WHEN IFZERO does match and contains a comment containing '>', terminated", () => {
+            const data = assembleWithErrors(`
+                IFZERO 0 <
+                    CLA / A > 37
+                >
+                1
+            `);
+            test("THEN it should fail due to unmatched >", () => {
+                expect(data.errors.length).toBeGreaterThan(0);
+            });
+        });
+
+        describe("WHEN IFZERO does match and contains a comment containing '>', unterminated", () => {
+            const data = assemble(`
+                IFZERO 0 <
+                    1
+                    2 / A > 37?
+                3
+            `);
+            test("THEN it should parse the comment as such and still go on", () => {
+                expect(data.memory[0o200]).toEqual(1);
+                expect(data.memory[0o201]).toEqual(2);
+                expect(data.memory[0o202]).toEqual(3);
+            });
+        });
+    });
 });

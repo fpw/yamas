@@ -2,60 +2,79 @@ import { Lexer } from "../../lexer/Lexer";
 import * as Tokens from "../../lexer/Token";
 import { TokenType } from "../../lexer/Token";
 import { normalizeSymbolName } from "../../utils/Strings";
-import { ExprParser } from "./ExprParser";
-import { LeafParser } from "./LeafParser";
 import * as Nodes from "../Node";
 import { NodeType } from "../Node";
 import { Parser } from "../Parser";
+import { ExprParser } from "./ExprParser";
+import { LeafParser } from "./LeafParser";
 
-type KeywordHandler = (symbol: Tokens.SymbolToken) => Nodes.Statement;
+type PseudoHandler = (symbol: Tokens.SymbolToken) => Nodes.Statement;
 
 export class PseudoParser {
-    private keywordActions = new Map<string, KeywordHandler>();
+    public static readonly SupportedPseudos = [
+        "PAGE",     "FIELD",        "RELOC",
+        "IFDEF",    "IFNDEF",       "IFNZRO",   "IFZERO",   "DEFINE",
+        "TEXT",     "ZBLOCK",       "DUBL",     "FLTG",     "DEVICE",   "FILENAME",
+        "EXPUNGE",  "FIXTAB",       "FIXMRI",
+        "DECIMAL",  "OCTAL",
+        "NOPUNCH",  "ENPUNCH",
+        "EJECT",
+    ];
+    private pseudoActions = new Map<string, PseudoHandler>();
 
     public constructor(private lexer: Lexer, private leafParser: LeafParser, private exprParser: ExprParser) {
-        this.registerKeywords((keyword, action) => {
-            // make sure the table actually contains all unnormalized keywords form since
+        this.registerPseudos((pseudo, action) => {
+            // make sure the table actually contains all unnormalized pseudo forms since
             // they are visible to the outside
-            if (!Parser.SupportedKeywords.includes(keyword)) {
-                throw Error("Unsupported keyword added");
+            if (!PseudoParser.SupportedPseudos.includes(pseudo)) {
+                throw Error("Unsupported pseudo added");
             }
-            this.keywordActions.set(normalizeSymbolName(keyword), action);
+            this.pseudoActions.set(normalizeSymbolName(pseudo), action);
         });
+
+        for (const pseudo of PseudoParser.SupportedPseudos) {
+            if (!this.pseudoActions.has(normalizeSymbolName(pseudo))) {
+                throw Error(`Pseudo ${pseudo} has no handler`);
+            }
+        }
     }
 
-    private registerKeywords(mkKeyword: (keyword: string, action: KeywordHandler) => void) {
-        mkKeyword("PAGE", token => ({ type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token }));
-        mkKeyword("FIELD", token => ({ type: NodeType.ChangeField, expr: this.parseParam(token), token }));
-        mkKeyword("RELOC", token => ({ type: NodeType.Reloc, expr: this.parseOptionalParam(token), token }));
-
-        mkKeyword("FIXMRI", token => this.parseFixMri(token));
-        mkKeyword("FIXTAB", token => ({ type: NodeType.FixTab, token }));
-        mkKeyword("EXPUNGE", token => ({ type: NodeType.Expunge, token }));
-
-        mkKeyword("DEFINE", token => this.parseDefine(token));
-        mkKeyword("IFDEF", token => this.parseIfDef(token, false));
-        mkKeyword("IFNDEF", token => this.parseIfDef(token, true));
-        mkKeyword("IFZERO", token => this.parseIfZero(token, false));
-        mkKeyword("IFNZRO", token => this.parseIfZero(token, true));
-
-        mkKeyword("DECIMAL", token => ({ type: NodeType.Radix, radix: 10, token }));
-        mkKeyword("OCTAL", token => ({ type: NodeType.Radix, radix: 8, token }));
-
-        mkKeyword("ZBLOCK", token => ({ type: NodeType.ZeroBlock, expr: this.parseParam(token), token }));
-        mkKeyword("TEXT", token => ({ type: NodeType.Text, str: this.lexer.nextStringLiteral(true), token }));
-        mkKeyword("DUBL", token => this.parseDublList(token));
-        mkKeyword("FLTG", token => this.parseFltgList(token));
-        mkKeyword("DEVICE", token => ({ type: NodeType.DeviceName, name: this.leafParser.parseSymbol(), token }));
-        mkKeyword("FILENAME", token => this.parseFilename(token));
-
-        mkKeyword("EJECT", token => ({ type: NodeType.Eject, str: this.lexer.nextStringLiteral(false), token }));
-        mkKeyword("ENPUNCH", token => ({ type: NodeType.PunchControl, enable: true, token }));
-        mkKeyword("NOPUNCH", token => ({ type: NodeType.PunchControl, enable: false, token }));
+    public disablePseudo(pseudo: string) {
+        this.pseudoActions.delete(pseudo);
     }
 
-    public tryHandleKeyword(startSym: Tokens.SymbolToken): Nodes.Statement | undefined {
-        const handler = this.keywordActions.get(normalizeSymbolName(startSym.symbol));
+    private registerPseudos(mkPseudo: (pseudo: string, action: PseudoHandler) => void) {
+        mkPseudo("PAGE", token => ({ type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token }));
+        mkPseudo("FIELD", token => ({ type: NodeType.ChangeField, expr: this.parseParam(token), token }));
+        mkPseudo("RELOC", token => ({ type: NodeType.Reloc, expr: this.parseOptionalParam(token), token }));
+
+        mkPseudo("FIXMRI", token => this.parseFixMri(token));
+        mkPseudo("FIXTAB", token => ({ type: NodeType.FixTab, token }));
+        mkPseudo("EXPUNGE", token => ({ type: NodeType.Expunge, token }));
+
+        mkPseudo("DEFINE", token => this.parseDefine(token));
+        mkPseudo("IFDEF", token => this.parseIfDef(token, false));
+        mkPseudo("IFNDEF", token => this.parseIfDef(token, true));
+        mkPseudo("IFZERO", token => this.parseIfZero(token, false));
+        mkPseudo("IFNZRO", token => this.parseIfZero(token, true));
+
+        mkPseudo("DECIMAL", token => ({ type: NodeType.Radix, radix: 10, token }));
+        mkPseudo("OCTAL", token => ({ type: NodeType.Radix, radix: 8, token }));
+
+        mkPseudo("ZBLOCK", token => ({ type: NodeType.ZeroBlock, expr: this.parseParam(token), token }));
+        mkPseudo("TEXT", token => ({ type: NodeType.Text, str: this.lexer.nextStringLiteral(true), token }));
+        mkPseudo("DUBL", token => this.parseDublList(token));
+        mkPseudo("FLTG", token => this.parseFltgList(token));
+        mkPseudo("DEVICE", token => ({ type: NodeType.DeviceName, name: this.leafParser.parseSymbol(), token }));
+        mkPseudo("FILENAME", token => this.parseFilename(token));
+
+        mkPseudo("EJECT", token => ({ type: NodeType.Eject, str: this.lexer.nextStringLiteral(false), token }));
+        mkPseudo("ENPUNCH", token => ({ type: NodeType.PunchControl, enable: true, token }));
+        mkPseudo("NOPUNCH", token => ({ type: NodeType.PunchControl, enable: false, token }));
+    }
+
+    public tryHandlePseudo(startSym: Tokens.SymbolToken): Nodes.Statement | undefined {
+        const handler = this.pseudoActions.get(normalizeSymbolName(startSym.symbol));
         if (!handler) {
             return undefined;
         }

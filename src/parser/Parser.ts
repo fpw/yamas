@@ -9,15 +9,8 @@ import { NodeType } from "./Node";
 import { PseudoParser } from "./parsers/PseudoParser";
 
 export class Parser {
-    public static readonly SupportedKeywords = [
-        "PAGE",     "FIELD",        "RELOC",
-        "IFDEF",    "IFNDEF",       "IFNZRO",   "IFZERO",   "DEFINE",
-        "TEXT",     "ZBLOCK",       "DUBL",     "FLTG",     "DEVICE",   "FILENAME",
-        "EXPUNGE",  "FIXTAB",       "FIXMRI",
-        "DECIMAL",  "OCTAL",
-        "NOPUNCH",  "ENPUNCH",
-        "EJECT",
-    ];
+    public static readonly SupportedPseudos = PseudoParser.SupportedPseudos;
+    private disabledPseudos = new Set<string>();
     private inputName: string;
     private lexer: Lexer;
     private macros = new Map<string, Nodes.DefineStatement>();
@@ -31,6 +24,10 @@ export class Parser {
         this.leafParser = new LeafParser(this.lexer);
         this.exprParser = new ExprParser(this.lexer, this.leafParser);
         this.pseudoParser = new PseudoParser(this.lexer, this.leafParser, this.exprParser);
+    }
+
+    public disablePseudo(pseudo: string) {
+        this.pseudoParser.disablePseudo(pseudo);
     }
 
     public parseProgram(): Nodes.Program {
@@ -93,7 +90,7 @@ export class Parser {
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
-        const pseudo = this.pseudoParser.tryHandleKeyword(startSym);
+        const pseudo = this.pseudoParser.tryHandlePseudo(startSym);
         if (pseudo) {
             if (pseudo.type == NodeType.Define) {
                 // need to remember macro names so that we can distinguish invocations from symbol groups

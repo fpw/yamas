@@ -1,4 +1,4 @@
-import { Assembler } from "./assembler/Assembler";
+import { Assembler, AssemblerOptions } from "./assembler/Assembler";
 import { dumpNode } from "./parser/Node";
 import { PreludeFamily8 } from "./prelude/Family8";
 import { PreludeIO } from "./prelude/IO";
@@ -6,25 +6,29 @@ import { Prelude8E } from "./prelude/PDP8E";
 import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
 import { CodeError } from "./utils/CodeError";
 
-export interface Options {
-    loadPrelude?: boolean;
+export interface YamasOptions {
     outputAst?: (inputName: string, line: string) => void;
 
-    // Ideas:
-    keepLinksInFieldSwitch?: boolean; // to not delete link table when switching fields
+    loadPrelude?: boolean;
 
     // to disable given pseudos, e.g. to assemble code that uses DEFINE as symbol
-    // implementation idea: keep an array of LinKTables in Assembler
     disablePseudos?: string[];
+
+    // Ideas:
+
+    // implementation idea: keep an array of LinKTables in Assembler
+    keepLinksInFieldSwitch?: boolean; // to not delete link table when switching fields
 };
 
 export class Yamas {
-    private asm = new Assembler();
-    private opts: Options;
+    private asm: Assembler;
+    private opts: YamasOptions;
     private binTape = new BinTapeWriter();
 
-    public constructor(opts: Options) {
+    public constructor(opts: YamasOptions) {
         this.opts = opts;
+        this.asm = new Assembler(this.convertOpts(opts));
+
         this.asm.setOutputHandler({
             changeField: field => this.binTape.writeField(field),
             changeOrigin: org => this.binTape.writeOrigin(org),
@@ -49,5 +53,11 @@ export class Yamas {
         const errors = this.asm.assembleAll();
         const binary = this.binTape.finish();
         return { binary, errors };
+    }
+
+    private convertOpts(opts: YamasOptions): AssemblerOptions {
+        return {
+            disabledPseudos: opts.disablePseudos,
+        };
     }
 }

@@ -1,7 +1,7 @@
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "fs";
 import { basename } from "path";
 import { parse } from "ts-command-line-args";
-import { Options, Yamas } from "./Yamas";
+import { YamasOptions, Yamas } from "./Yamas";
 import { formatCodeError } from "./utils/CodeError";
 
 interface CliArgs {
@@ -23,7 +23,7 @@ function main() {
         helpArg: "help",
     });
 
-    const opts: Options = {};
+    const opts: YamasOptions = {};
     opts.loadPrelude = args.noPrelude ? false : true;
 
     const astFiles = new Map<string, number>();

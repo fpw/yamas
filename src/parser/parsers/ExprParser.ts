@@ -1,15 +1,33 @@
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { Lexer } from "../../lexer/Lexer";
 import * as Tokens from "../../lexer/Token";
 import { TokenType } from "../../lexer/Token";
-import { LeafParser } from "./LeafParser";
+import { CommonParser } from "./CommonParser";
 import * as Nodes from "../Node";
 import { NodeType } from "../Node";
-import { Parser } from "../Parser";
+import { Parser, ParserOptions } from "../Parser";
 
 type BinOpFragment = { elem: Nodes.Element, op?: Tokens.CharToken };
 
 export class ExprParser {
-    public constructor(private lexer: Lexer, private leafParser: LeafParser) {
+    public constructor(private opts: ParserOptions, private lexer: Lexer, private commonParser: CommonParser) {
     }
 
     /**
@@ -144,7 +162,7 @@ export class ExprParser {
      * @returns The next element of an expression and the operator behind it, if any.
      */
     private parseElementAndOperator(): BinOpFragment {
-        const firstElem = this.leafParser.parseElement();
+        const firstElem = this.commonParser.parseElement();
 
         const nextTok = this.lexer.next();
         if (!this.couldBeInExpr(nextTok)) {

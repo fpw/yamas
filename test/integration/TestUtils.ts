@@ -26,7 +26,7 @@ export function assemble(input: string): TestData {
 export function assembleWithErrors(input: string): TestData {
     const memory: number[] = [];
     const orgs: number[] = [];
-    const asm = new Assembler();
+    const asm = new Assembler({});
     let field = 0;
 
     asm.setOutputHandler({

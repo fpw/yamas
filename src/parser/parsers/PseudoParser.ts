@@ -1,12 +1,30 @@
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { Lexer } from "../../lexer/Lexer";
 import * as Tokens from "../../lexer/Token";
 import { TokenType } from "../../lexer/Token";
 import { normalizeSymbolName } from "../../utils/Strings";
 import * as Nodes from "../Node";
 import { NodeType } from "../Node";
-import { Parser } from "../Parser";
+import { Parser, ParserOptions } from "../Parser";
 import { ExprParser } from "./ExprParser";
-import { LeafParser } from "./LeafParser";
+import { CommonParser } from "./CommonParser";
 
 type PseudoHandler = (symbol: Tokens.SymbolToken) => Nodes.Statement;
 
@@ -22,8 +40,17 @@ export class PseudoParser {
     ];
     private pseudoActions = new Map<string, PseudoHandler>();
 
-    public constructor(private lexer: Lexer, private leafParser: LeafParser, private exprParser: ExprParser) {
+    public constructor(
+        private opts: ParserOptions,
+        private lexer: Lexer,
+        private commonParser: CommonParser,
+        private exprParser: ExprParser
+    ) {
         this.registerPseudos((pseudo, action) => {
+            if (this.opts.disabledPseudos?.includes(pseudo)) {
+                return;
+            }
+
             // make sure the table actually contains all unnormalized pseudo forms since
             // they are visible to the outside
             if (!PseudoParser.SupportedPseudos.includes(pseudo)) {
@@ -31,16 +58,6 @@ export class PseudoParser {
             }
             this.pseudoActions.set(normalizeSymbolName(pseudo), action);
         });
-
-        for (const pseudo of PseudoParser.SupportedPseudos) {
-            if (!this.pseudoActions.has(normalizeSymbolName(pseudo))) {
-                throw Error(`Pseudo ${pseudo} has no handler`);
-            }
-        }
-    }
-
-    public disablePseudo(pseudo: string) {
-        this.pseudoActions.delete(pseudo);
     }
 
     private registerPseudos(mkPseudo: (pseudo: string, action: PseudoHandler) => void) {
@@ -65,12 +82,16 @@ export class PseudoParser {
         mkPseudo("TEXT", token => ({ type: NodeType.Text, str: this.lexer.nextStringLiteral(true), token }));
         mkPseudo("DUBL", token => this.parseDublList(token));
         mkPseudo("FLTG", token => this.parseFltgList(token));
-        mkPseudo("DEVICE", token => ({ type: NodeType.DeviceName, name: this.leafParser.parseSymbol(), token }));
+        mkPseudo("DEVICE", token => ({ type: NodeType.DeviceName, name: this.commonParser.parseSymbol(), token }));
         mkPseudo("FILENAME", token => this.parseFilename(token));
 
         mkPseudo("EJECT", token => ({ type: NodeType.Eject, str: this.lexer.nextStringLiteral(false), token }));
         mkPseudo("ENPUNCH", token => ({ type: NodeType.PunchControl, enable: true, token }));
         mkPseudo("NOPUNCH", token => ({ type: NodeType.PunchControl, enable: false, token }));
+    }
+
+    public disablePseudo(pseudo: string) {
+        this.pseudoActions.delete(pseudo);
     }
 
     public tryHandlePseudo(startSym: Tokens.SymbolToken): Nodes.Statement | undefined {
@@ -119,22 +140,22 @@ export class PseudoParser {
     private parseIfDef(token: Tokens.SymbolToken, invert: boolean): Nodes.Statement {
         return {
             type: invert ? NodeType.IfNotDef : NodeType.IfDef,
-            symbol: this.leafParser.parseSymbol(),
+            symbol: this.commonParser.parseSymbol(),
             body: this.parseMacroBody(),
             token,
         };
     }
 
     private parseDefine(token: Tokens.SymbolToken): Nodes.DefineStatement {
-        const nameElem = this.leafParser.parseSymbol();
+        const nameElem = this.commonParser.parseSymbol();
         const name = nameElem;
         const params: Nodes.SymbolNode[] = [];
         let body: Nodes.MacroBody;
 
         while (true) {
-            const next = this.lexer.nextNonBlank();
+            const next = this.lexer.nextNonBlank(true);
             if (next.type == TokenType.Symbol) {
-                params.push(this.leafParser.parseSymbol(next));
+                params.push(this.commonParser.parseSymbol(next));
             } else if (next.type == TokenType.MacroBody) {
                 body = this.parseMacroBody(next);
                 break;
@@ -153,7 +174,7 @@ export class PseudoParser {
             if (op.type == TokenType.Char && op.char == "=") {
                 const assign: Nodes.AssignStatement = {
                     type: NodeType.Assignment,
-                    sym: this.leafParser.parseSymbol(dstSym),
+                    sym: this.commonParser.parseSymbol(dstSym),
                     val: this.exprParser.parseExpr(),
                     token: op,
                 };
@@ -173,7 +194,7 @@ export class PseudoParser {
 
     private parseMacroBody(gotTok?: Tokens.MacroBodyToken): Nodes.MacroBody {
         if (!gotTok) {
-            const next = this.lexer.nextNonBlank();
+            const next = this.lexer.nextNonBlank(true);
             if (next.type != TokenType.MacroBody) {
                 throw Error("Macro body expected");
             }
@@ -190,7 +211,7 @@ export class PseudoParser {
         const list: Nodes.DublListMember[] = [];
 
         while (true) {
-            const dubl = this.leafParser.parseDubl();
+            const dubl = this.parseDubl();
             if (dubl) {
                 list.push(dubl);
             } else {
@@ -209,7 +230,7 @@ export class PseudoParser {
         const list: Nodes.FloatListMember[] = [];
 
         while (true) {
-            const fltg = this.leafParser.parseFloat();
+            const fltg = this.parseFloat();
             if (fltg) {
                 list.push(fltg);
             } else {
@@ -222,5 +243,57 @@ export class PseudoParser {
             list: list,
             token: fltgSym,
         };
+    }
+
+    public parseDubl(): Nodes.DublListMember | undefined {
+        const next = this.lexer.nextNonBlank();
+        switch (next.type) {
+            case TokenType.Comment:
+                return this.commonParser.parseComment(next);
+            case TokenType.Separator:
+            case TokenType.EOL:
+                return this.commonParser.parseSeparator(next);
+            case TokenType.Integer:
+                return { type: NodeType.DoubleInt, token: next };
+            case TokenType.Char:
+                if (next.char == "+" || next.char == "-") {
+                    const nextInt = this.lexer.next();
+                    if (nextInt.type != TokenType.Integer) {
+                        throw Parser.mkTokError("Unexpected unary operand", nextInt);
+                    }
+                    return { type: NodeType.DoubleInt, unaryOp: next, token: nextInt };
+                } else {
+                    this.lexer.unget(next);
+                    return undefined;
+                }
+            default:
+                this.lexer.unget(next);
+                return undefined;
+        }
+    }
+
+    public parseFloat(): Nodes.FloatListMember | undefined {
+        const next = this.lexer.nextNonBlank();
+        switch (next.type) {
+            case TokenType.Comment:
+                return this.commonParser.parseComment(next);
+            case TokenType.Separator:
+            case TokenType.EOL:
+                return this.commonParser.parseSeparator(next);
+            case TokenType.Integer:
+                this.lexer.unget(next);
+                return { type: NodeType.Float, token: this.lexer.nextFloat() };
+            case TokenType.Char:
+                if (["-", "+", "."].includes(next.char) || (next.char >= "0" && next.char <= "9")) {
+                    this.lexer.unget(next);
+                    return { type: NodeType.Float, token: this.lexer.nextFloat() };
+                } else {
+                    this.lexer.unget(next);
+                    return undefined;
+                }
+            default:
+                this.lexer.unget(next);
+                return undefined;
+        }
     }
 }

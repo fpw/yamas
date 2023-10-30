@@ -1,6 +1,24 @@
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import * as Nodes from "../parser/Node";
 import { NodeType } from "../parser/Node";
-import { Parser } from "../parser/Parser";
+import { Parser, ParserOptions } from "../parser/Parser";
 import * as CharSets from "../utils/CharSets";
 import { CodeError } from "../utils/CodeError";
 import { toDECFloat } from "../utils/Floats";
@@ -16,8 +34,7 @@ export interface OutputHandler {
     writeValue(clc: number, val: number): void;
 }
 
-export interface AssemblerOptions {
-    disabledPseudos?: string[];
+export interface AssemblerOptions extends ParserOptions {
 }
 
 export class Assembler {
@@ -27,8 +44,8 @@ export class Assembler {
     private programs: Nodes.Program[] = [];
     private outputHandler?: OutputHandler;
 
-    public constructor(options?: AssemblerOptions) {
-        this.opts = options ?? {};
+    public constructor(options: AssemblerOptions) {
+        this.opts = options;
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
 
@@ -43,7 +60,7 @@ export class Assembler {
     }
 
     public parseInput(name: string, input: string): Nodes.Program {
-        const parser = this.createParser(name, input);
+        const parser = new Parser(this.opts, name, input);
         const prog = parser.parseProgram();
         this.programs.push(prog);
         return prog;
@@ -72,12 +89,6 @@ export class Assembler {
         this.outputLinks(asmCtx);
 
         return errors;
-    }
-
-    private createParser(input: string, data: string): Parser {
-        const parser = new Parser(input, data);
-        this.opts.disabledPseudos?.forEach(p => parser.disablePseudo(p));
-        return parser;
     }
 
     private createContext(generateCode: boolean): Context {
@@ -314,7 +325,7 @@ export class Assembler {
     private handleConditionBody(ctx: Context, body: Nodes.MacroBody) {
         if (!ctx.generateCode) {
             const name = body.token.cursor.inputName + `:ConditionOnLine${body.token.cursor.lineIdx + 1}`;
-            const parser = this.createParser(name, body.token.body);
+            const parser = new Parser(this.opts, name, body.token.body);
             body.parsed = parser.parseProgram();
         } else {
             if (!body.parsed) {

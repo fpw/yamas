@@ -9,11 +9,12 @@ describe("GIVEN a program with conditional statements", () => {
             IFNZRO 0 <
                 AA=1 / Comment inside
             >
-            IFDEF X <BB=2
+            IFDEF X
+            <
+                BB=2
             >
-            IFNDEF X <
-                B=2
-            >
+            IFNDEF X
+                <B=2>
             Y=2
             IFDEF Y <C=2;TAD>
             IFNDEF Y <CC=2 ; CLA>

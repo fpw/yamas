@@ -1,3 +1,21 @@
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { CodeError } from "../utils/CodeError";
 import { replaceBlanks } from "../utils/Strings";
 import { TokenType } from "./Token";
@@ -38,6 +56,10 @@ export class Lexer {
         this.substitutions.set(symbol, sub);
     }
 
+    public getInputName(): string {
+        return this.inputName;
+    }
+
     public next(): Tokens.Token {
         const data = this.getData();
         if (this.cursor.dataIdx >= data.length) {
@@ -55,10 +77,12 @@ export class Lexer {
         this.skipToLineBreak(data);
     }
 
-    public nextNonBlank(): Tokens.Token {
+    public nextNonBlank(skipLinebreaks = false): Tokens.Token {
         while (true) {
             const next = this.next();
-            if (next.type != TokenType.Blank) {
+            if (next.type == TokenType.EOL && skipLinebreaks) {
+                continue;
+            } else if (next.type != TokenType.Blank) {
                 return next;
             }
         }

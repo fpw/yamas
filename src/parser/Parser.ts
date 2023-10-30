@@ -1,46 +1,60 @@
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { Lexer } from "../lexer/Lexer";
 import * as Tokens from "../lexer/Token";
-import { TokenType } from "../lexer/Token";
 import { CodeError } from "../utils/CodeError";
-import { ExprParser } from "./parsers/ExprParser";
-import { LeafParser } from "./parsers/LeafParser";
 import * as Nodes from "./Node";
 import { NodeType } from "./Node";
 import { PseudoParser } from "./parsers/PseudoParser";
+import { StatementParser } from "./parsers/StatementParser";
+
+export interface ParserOptions {
+    disabledPseudos?: string[];
+}
 
 export class Parser {
     public static readonly SupportedPseudos = PseudoParser.SupportedPseudos;
-    private disabledPseudos = new Set<string>();
-    private inputName: string;
+    private options: ParserOptions;
     private lexer: Lexer;
-    private macros = new Map<string, Nodes.DefineStatement>();
-    private leafParser: LeafParser;
-    private exprParser: ExprParser;
-    private pseudoParser: PseudoParser;
+    private stmtParser: StatementParser;
 
-    public constructor(inputName: string, input: string) {
-        this.inputName = inputName;
+    public constructor(options: ParserOptions, inputName: string, input: string) {
+        this.options = options;
         this.lexer = new Lexer(inputName, input);
-        this.leafParser = new LeafParser(this.lexer);
-        this.exprParser = new ExprParser(this.lexer, this.leafParser);
-        this.pseudoParser = new PseudoParser(this.lexer, this.leafParser, this.exprParser);
+        this.stmtParser = new StatementParser(this.options, this.lexer);
     }
 
-    public disablePseudo(pseudo: string) {
-        this.pseudoParser.disablePseudo(pseudo);
+    public addSubstitution(symbol: string, body: string) {
+        this.lexer.addSubstitution(symbol, body);
     }
 
     public parseProgram(): Nodes.Program {
         const prog: Nodes.Program = {
             type: NodeType.Program,
-            inputName: this.inputName,
+            inputName: this.lexer.getInputName(),
             stmts: [],
             errors: [],
         };
 
         while (true) {
             try {
-                const stmt = this.parseStatement();
+                const stmt = this.stmtParser.parseStatement();
                 if (!stmt) {
                     break;
                 }
@@ -50,161 +64,13 @@ export class Parser {
                 if (e instanceof CodeError) {
                     prog.errors.push(e);
                 } else if (e instanceof Error) {
-                    prog.errors.push(new CodeError(e.message, this.inputName, 0, 0));
+                    prog.errors.push(new CodeError(e.message, this.lexer.getInputName(), 0, 0));
                 }
                 this.lexer.ignoreCurrentLine();
             }
         };
 
         return prog;
-    }
-
-    private parseStatement(): Nodes.Statement | undefined {
-        const tok = this.lexer.nextNonBlank();
-
-        switch (tok.type) {
-            case TokenType.Char:
-                switch (tok.char) {
-                    case "*":
-                        return this.parseOriginStatement(tok);
-                    case "+":
-                    case "-":
-                    case ".":
-                        return this.parseExprStatement(tok);
-                }
-                break;
-            case TokenType.ASCII:
-            case TokenType.Integer:
-                return this.parseExprStatement(tok);
-            case TokenType.Symbol:
-                return this.finishStatement(tok);
-            case TokenType.Comment:
-                return this.leafParser.parseComment(tok);
-            case TokenType.EOL:
-            case TokenType.Separator:
-                return this.leafParser.parseSeparator(tok);
-            case TokenType.EOF:
-                return undefined;
-        }
-        throw Parser.mkTokError(`Statement expected, got ${Tokens.tokenToString(tok)}`, tok);
-    }
-
-    private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
-        const pseudo = this.pseudoParser.tryHandlePseudo(startSym);
-        if (pseudo) {
-            if (pseudo.type == NodeType.Define) {
-                // need to remember macro names so that we can distinguish invocations from symbol groups
-                this.macros.set(pseudo.name.token.symbol, pseudo);
-            }
-            return pseudo;
-        } else if (this.macros.has(startSym.symbol)) {
-            this.lexer.unget(startSym);
-            return this.parseInvocation();
-        }
-
-        const next = this.lexer.next();
-        if (next.type == TokenType.Char) {
-            if (next.char == ",") {
-                return this.parseLabelDef(startSym, next);
-            } else if (next.char == "=") {
-                return this.parseAssignment(startSym, next);
-            }
-        }
-        this.lexer.unget(next);
-        return this.parseExprStatement(startSym);
-    }
-
-    private parseExprStatement(gotTok?: Tokens.Token): Nodes.ExpressionStatement {
-        if (gotTok) {
-            this.lexer.unget(gotTok);
-        }
-
-        return {
-            type: NodeType.ExpressionStmt,
-            expr: this.exprParser.parseExpr(),
-        } as Nodes.ExpressionStatement;
-    };
-
-    private parseOriginStatement(sym: Tokens.CharToken): Nodes.OriginStatement {
-        return {
-            type: NodeType.Origin,
-            token: sym,
-            val: this.exprParser.parseExpr(),
-        };
-    }
-
-    private parseLabelDef(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.LabelDef {
-        return {
-            type: NodeType.Label,
-            sym: {
-                type: NodeType.Symbol,
-                token: sym,
-            },
-            token: chr,
-        };
-    }
-
-    private parseAssignment(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.AssignStatement {
-        return {
-            type: NodeType.Assignment,
-            sym: {
-                type: NodeType.Symbol,
-                token: sym,
-            },
-            val: this.exprParser.parseExpr(),
-            token: chr,
-        };
-    }
-
-    private parseInvocation(): Nodes.Invocation {
-        const nameSym = this.leafParser.parseSymbol();
-        const macro = this.macros.get(nameSym.token.symbol);
-        if (!macro) {
-            throw Parser.mkNodeError("Not a macro", nameSym);
-        }
-
-        const args: Tokens.MacroBodyToken[] = [];
-        for (let i = 0; i < macro.params.length; i++) {
-            const arg = this.lexer.nextMacroArgument();
-            args.push(arg);
-        }
-
-        const next = this.lexer.nextNonBlank();
-        if (![TokenType.Comment, TokenType.Separator, TokenType.EOF, TokenType.EOL].includes(next.type)) {
-            throw Parser.mkTokError("Excessive argument for macro", next);
-        }
-        this.lexer.unget(next);
-
-        return {
-            type: NodeType.Invocation,
-            name: nameSym,
-            args: args,
-            program: this.createInvocationProgram(nameSym.token, macro, args),
-        };
-    }
-
-    private createInvocationProgram(
-        nameSym: Tokens.SymbolToken,
-        macro: Nodes.DefineStatement,
-        args: Tokens.MacroBodyToken[]
-    ): Nodes.Program {
-        const macroParser = new Parser(`${this.inputName}:${macro.name.token.symbol}`, macro.body.token.body);
-        for (let i = 0; i < args.length; i++) {
-            macroParser.lexer.addSubstitution(macro.params[i].token.symbol, args[i].body);
-        }
-
-        try {
-            return macroParser.parseProgram();
-        } catch (e) {
-            if (!(e instanceof CodeError)) {
-                throw e;
-            }
-            const name = macro.name.token.symbol;
-            const line = e.line;
-            const col = e.col;
-            const msg = e.message;
-            throw Parser.mkTokError(`Error invoking ${name}: "${msg}", in invocation line ${line}:${col}`, nameSym);
-        }
     }
 
     public static mkNodeError(msg: string, lastNode: Nodes.Node): CodeError {

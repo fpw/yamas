@@ -1,16 +1,22 @@
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 export const PreludeIO = `
-    / PROGRAM INTERRUPT
-    ION=6001
-    IOF=6002
-
-    / MEMORY EXTENSION
-    RDF=6214
-    RIF=6224
-    RMF=6244
-    RIB=6234
-    CDF=6201
-    CIF=6202
-
     / HIGH SPEED TAPE READER
     RSF=6011
     RRB=6012
@@ -23,7 +29,6 @@ export const PreludeIO = `
     PLS=6026
 
     / TELETYPE KEYBOARD
-    KCF=6030
     KSF=6031
     KCC=6032
     KRS=6034
@@ -31,7 +36,6 @@ export const PreludeIO = `
     KRB=6036
 
     / TELETYPE PUNCH
-    TFL=6040
     TSF=6041
     TCF=6042
     TPC=6044

@@ -6,6 +6,7 @@
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "start": "tsx src/main.ts",
+    "prepack": "tsc",
     "lint": "tsc && eslint .",
     "test": "vitest run --dir test",
     "test:watch": "vitest --dir test",

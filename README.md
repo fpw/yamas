@@ -1,6 +1,6 @@
 # Introduction
 This is Yamas – Yet Another Macro Assembler: A PAL-compatible assembler for PDP-8 computers. It also includes support
-macros in the syntax of [MACRO-8]. It is a complete clean-room implementation of a PDP-8 using web technologies so that
+macros in the syntax of [MACRO-8 (PDF manual)]. It is a complete clean-room implementation of a PDP-8 using web technologies so that
 the assembler can be integrated into web applications, apps on phones and the like. Of course it also comes with a
 a traditional shell command (through Node.js).
 
@@ -11,7 +11,8 @@ While [palbart] and [macro8x] exist, it would be hard to adapt them for usage on
 syntax highlighter requires knowledge about the abstract syntax tree (AST) of the program, something that the existing
 assemblers don't even have since they're traditional two-pass compilers that directly emit output symbols while still
 parsing the input. Yamas is built more like a compiler than an assembler: it creates an AST using a parser and a lexer
-and
+that is then passed to the actual assembler with the possibility to access the artifactes created in between. This enables
+tools like code editors to access the AST to query defined symbols, expanded macros and the like.
 
 ### Which pseudo symbols are supported?
 Currently, the following pseudos are supported:
@@ -78,7 +79,7 @@ Some programs deliberately use the origin operator to generate RIM loader sectio
 See above: The origin statements must be preserved as they appeared in the code.
 
 [palbart]: http://www.pdp8online.com/ftp/software/palbart/
-[macro8x]: http://simh.trailing-edge.com/sources/simtools/crossassemblers/macro8x.c
+[macro8x]: http://simh.trailing-edge.com/sources/simtools/crossassemblers/
 [palbart testbench]: http://www.pdp8online.com/ftp/software/palbart/testbench/
 [cmp_tape]: http://www.pdp8online.com/ftp/software/cmp_tape/
-[MACRO-8]: http://www.bitsavers.org/pdf/dec/pdp8/software/DEC-08-CMAB-D_MACRO8.pdf
+[MACRO-8 (PDF manual)]: http://www.bitsavers.org/pdf/dec/pdp8/software/DEC-08-CMAB-D_MACRO8.pdf

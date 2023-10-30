@@ -8,6 +8,7 @@
             "vitest/globals"
         ],
         "outDir": "dist",
+        "sourceMap": true,
         "declaration": true,
         "allowJs": false,
         "skipLibCheck": true,

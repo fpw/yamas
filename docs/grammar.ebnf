@@ -1,0 +1,51 @@
+Program             ::= Statement*
+
+Statement           ::= OriginStatement | LabelDef | AssignStatement | ExpressionStatement | Comment | StatementSeparator | PseudoStatement | Invocation
+OriginStatement     ::= '*' Expression
+LabelDef            ::= Symbol ','
+AssignStatement     ::= Symbol '=' Expression
+ExpressionStatement ::= Expression
+Invocation          ::= Symbol (Symbol (',' Symbol)*)?
+Comment             ::= '/' [^\n]* (EOL | EOF)
+StatementSeparator  ::= ';' | EOL
+
+Expression          ::= (SymbolGroup | ParenExpr | BinaryOp | Element) (')' | ']')?
+ParenExpr           ::= '(' Blank* Expression | '[' Blank* Expression
+SymbolGroup         ::= Symbol (Blank Expression)*
+BinaryOp            ::= (Element | BinaryOp) ('+' | '-' | '!' | '&' | '^' | '%') Element
+
+PseudoStatement     ::= OriginPseudo | SymbolTablePseudo | MacroPseudo | DataPseudo | RadixPseudo | OutputCtrlPseudo
+OriginPseudo        ::= "PAGE" Expression? |
+                        "FIELD" Expression |
+                        "RELOC" Expression?
+SymbolTablePseudo   ::= "FIXMRI" Symbol '=' Expression |
+                        "FIXTAB" |
+                        "EXPUNGE"
+RadixPseudo         ::= "DECIMAL" | "OCTAL"
+MacroPseudo         ::= "DEFINE" Symbol (Blank Symbol)* Blank* MacroBody |
+                        "IFDEF" Symbol MacroBody |
+                        "IFNDEF" Symbol MacroBody |
+                        "IFZERO" Expression MacroBody |
+                        "IFNZRO" Expression MacroBody
+DataPseudo          ::= "ZBLOCK" Expression |
+                        "TEXT" [.][*]*[.] |
+                        "DUBL" (('+' | '-')? Integer | NeutralListElement)* |
+                        "FLTG" (Float | NeutralListElement)* |
+                        "DEVICE" [.]* |
+                        "FILENAME" [.]*
+OutputCtrlPseudo    ::= "EJECT" | "ENPUNCH" | "NOPUNCH"
+
+NeutralListElement  ::= StatementSeparator | Comment
+MacroBody           ::= '<' Statement* '>'
+Float               ::= [-+]? ([0-9]+ '.' [0-9]* | [0-9]* '.' [0-9]+ | [0-9]+) ([eE][-+]? [0-9]+)?
+
+Element             ::= Blank* (UnaryOp | Integer | Symbol | ASCII | CLC)
+UnaryOp             ::= ('+' | '-') Element
+Integer             ::= [0-9]+
+Symbol              ::= [A-Z][A-Z0-9]+
+CLC                 ::= '.'
+ASCII               ::= '"' .
+
+Blank               ::= ' ' | '\t' | '\f'
+EOL                 ::= '\r' | '\n'
+EOF                 ::= '$' | [\$]

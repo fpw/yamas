@@ -16,34 +16,6 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
-/*
- *
- * Program: Statement | Statement Program
- *
- * Statement: OriginStatement | LabelDef | AssignStatement | ExpressionStatement | Comment | Text | StatementSeparator
- *  OriginStatement: *Expression
- *  LabelDef: Symbol,
- *  AssignStatement: Symbol=Expression
- *  ExpressionStatement: Expression
- *  Comment: /.*
- *  Text: TEXT ...
- *  StatementSeparator: ;|\n|EOF
- *
- * Expression: SymbolGroup | ParenExpr | BinaryOp | MacroBody | Element (but not symbol -> will be SymbolGroup)
- *  SymbolGroup: Symbol [Expression]
- *  ParenExpr: (Expression)? | [Expression]?
- *  BinaryOp: BinaryOp | Element Op Element
- *  MacroBody: <.*>
- *
- * Element: UnaryOp | Integer | Symbol | ASCII | .
- *  UnaryOp: -Element | +Element
- *  Integer: [0-9]+
- *  Symbol: [A-Z][A-Z0-9]+
- *  ASCII: ".
- *
- */
-
 import { replaceBlanks } from "../utils/Strings.js";
 import * as Tokens from "../lexer/Token.js";
 import { CodeError } from "../utils/CodeError.js";

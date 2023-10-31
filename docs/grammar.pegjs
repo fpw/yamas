@@ -1,51 +1,83 @@
-Program = Statement*
+{{ const keywords = new Set([
+        "PAGE",     "FIELD",        "RELOC",
+        "IFDEF",    "IFNDEF",       "IFNZRO",   "IFZERO",   "DEFINE",
+        "TEXT",     "ZBLOCK",       "DUBL",     "FLTG",     "DEVICE",   "FILENAME",
+        "EXPUNGE",  "FIXTAB",       "FIXMRI",
+        "DECIMAL",  "OCTAL",
+        "NOPUNCH",  "ENPUNCH",
+        "EJECT",
+]); }}
 
-Statement = Blank* (Origin / Label / Assign / PseudoStatement / ExpressionStmt / Separator / Comment / Invocation)
-Origin = "*" Expression
-Label = Symbol ","
-Assign = Symbol "=" Expression
-ExpressionStmt = Expression
-Separator = ";" / EOL
-Invocation = Symbol (Symbol ("," Symbol)*)?
-Comment = $("/" [^\n]* (EOL / EOF))
+Program             = Statement* _* (EOF .*)?
 
-Expression = (SymbolGroup / ParenExpr / BinaryOp / Element)
-ParenExpr = ("(" / "[") Blank* Expression
-SymbolGroup = Symbol (Blank Expression)*
-BinaryOp =  Element ("+" / "-" / "!" / "&" / "^" / "%") BinaryOp / Element
+Statement           = _* (
+                            Origin /
+                            Invocation /
+                            Label /
+                            Assign /
+                            PseudoStatement /
+                            ExpressionStmt /
+                            Separator /
+                            Comment /
+                            EOL
+                        ) _* EndOfExpr?
 
-PseudoStatement     = OriginPseudo / SymbolTablePseudo / MacroPseudo / DataPseudo / RadixPseudo / OutputCtrlPseudo
-OriginPseudo        = "PAGE" Expression? /
-                        "FIELD" Expression /
-                        "RELOC" Expression?
-SymbolTablePseudo   = "FIXMRI" Symbol "=" Expression /
-                        "FIXTAB" /
-                        "EXPUNGE"
+Origin              = "*" Expression
+Label               = Symbol ","
+Assign              = Symbol "=" _* Expression
+ExpressionStmt      = Expression
+Separator           = ";" / EOL
+Invocation          = Symbol (_* Symbol _* ("," _* Symbol)*)? _* & EndOfExpr
+Comment             = $("/" [^\n]* & (EOL / EOF))
+
+PseudoStatement     = OriginPseudo /
+                      SymbolTablePseudo /
+                      MacroPseudo /
+                      DataPseudo /
+                      RadixPseudo /
+                      OutputCtrlPseudo
+
+OriginPseudo        = "PAGE" (_* Param)? /
+                      "FIELD" _* Param /
+                      "RELOC" (_* Param)?
+SymbolTablePseudo   = "FIXMRI" _ Symbol "=" Param /
+                      "FIXTAB" /
+                      "EXPUNGE"
 RadixPseudo         = "DECIMAL" / "OCTAL"
-MacroPseudo         = "DEFINE" Symbol (Blank Symbol)* Blank* MacroBody /
-                        "IFDEF" Symbol MacroBody /
-                        "IFNDEF" Symbol MacroBody /
-                        "IFZERO" Expression MacroBody /
-                        "IFNZRO" Expression MacroBody
-DataPseudo          = "ZBLOCK" Expression /
-                        "TEXT" [.][*]*[.] /
-                        "DUBL" (("+" / "-")? Integer / NeutralListElement)* /
-                        "FLTG" (Float / NeutralListElement)* /
-                        "DEVICE" [.]* /
-                        "FILENAME" [.]*
-OutputCtrlPseudo    = "EJECT" / "ENPUNCH" / "NOPUNCH"
+MacroPseudo         = "DEFINE" _ Symbol (_ Symbol)* _* MacroBody /
+                      "IFDEF" _ Symbol _* MacroBody /
+                      "IFNDEF" _ Symbol _* MacroBody /
+                      "IFZERO" _ Param _* MacroBody /
+                      "IFNZRO" _ Param _* MacroBody
+DataPseudo          = "ZBLOCK" _ Param /
+                      "TEXT" _ [^\n]* & EndOfExpr /
+                      "DUBL" _ (("+" / "-")? Integer / NeutralListElement)* /
+                      "FLTG" _ (Float / NeutralListElement)* /
+                      "DEVICE" _ [.]* /
+                      "FILENAME" _ [.]*
+OutputCtrlPseudo    = "ENPUNCH" /
+                      "NOPUNCH" /
+                      "EJECT" (_ [^\n]*)?
+Param               = BinaryOp / Element
+
+Expression          = (BinaryOp / SymbolGroup / ParenExpr / Element)
+ParenExpr           = ("(" / "[") _* Expression (_? ")" / "]")?
+SymbolGroup         = Symbol (_ Expression)*
+BinaryOp            = ElementAndOp+ Element
+ElementAndOp        = Element ("+" / "-" / "!" / "&" / "^" / "%")
+EndOfExpr           = Separator / Comment / EOF / MacroBody
 
 NeutralListElement  = Separator / Comment
-MacroBody = Blank* ("<" [^>]* ">")
-Float = [-+]? ([0-9]+ "." [0-9]* / [0-9]* "." [0-9]+ / [0-9]+) ([eE][-+]? [0-9]+)?
+MacroBody           = ("<" [^>]* ">")
+Float               = [-+]? ([0-9]+ "." [0-9]* / [0-9]* "." [0-9]+ / [0-9]+) ([eE][-+]? [0-9]+)?
 
-Element = Blank* (UnaryOp / Integer / Symbol / ASCII / CLC)
-UnaryOp = [+-] Element
-Integer = [0-9]+ { return `Integer(${text()})`; }
-Symbol = sym:([A-Z][A-Z0-9]*) { return `Symbol(${text()})`; }
-CLC = "."
-ASCII= "\"".
+Element             = UnaryOp / Integer / Symbol / ASCII / CLC
+UnaryOp             = [+-] Element
+Integer             = [0-9]+
+Symbol              = sym:$([A-Z][A-Z0-9]*) &{return !keywords.has(sym)} {return `Symbol(${sym})`; }
+CLC                 = "."
+ASCII               = "\"".
 
-Blank = " " / "\t" / "\f"
-EOL = "\r" / "\n"
-EOF = "$"
+_                   = $(" " / "\t" / "\f")
+EOL                 = "\r" / "\n"
+EOF                 = "$"

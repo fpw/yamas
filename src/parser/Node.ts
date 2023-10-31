@@ -44,9 +44,9 @@
  *
  */
 
-import { replaceBlanks } from "../utils/Strings";
-import * as Tokens from "../lexer/Token";
-import { CodeError } from "../utils/CodeError";
+import { replaceBlanks } from "../utils/Strings.js";
+import * as Tokens from "../lexer/Token.js";
+import { CodeError } from "../utils/CodeError.js";
 
 export enum NodeType {
     // Program

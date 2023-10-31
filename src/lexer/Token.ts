@@ -16,8 +16,8 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { replaceBlanks } from "../utils/Strings";
-import { Cursor } from "./Lexer";
+import { replaceBlanks } from "../utils/Strings.js";
+import { Cursor } from "./Lexer.js";
 
 export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";
 export type ParenChr =  "(" | ")" | "[" | "]";

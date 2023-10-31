@@ -1,4 +1,4 @@
-import { assemble } from "./TestUtils";
+import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a program with origin statements", () => {
     describe("WHEN evaluating the origin statement", () => {

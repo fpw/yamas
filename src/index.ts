@@ -16,12 +16,12 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export * from "./Yamas";
-export * from "./lexer/Lexer";
-export * from "./lexer/Token";
-export * from "./parser/Node";
-export * from "./parser/Parser";
-export * from "./assembler/Assembler";
-export * from "./tapeformats/BinTapeReader";
-export * from "./tapeformats/BinTapeWriter";
-export * from "./utils/CodeError";
+export * from "./Yamas.js";
+export * from "./lexer/Lexer.js";
+export * from "./lexer/Token.js";
+export * from "./parser/Node.js";
+export * from "./parser/Parser.js";
+export * from "./assembler/Assembler.js";
+export * from "./tapeformats/BinTapeReader.js";
+export * from "./tapeformats/BinTapeWriter.js";
+export * from "./utils/CodeError.js";

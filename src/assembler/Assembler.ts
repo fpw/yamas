@@ -16,17 +16,17 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as Nodes from "../parser/Node";
-import { NodeType } from "../parser/Node";
-import { Parser, ParserOptions } from "../parser/Parser";
-import * as CharSets from "../utils/CharSets";
-import { CodeError } from "../utils/CodeError";
-import { toDECFloat } from "../utils/Floats";
-import * as PDP8 from "../utils/PDP8";
-import { parseIntSafe } from "../utils/Strings";
-import { Context } from "./Context";
-import { LinkTable } from "./LinkTable";
-import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable";
+import * as Nodes from "../parser/Node.js";
+import { NodeType } from "../parser/Node.js";
+import { Parser, ParserOptions } from "../parser/Parser.js";
+import * as CharSets from "../utils/CharSets.js";
+import { CodeError } from "../utils/CodeError.js";
+import { toDECFloat } from "../utils/Floats.js";
+import * as PDP8 from "../utils/PDP8.js";
+import { parseIntSafe } from "../utils/Strings.js";
+import { Context } from "./Context.js";
+import { LinkTable } from "./LinkTable.js";
+import { SymbolData, SymbolTable, SymbolType } from "./SymbolTable.js";
 
 export interface OutputHandler {
     changeOrigin(clc: number): void;

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /*
  *   Yamas - Yet Another Macro Assembler (for the PDP-8)
  *   Copyright (C) 2023 Folke Will <folko@solhost.org>
@@ -16,48 +17,11 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { command, positional, run } from "cmd-ts";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import path, { basename } from "path";
-import { parse } from "ts-command-line-args";
-import { Yamas, YamasOptions } from "./Yamas";
-import { BinTapeReader } from "./tapeformats/BinTapeReader";
-import { MemSize } from "./utils/PDP8";
-import { numToOctal } from "./utils/Strings";
-
-interface CliArgs {
-    help?: boolean;
-    dir: string;
-}
-
-function main() {
-    const args = parse<CliArgs>({
-        help: { type: Boolean, optional: true, description: "Show usage help" },
-        dir: { type: String, defaultOption: true, description: "Input directory" },
-    },
-    {
-        helpArg: "help",
-    });
-
-    for (const fileName of readdirSync(args.dir)) {
-        if (!fileName.match(/\.(pa|pal)$/)) {
-            continue;
-        }
-        const filePath = args.dir + "/" + fileName;
-        const bnPath = path.format({ ...path.parse(filePath), base: "", ext: ".bn" });
-        if (!existsSync(bnPath)) {
-            continue;
-        }
-
-        const optsPath = path.format({ ...path.parse(filePath), base: "", ext: ".options.json" });
-        let rawOpts: object | undefined;
-        if (existsSync(optsPath)) {
-            rawOpts = JSON.parse(readFileSync(optsPath, "utf-8")) as object;
-        }
-        const opts = createOptions(rawOpts);
-        const res = testOne(opts, filePath, bnPath);
-        console.log(`Checked ${basename(filePath)}: ${res ? "good" : "bad"}`);
-    }
-}
+import { Yamas, YamasOptions } from "./Yamas.js";
+import { compareBin } from "./tapeformats/compareBin.js";
 
 function createOptions(json?: object): YamasOptions {
     const opts: YamasOptions = {
@@ -94,22 +58,35 @@ function testOne(opts: YamasOptions, srcPath: string, bnPath: string): boolean {
     }
 }
 
-function compareBin(name: string, ours: Uint8Array, other: Uint8Array): boolean {
-    const ourState = new BinTapeReader(ours).read();
-    const otherState = new BinTapeReader(other).read();
-    let good = true;
+const cmd = command({
+    name: "yamas-tb",
+    description: "Yamas Testbench",
+    args: {
+        dir: positional({
+            displayName: "Input directory with .pa(l) and .bn files",
+        }),
+    },
+    handler: (args) => {
+        for (const fileName of readdirSync(args.dir)) {
+            if (!fileName.match(/\.(pa|pal)$/)) {
+                continue;
+            }
+            const filePath = args.dir + "/" + fileName;
+            const bnPath = path.format({ ...path.parse(filePath), base: "", ext: ".bn" });
+            if (!existsSync(bnPath)) {
+                continue;
+            }
 
-    for (let i = 0; i < MemSize; i++) {
-        if (ourState[i] !== otherState[i]) {
-            good = false;
-            const addrStr = numToOctal(i, 5);
-            const ourStr = ourState[i] !== undefined ? numToOctal(ourState[i]!, 4) : "null";
-            const otherStr = otherState[i] !== undefined ? numToOctal(otherState[i]!, 4) : "null";
-            console.log(`${name}: ${addrStr}: our ${ourStr} != other ${otherStr}`);
+            const optsPath = path.format({ ...path.parse(filePath), base: "", ext: ".options.json" });
+            let rawOpts: object | undefined;
+            if (existsSync(optsPath)) {
+                rawOpts = JSON.parse(readFileSync(optsPath, "utf-8")) as object;
+            }
+            const opts = createOptions(rawOpts);
+            const res = testOne(opts, filePath, bnPath);
+            console.log(`Checked ${basename(filePath)}: ${res ? "good" : "bad"}`);
         }
     }
+});
 
-    return good;
-}
-
-main();
+void run(cmd, process.argv.slice(2));

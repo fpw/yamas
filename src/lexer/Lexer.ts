@@ -16,10 +16,10 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { CodeError } from "../utils/CodeError";
-import { replaceBlanks } from "../utils/Strings";
-import { TokenType } from "./Token";
-import * as Tokens from "./Token";
+import { CodeError } from "../utils/CodeError.js";
+import { replaceBlanks } from "../utils/Strings.js";
+import { TokenType } from "./Token.js";
+import * as Tokens from "./Token.js";
 
 export interface Cursor {
     inputName: string;

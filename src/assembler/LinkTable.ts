@@ -16,8 +16,8 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as PDP8 from "../utils/PDP8";
-import { Context } from "./Context";
+import * as PDP8 from "../utils/PDP8.js";
+import { Context } from "./Context.js";
 
 export class LinkTable {
     // [page][index]

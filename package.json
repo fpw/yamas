@@ -1,11 +1,12 @@
 {
   "name": "yamas",
   "description": "Yet Another Macro Assembler: A PDP-8 assembler.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": "Folke Will <folko@solhost.org>",
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "start": "tsx src/main.ts",
+    "build": "tsc",
     "prepack": "tsc",
     "lint": "tsc && eslint .",
     "test": "vitest run --dir test",
@@ -13,12 +14,14 @@
     "test:coverage": "vitest run --coverage",
     "testbench": "tsx src/testbench.ts"
   },
+  "type": "module",
   "main": "dist/src/index.js",
   "bin": {
-    "yamas": "dist/src/main.js"
+    "yamas": "dist/src/main.js",
+    "yamas-tb": "dist/src/testbench.js"
   },
   "dependencies": {
-    "ts-command-line-args": "^2.5.1"
+    "cmd-ts": "^0.13.0"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "^0.1.2",

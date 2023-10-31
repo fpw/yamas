@@ -1,6 +1,6 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../../src/assembler/Assembler";
-import { assemble, assembleWithErrors } from "./TestUtils";
+import { Assembler } from "../../src/assembler/Assembler.js";
+import { assemble, assembleWithErrors } from "./TestUtils.js";
 
 describe("GIVEN a program containing statements", () => {
     describe("WHEN evaluating expression statements", () => {

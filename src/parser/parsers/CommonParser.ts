@@ -16,12 +16,12 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Lexer } from "../../lexer/Lexer";
-import * as Tokens from "../../lexer/Token";
-import { TokenType } from "../../lexer/Token";
-import * as Nodes from "../Node";
-import { NodeType } from "../Node";
-import { Parser, ParserOptions } from "../Parser";
+import { Lexer } from "../../lexer/Lexer.js";
+import * as Tokens from "../../lexer/Token.js";
+import { TokenType } from "../../lexer/Token.js";
+import * as Nodes from "../Node.js";
+import { NodeType } from "../Node.js";
+import { Parser, ParserOptions } from "../Parser.js";
 
 export class CommonParser {
     public constructor(private opts: ParserOptions, private lexer: Lexer) {

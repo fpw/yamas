@@ -16,13 +16,13 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Assembler, AssemblerOptions } from "./assembler/Assembler";
-import { Program } from "./parser/Node";
-import { PreludeFamily8 } from "./prelude/Family8";
-import { PreludeIO } from "./prelude/IO";
-import { Prelude8E } from "./prelude/PDP8E";
-import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
-import { CodeError } from "./utils/CodeError";
+import { Assembler, AssemblerOptions } from "./assembler/Assembler.js";
+import { Program } from "./parser/Node.js";
+import { PreludeFamily8 } from "./prelude/Family8.js";
+import { PreludeIO } from "./prelude/IO.js";
+import { Prelude8E } from "./prelude/PDP8E.js";
+import { BinTapeWriter } from "./tapeformats/BinTapeWriter.js";
+import { CodeError } from "./utils/CodeError.js";
 
 export interface YamasOptions {
     loadPrelude?: boolean;

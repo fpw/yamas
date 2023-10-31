@@ -16,7 +16,7 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { normalizeSymbolName } from "../utils/Strings";
+import { normalizeSymbolName } from "../utils/Strings.js";
 
 export enum SymbolType {
     Param,      // A=x

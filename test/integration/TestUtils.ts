@@ -1,10 +1,10 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../../src/assembler/Assembler";
-import { Program } from "../../src/parser/Node";
-import { PreludeFamily8 } from "../../src/prelude/Family8";
-import { PreludeIO } from "../../src/prelude/IO";
-import { Prelude8E } from "../../src/prelude/PDP8E";
-import { CodeError } from "../../src/utils/CodeError";
+import { Assembler } from "../../src/assembler/Assembler.js";
+import { Program } from "../../src/parser/Node.js";
+import { PreludeFamily8 } from "../../src/prelude/Family8.js";
+import { PreludeIO } from "../../src/prelude/IO.js";
+import { Prelude8E } from "../../src/prelude/PDP8E.js";
+import { CodeError } from "../../src/utils/CodeError.js";
 
 export interface TestData {
     asm: Assembler;

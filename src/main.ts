@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /*
  *   Yamas - Yet Another Macro Assembler (for the PDP-8)
  *   Copyright (C) 2023 Folke Will <folko@solhost.org>
@@ -16,52 +17,74 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "fs";
+import { command, flag, option, optional, positional, run, string } from "cmd-ts";
+import { closeSync, openSync, readFileSync, writeFileSync } from "fs";
 import { basename } from "path";
-import { parse } from "ts-command-line-args";
-import { YamasOptions, Yamas } from "./Yamas";
-import { formatCodeError } from "./utils/CodeError";
-import { dumpNode } from "./parser/Node";
+import { Yamas, YamasOptions } from "./Yamas.js";
+import { dumpNode } from "./parser/Node.js";
+import { formatCodeError } from "./utils/CodeError.js";
+import { compareBin } from "./tapeformats/compareBin.js";
 
-interface CliArgs {
-    help?: boolean;
-    files: string[];
-    noPrelude?: boolean;
-    compare?: string;
-    outputAst?: boolean;
-}
+// eslint-disable-next-line max-lines-per-function
+const cmd = command({
+    name: "yamas",
+    description: "Yet Another Macro Assembler (for PDP-8)",
+    args: {
+        noPrelude: flag({
+            long: "no-prelude",
+            description: "Do not set default symbols"
+        }),
+        outputAst: flag({
+            long: "write-ast",
+            short: "a",
+            description: "Write abstract syntax tree"
+        }),
+        compareWith: option({
+            long: "compare",
+            short: "c",
+            description: "Compare output with given bin file",
+            type: optional(string),
+        }),
+        filesStr: positional({
+            displayName: "Input files",
+            description: "Input source files",
+        }),
+    },
+    handler: (args) => {
+        const opts: YamasOptions = {};
+        opts.loadPrelude = !args.noPrelude;
 
-function main() {
-    const args = parse<CliArgs>({
-        help: { type: Boolean, optional: true, description: "Show usage help" },
-        noPrelude: { type: Boolean, optional: true, defaultValue: false, description: "Do not define common symbols" },
-        files: { type: String, multiple: true, defaultOption: true, description: "Input files" },
-        compare: { type: String, optional: true, alias: "c", description: "Compare output with a given bin file" },
-        outputAst: { type: Boolean, optional: true, alias: "a", description: "Write abstract syntrax tree" },
-    }, {
-        helpArg: "help",
-    });
+        const files = args.filesStr.split(" ");
 
-    const opts: YamasOptions = {};
-    opts.loadPrelude = args.noPrelude ? false : true;
+        const yamas = new Yamas(opts);
+        for (const file of files) {
+            const src = readFileSync(file, "ascii");
+            const ast = yamas.addInput(file, src);
+            if (args.outputAst) {
+                const astFile = openSync(basename(file) + ".ast.txt", "w");
+                dumpNode(ast, line => writeFileSync(astFile, line + "\n"));
+                closeSync(astFile);
+            }
+        }
 
-    const yamas = new Yamas(opts);
-    for (const file of args.files) {
-        const src = readFileSync(file, "ascii");
-        const ast = yamas.addInput(file, src);
-        if (args.outputAst) {
-            const astFile = openSync(basename(file) + ".ast.txt", "w");
-            dumpNode(ast, line => writeFileSync(astFile, line + "\n"));
-            closeSync(astFile);
+        const output = yamas.run();
+        output.errors.forEach(e => console.error(formatCodeError(e)));
+        if (output.errors.length == 0) {
+            const lastName = files[files.length - 1];
+            writeFileSync(basename(lastName) + ".bin", output.binary);
+            console.log(`Wrote ${output.binary.length} bytes`);
+        }
+
+        if (args.compareWith) {
+            const otherBin = readFileSync(args.compareWith);
+            const name = basename(args.compareWith);
+            if (compareBin(name, output.binary, otherBin)) {
+                console.log("No differences");
+            } else {
+                process.exit(-1);
+            }
         }
     }
+});
 
-    const output = yamas.run();
-    output.errors.forEach(e => console.error(formatCodeError(e)));
-    if (output.errors.length == 0) {
-        const lastName = args.files[args.files.length - 1];
-        writeFileSync(basename(lastName) + ".bin", output.binary);
-    }
-}
-
-main();
+void run(cmd, process.argv.slice(2));

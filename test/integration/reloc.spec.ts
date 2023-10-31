@@ -1,6 +1,6 @@
 /* eslint-disable max-lines-per-function */
-import { dumpNode } from "../../src/parser/Node";
-import { assemble, assembleWithErrors } from "./TestUtils";
+import { dumpNode } from "../../src/parser/Node.js";
+import { assemble, assembleWithErrors } from "./TestUtils.js";
 
 describe("GIVEN a program containing reloc statements", () => {
     describe("WHEN assembling an example program with a RELOC", () => {

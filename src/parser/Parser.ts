@@ -16,13 +16,13 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Lexer } from "../lexer/Lexer";
-import * as Tokens from "../lexer/Token";
-import { CodeError } from "../utils/CodeError";
-import * as Nodes from "./Node";
-import { NodeType } from "./Node";
-import { PseudoParser } from "./parsers/PseudoParser";
-import { StatementParser } from "./parsers/StatementParser";
+import { Lexer } from "../lexer/Lexer.js";
+import * as Tokens from "../lexer/Token.js";
+import { CodeError } from "../utils/CodeError.js";
+import * as Nodes from "./Node.js";
+import { NodeType } from "./Node.js";
+import { PseudoParser } from "./parsers/PseudoParser.js";
+import { StatementParser } from "./parsers/StatementParser.js";
 
 export interface ParserOptions {
     disabledPseudos?: string[];

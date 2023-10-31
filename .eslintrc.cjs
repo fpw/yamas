@@ -46,7 +46,7 @@ module.exports = {
         "eqeqeq": "off",
     },
     "ignorePatterns": [
-        ".eslintrc.js",
+        ".eslintrc.cjs",
         "public/",
         "coverage/",
         "dist/",

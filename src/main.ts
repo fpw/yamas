@@ -21,6 +21,7 @@ import { basename } from "path";
 import { parse } from "ts-command-line-args";
 import { YamasOptions, Yamas } from "./Yamas";
 import { formatCodeError } from "./utils/CodeError";
+import { dumpNode } from "./parser/Node";
 
 interface CliArgs {
     help?: boolean;
@@ -44,25 +45,23 @@ function main() {
     const opts: YamasOptions = {};
     opts.loadPrelude = args.noPrelude ? false : true;
 
-    const astFiles = new Map<string, number>();
-    if (args.outputAst) {
-        args.files.forEach(f => astFiles.set(f, openSync(basename(f) + ".ast.txt", "w")));
-        opts.outputAst = (file, line) => writeSync(astFiles.get(file)!, line + "\n");
-    }
-
     const yamas = new Yamas(opts);
     for (const file of args.files) {
         const src = readFileSync(file, "ascii");
-        yamas.addInput(file, src);
+        const ast = yamas.addInput(file, src);
+        if (args.outputAst) {
+            const astFile = openSync(basename(file) + ".ast.txt", "w");
+            dumpNode(ast, line => writeFileSync(astFile, line + "\n"));
+            closeSync(astFile);
+        }
     }
 
     const output = yamas.run();
     output.errors.forEach(e => console.error(formatCodeError(e)));
     if (output.errors.length == 0) {
-        writeFileSync("out.bin", output.binary);
+        const lastName = args.files[args.files.length - 1];
+        writeFileSync(basename(lastName) + ".bin", output.binary);
     }
-
-    astFiles.forEach(fd => closeSync(fd));
 }
 
 main();

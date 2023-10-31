@@ -17,6 +17,11 @@
  */
 
 export * from "./Yamas";
+export * from "./lexer/Lexer";
+export * from "./lexer/Token";
+export * from "./parser/Node";
+export * from "./parser/Parser";
 export * from "./assembler/Assembler";
 export * from "./tapeformats/BinTapeReader";
 export * from "./tapeformats/BinTapeWriter";
+export * from "./utils/CodeError";

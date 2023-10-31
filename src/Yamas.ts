@@ -17,7 +17,7 @@
  */
 
 import { Assembler, AssemblerOptions } from "./assembler/Assembler";
-import { dumpNode } from "./parser/Node";
+import { Program } from "./parser/Node";
 import { PreludeFamily8 } from "./prelude/Family8";
 import { PreludeIO } from "./prelude/IO";
 import { Prelude8E } from "./prelude/PDP8E";
@@ -25,8 +25,6 @@ import { BinTapeWriter } from "./tapeformats/BinTapeWriter";
 import { CodeError } from "./utils/CodeError";
 
 export interface YamasOptions {
-    outputAst?: (inputName: string, line: string) => void;
-
     loadPrelude?: boolean;
 
     // to disable given pseudos, e.g. to assemble code that uses DEFINE as symbol
@@ -37,6 +35,11 @@ export interface YamasOptions {
     // implementation idea: keep an array of LinKTables in Assembler
     keepLinksInFieldSwitch?: boolean; // to not delete link table when switching fields
 };
+
+export interface YamasOutput {
+    binary: Uint8Array;
+    errors: CodeError[];
+}
 
 export class Yamas {
     private asm: Assembler;
@@ -53,29 +56,26 @@ export class Yamas {
             writeValue: (_clc, val) => this.binTape.writeDataWord(val, true),
         });
 
-        if (opts.loadPrelude) {
+        if (this.opts.loadPrelude) {
             this.asm.parseInput("prelude/family8.pa", PreludeFamily8);
             this.asm.parseInput("prelude/iot.pa", PreludeIO);
             this.asm.parseInput("prelude/pdp8e.pa", Prelude8E);
         }
     }
 
-    public addInput(name: string, content: string) {
-        const ast = this.asm.parseInput(name, content);
-        if (this.opts.outputAst) {
-            dumpNode(ast, line => this.opts.outputAst!(name, line));
-        }
-    }
-
-    public run(): { binary: Uint8Array, errors: CodeError[] } {
-        const errors = this.asm.assembleAll();
-        const binary = this.binTape.finish();
-        return { binary, errors };
-    }
-
     private convertOpts(opts: YamasOptions): AssemblerOptions {
         return {
             disabledPseudos: opts.disablePseudos,
         };
+    }
+
+    public addInput(name: string, content: string): Program {
+        return this.asm.parseInput(name, content);
+    }
+
+    public run(): YamasOutput {
+        const errors = this.asm.assembleAll();
+        const binary = this.binTape.finish();
+        return { binary, errors };
     }
 }

@@ -1,7 +1,7 @@
 {
   "name": "yamas",
   "description": "Yet Another Macro Assembler: A PDP-8 assembler.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": "Folke Will <folko@solhost.org>",
   "license": "AGPL-3.0-or-later",
   "scripts": {
@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "testbench": "tsx src/testbench.ts"
   },
+  "main": "dist/src/index.js",
   "bin": {
     "yamas": "dist/src/main.js"
   },

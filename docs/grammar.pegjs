@@ -29,9 +29,9 @@ Origin                  = "*" Expression
 Label                   = Symbol ","
 Assign                  = Symbol "=" _* Expression
 ExpressionStmt          = Expression
-Separator               = ";" / EOL
-Invocation              = sym:Symbol &{return macros.has(sym);} (_* [^,\n/]+ ("," _* [^,\n/]+)*)? _* & EndOfExpr
-Comment                 = $("/" [^\n]* & (EOL / EOF))
+Separator               = ";"
+Invocation              = sym:Symbol &{return macros.has(sym);} (_* [^,\n/]+ ("," _* [^,\n/]+)*)? _* 
+Comment                 = $("/" [^\n]*) EOL?
 
 PseudoStatement         = OriginPseudo /
                           SymbolTablePseudo /
@@ -63,7 +63,7 @@ IfNZro                  = "IFNZRO" _ Param _* MacroBody
 
 DataPseudo              = ZBlock / Text / Dubl / Fltg / Device / FileName
 ZBlock                  = "ZBLOCK" _ Param
-Text                    = "TEXT" _ [^\n]* & EndOfExpr
+Text                    = "TEXT" _ l:. (c:. &{return c != l;})* r:.
 Dubl                    = "DUBL" _ (("+" / "-")? Integer / NeutralListElement)*
 Fltg                    = "FLTG" _ (Float / NeutralListElement)*
 Device                  = "DEVICE" _ [^\n/]+

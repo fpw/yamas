@@ -11,9 +11,7 @@
     const macros = new Set();
 %}
 
-S -> Program
-
-Program         -> Statement:* (_ | EOL):* (EOF .:*):?
+Program         -> Statement:* _:* (EOF .:*):?
 
 Statement       -> _:* (
                             Origin |
@@ -23,16 +21,17 @@ Statement       -> _:* (
                             PseudoStatement |
                             ExpressionStmt |
                             Separator |
-                            Comment 
-                        ) EndOfExpr
+                            Comment | 
+                            EOL
+                        ) (_|EOL) EndOfExpr:?
 
-Origin          -> "*" Param
+Origin          -> "*" Expression
 Label           -> Symbol ","
 Assign          -> Symbol "=" _:* Expression
 ExpressionStmt  -> Expression
 Separator       -> ";"
 Invocation      -> Symbol (_:* [^,\n/]:+ ("," _:* [^,\n/]:+):*):? _:* {% (d, l, reject) => !macros.has(d[0]) ? reject : d %}
-Comment         -> ("/" [^\n]:*)
+Comment         -> ("/" [^\n]:*) EOL:?
 
 Param           -> BinaryOp | Element
 
@@ -78,7 +77,6 @@ Fltg            -> "FLTG" _ (Float | NeutralListElement):*
 Device          -> "DEVICE" _ [^\n/]:+
 FileName        -> "FILENAME" _ [^\n/]:+
 
-
 OutputCtrlPseudo -> EnPunch | NoPunch | Eject
 EnPunch         -> "ENPUNCH"
 NoPunch         -> "NOPUNCH"
@@ -87,10 +85,10 @@ Eject           -> "EJECT" (_ [^\n]:*):?
 Element         -> UnaryOp:? (Integer | Symbol | ASCII | CLC)
 UnaryOp         -> [-+]
 Integer         -> [0-9]:+
-Symbol          -> ([A-Z] [A-Z0-9]:*) {% (d, l, reject) => keywords.has(d[0].flat().join("")) ? reject : d[0].flat().join("") %}
+Symbol          -> ([A-Z] [A-Z0-9]:*)    {% (d, l, reject) => keywords.has(d[0].flat().join("")) ? reject : d[0].flat().join("") %}
 CLC             -> "."
 ASCII           -> "\"" .
 
 _               -> " " | "\t"
-EOL             -> "\n" | "\r" | "\r\n"
+EOL             -> "\n" | "\r"
 EOF             -> "$"

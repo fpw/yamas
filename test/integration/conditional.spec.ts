@@ -88,6 +88,17 @@ describe("GIVEN a program with conditional statements", () => {
         });
     });
 
+    describe("WHEN a condition body closes with stray characters", () => {
+        const data = assembleWithErrors(`
+            IFNZRO A <
+                B=2
+            > 1
+        `);
+        test("THEN it should generate an error", () => {
+            expect(data.errors.length).toBeGreaterThan(0);
+        });
+    });
+
     describe("WHEN evaluating undefined symbols that evaluate the same in pass 1 and 2", () => {
         describe("WHEN IFNZRO runs in pass 1 and in pass 2", () => {
             const data = assemble(`
@@ -117,7 +128,7 @@ describe("GIVEN a program with conditional statements", () => {
             });
         });
 
-        describe("WHEN IFZERO does match and contains a comment containing '>', terminated", () => {
+        describe("WHEN IFZERO does match and contains a comment containing '>', terminated with no stray chars", () => {
             const data = assembleWithErrors(`
                 IFZERO 0 <
                     CLA / A > 37

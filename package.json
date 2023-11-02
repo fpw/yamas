@@ -5,31 +5,35 @@
   "author": "Folke Will <folko@solhost.org>",
   "license": "AGPL-3.0-or-later",
   "scripts": {
-    "start": "tsx src/main.ts",
+    "start": "tsx scripts/yamas.ts",
+    "testbench": "tsx scripts/testbench.ts",
+    "grammar-testbench": "tsx scripts/grammar-testbench.ts",
+    "generate-diagrams": "tsx scripts/generate-diagrams.ts",
     "build": "tsc",
     "prepack": "tsc",
     "lint": "tsc && eslint .",
     "test": "vitest run --dir test",
     "test:watch": "vitest --dir test",
-    "test:coverage": "vitest run --coverage",
-    "testbench": "tsx src/testbench.ts"
+    "test:coverage": "vitest run --coverage"
   },
   "type": "module",
   "main": "dist/src/index.js",
   "bin": {
-    "yamas": "dist/src/main.js",
-    "yamas-tb": "dist/src/testbench.js"
+    "yamas": "dist/scripts/yamas.js",
+    "yamas-tb": "dist/scripts/testbench.js"
   },
   "dependencies": {
     "cmd-ts": "^0.13.0"
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "^0.1.2",
-    "@types/node": "^20.8.9",
+    "@stylistic/eslint-plugin": "^1.0.0",
+    "@types/node": "^20.8.10",
     "@typescript-eslint/eslint-plugin": "^6.9.1",
     "@typescript-eslint/parser": "^6.9.1",
     "@vitest/coverage-v8": "^0.34.6",
     "eslint": "^8.52.0",
+    "peggy": "^3.0.2",
+    "peggy-tracks": "^1.1.0",
     "tsx": "^3.14.0",
     "typescript": "^5.2.2",
     "vitest": "^0.34.6"

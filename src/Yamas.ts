@@ -28,7 +28,7 @@ export interface YamasOptions {
     loadPrelude?: boolean;
 
     // to disable given pseudos, e.g. to assemble code that uses DEFINE as symbol
-    disablePseudos?: string[];
+    disabledPseudos?: string[];
 
     // Ideas:
 
@@ -65,7 +65,7 @@ export class Yamas {
 
     private convertOpts(opts: YamasOptions): AssemblerOptions {
         return {
-            disabledPseudos: opts.disablePseudos,
+            disabledPseudos: opts.disabledPseudos,
         };
     }
 

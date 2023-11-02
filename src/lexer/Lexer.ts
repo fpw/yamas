@@ -106,11 +106,9 @@ export class Lexer {
             if (data[i] === delims[0]) {
                 delims[1] = data[i];
                 break;
-            } else if (data[i] == "/" && !delim) {
+            } else if ((!delim && (data[i] == "/" || data[i] == ";")) || this.isLineBreak(data[i])) {
                 str = str.trim();
                 this.cursor.dataIdx--;
-                break;
-            } else if (this.isLineBreak(data[i])) {
                 break;
             }
             str += data[i];

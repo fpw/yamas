@@ -20,50 +20,16 @@
 import { command, positional, run } from "cmd-ts";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import path, { basename } from "path";
-import { Yamas, YamasOptions } from "./Yamas.js";
-import { compareBin } from "./tapeformats/compareBin.js";
-
-function createOptions(json?: object): YamasOptions {
-    const opts: YamasOptions = {
-        loadPrelude: true,
-    };
-
-    if (!json) {
-        return opts;
-    }
-
-    if ("disabledPseudos" in json) {
-        opts.disablePseudos = json.disabledPseudos as string[];
-    }
-
-    return opts;
-}
-
-function testOne(opts: YamasOptions, srcPath: string, bnPath: string): boolean {
-    const shouldBin = readFileSync(bnPath);
-    const src = readFileSync(srcPath, "ascii");
-
-    try {
-        const yamas = new Yamas(opts);
-        yamas.addInput(`${basename(srcPath)}`, src);
-        const output = yamas.run();
-        if (output.errors.length > 0) {
-            output.errors.forEach(e => console.error(e));
-            return false;
-        }
-        return compareBin(`${basename(bnPath)}`, output.binary, shouldBin);
-    } catch (e) {
-        console.error(e);
-        return false;
-    }
-}
+import { Yamas, YamasOptions } from "../src/Yamas.js";
+import { compareBin } from "../src/tapeformats/compareBin.js";
 
 const cmd = command({
     name: "yamas-tb",
     description: "Yamas Testbench",
     args: {
         dir: positional({
-            displayName: "Input directory with .pa(l) and .bn files",
+            description: "Input directory with .pa(l) and .bn files",
+            displayName: "directory",
         }),
     },
     handler: (args) => {
@@ -88,5 +54,40 @@ const cmd = command({
         }
     }
 });
+
+function createOptions(json?: object): YamasOptions {
+    const opts: YamasOptions = {
+        loadPrelude: true,
+    };
+
+    if (!json) {
+        return opts;
+    }
+
+    if ("disabledPseudos" in json) {
+        opts.disabledPseudos = json.disabledPseudos as string[];
+    }
+
+    return opts;
+}
+
+function testOne(opts: YamasOptions, srcPath: string, bnPath: string): boolean {
+    const shouldBin = readFileSync(bnPath);
+    const src = readFileSync(srcPath, "ascii");
+
+    try {
+        const yamas = new Yamas(opts);
+        yamas.addInput(`${basename(srcPath)}`, src);
+        const output = yamas.run();
+        if (output.errors.length > 0) {
+            output.errors.forEach(e => console.error(e));
+            return false;
+        }
+        return compareBin(`${basename(bnPath)}`, output.binary, shouldBin);
+    } catch (e) {
+        console.error(e);
+        return false;
+    }
+}
 
 void run(cmd, process.argv.slice(2));

@@ -196,10 +196,18 @@ export class PseudoParser {
         if (!gotTok) {
             const next = this.lexer.nextNonBlank(true);
             if (next.type != TokenType.MacroBody) {
-                throw Error("Macro body expected");
+                throw Parser.mkTokError("Macro body expected", next);
             }
             gotTok = next;
         }
+
+        const next = this.lexer.nextNonBlank();
+        if (next.type != TokenType.Separator && next.type != TokenType.Comment &&
+            next.type != TokenType.EOL && next.type != TokenType.EOF
+        ) {
+            throw Parser.mkTokError("Stray token after macro body", next);
+        }
+        this.lexer.unget(next);
 
         return {
             type: NodeType.MacroBody,

@@ -94,6 +94,10 @@ export class ExprParser {
                     throw Parser.mkTokError("Expression expected", tok);
                 }
                 break;
+            } else if (tok.type == TokenType.Char) {
+                if (tok.char == ")" || tok.char == "]") {
+                    break;
+                }
             }
             this.lexer.unget(tok);
             const expr = this.parseExpressionPart();
@@ -125,6 +129,13 @@ export class ExprParser {
                     // starts with something else -> don't try as group, e.g. (-CDF 0)
                     expr = this.parseExpressionPart();
                 }
+
+                const closingMatch = (first.char == "(" ? ")" : "]");
+                const closingParen = this.lexer.nextNonBlank();
+                if (closingParen.type != TokenType.Char || closingParen.char != closingMatch) {
+                    this.lexer.unget(closingParen); // ignore non-closed parentheses
+                }
+
                 return {
                     type: NodeType.ParenExpr,
                     paren: first.char,
@@ -182,6 +193,7 @@ export class ExprParser {
                         return { elem: firstElem, op: nextTok };
                     case ")":
                     case "]":
+                        this.lexer.unget(nextTok);
                         return { elem: firstElem };
                     default:
                         throw Parser.mkTokError(`Unexpected operator in expression: '${nextTok.char}'`, nextTok);

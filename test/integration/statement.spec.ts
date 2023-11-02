@@ -1,5 +1,4 @@
 /* eslint-disable max-lines-per-function */
-import { Assembler } from "../../src/assembler/Assembler.js";
 import { assemble, assembleWithErrors } from "./TestUtils.js";
 
 describe("GIVEN a program containing statements", () => {
@@ -140,7 +139,7 @@ describe("GIVEN a program containing statements", () => {
         });
     });
 
-    describe("WHEN the multiple fields with link tables", () => {
+    describe("WHEN the input contains multiple fields with link tables", () => {
         const data = assemble(`
             PAGE 2
             TAD (10     / Creates link in 00777
@@ -153,8 +152,18 @@ describe("GIVEN a program containing statements", () => {
             *610
             TAD (30     / Must create link 00777 again
         `);
-        test("THEN it should generate the MRI in a link and use it as operand", () => {
+        test("THEN it should forget all links after switching back to a previous field", () => {
             expect(data.memory[0o0777]).toEqual(0o30);
+        });
+    });
+
+    describe("WHEN an assignment contains a literal", () => {
+        const data = assemble(`
+            A=(7)
+        `);
+        test("THEN it should generate a link and assign the address", () => {
+            expect(data.symbols["A"]).toEqual(0o0377);
+            expect(data.memory[0o0377]).toEqual(7);
         });
     });
 });

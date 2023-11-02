@@ -150,6 +150,7 @@ describe("GIVEN a program containing pseudo statements", () => {
             expect(data.memory[0o201]).toEqual(0o1003);
         });
     });
+
     describe("WHEN evaluating the FILENAME statement", () => {
         const data = assemble(`
             FILENAME PIP.SV

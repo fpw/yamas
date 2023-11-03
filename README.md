@@ -3,6 +3,9 @@ This is Yamas – Yet Another Macro Assembler: A PAL-compatible assembler for PD
 macros in the syntax of [MACRO-8 (PDF manual)]. It is a complete clean-room implementation of a PDP-8 assembler using web technologies so that
 the assembler can be integrated into web applications, apps on phones and the like. Of course, it also comes with a traditional shell command (through Node.js).
 
+## Usage
+If [Node.js](https://nodejs.org) is installed, it should be possible to just do `npx yamas <file.pa>`. The core assembler has no dependencies to Node.js and can run right in the browser, demo page coming soon!
+
 # FAQs
 ## Assembler FAQ
 ### Why another assembler for the PDP-8?

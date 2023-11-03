@@ -1,7 +1,7 @@
 {
   "name": "yamas",
   "description": "Yet Another Macro Assembler: A PDP-8 assembler.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "author": "Folke Will <folko@solhost.org>",
   "license": "AGPL-3.0-or-later",
   "scripts": {

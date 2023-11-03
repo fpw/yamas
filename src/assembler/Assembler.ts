@@ -300,18 +300,18 @@ export class Assembler {
         if (field < 0 || field >= PDP8.NumFields) {
             throw Assembler.mkError(`Invalid field ${field}`, stmt);
         }
-
-        ctx.field = field;
         if (ctx.reloc) {
             throw Assembler.mkError("Changing FIELD with active reloc not supported", stmt);
         }
+
+        ctx.field = field;
         ctx.setClc(PDP8.firstAddrInPage(1), false);
         if (ctx.generateCode) {
             this.outputLinks(ctx);
-            this.linkTable.clear();
             this.output.punchField(ctx, field);
             this.output.punchOrigin(ctx);
         }
+        this.linkTable.clear();
     }
 
     private handleReloc(ctx: Context, stmt: Nodes.RelocStatement) {

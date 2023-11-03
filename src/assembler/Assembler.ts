@@ -40,9 +40,9 @@ export interface AssemblerOptions extends ParserOptions {
 export class Assembler {
     private opts: AssemblerOptions;
     private syms = new SymbolTable();
-    private linkTable = new LinkTable();
     private output = new OutputGenerator();
     private programs: Nodes.Program[] = [];
+    private linkTable = new LinkTable();
     private evaluator = new Evaluator(this.syms, this.linkTable);
 
     public constructor(options: AssemblerOptions) {
@@ -74,12 +74,18 @@ export class Assembler {
     public assembleAll(): CodeError[] {
         const errors: CodeError[] = this.programs.map(p => p.errors).flat();
 
+        // pass 1: assign all symbols that can be evaluated in a single pass
         const symCtx = new Context(false);
         for (const prog of this.programs) {
             const symErrors = this.assignSymbols(symCtx, prog);
             errors.push(...symErrors);
         }
+        if (errors.length > 0) {
+            return errors;
+        }
 
+        // pass 2: generate code and assign missing symbols on the go
+        this.linkTable.clear();
         const asmCtx = new Context(true);
         this.output.punchOrigin(asmCtx);
         for (const prog of this.programs) {

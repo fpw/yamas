@@ -101,17 +101,17 @@ export class Evaluator {
         return acc;
     }
 
-    // It's allowed to have a negative MRI such as -TAD. Then the value is -TAD according
-    // to PAL8. However, that's not allowed if any other operand is OR-ed after the space, e.g.
-    // -TAD 5 is illegal.
-    // Ergo: It's not treated like a non-MRI because it's not allowed to have any parameter.
-    // But it's also not a real MRI because we never encode any real destination.
     private evalMRI(ctx: Context, group: Nodes.SymbolGroup): number | null {
         if (group.first.node.type != NodeType.Symbol) {
             throw Assembler.mkError("Tried to evaluate MRI-group with non-MRI", group);
         }
         const mri = this.syms.lookup(group.first.node.token.symbol);
 
+        // It's allowed to have a negative MRI such as -TAD. Then the value is -TAD according
+        // to PAL8. However, that's not allowed if any other operand is OR-ed after the space, e.g.
+        // -TAD 5 is illegal.
+        // Ergo: It's not treated like a non-MRI because it's not allowed to have any parameter.
+        // But it's also not a real MRI because we never encode any real destination.
         if (group.first.unaryOp !== undefined) {
             if (group.exprs.length > 0) {
                 throw Assembler.mkError("MRI expression with parameters is illegal with parameters", group);
@@ -166,7 +166,7 @@ export class Evaluator {
             return effVal | CUR;
         } else {
             if (mri & IND) {
-                throw  Error(`Double indirection on page ${curPage}"`);
+                throw Error(`Double indirection on page ${curPage}"`);
             }
             const linkPage = PDP8.calcPageNum(ctx.getClc(false));
             const indAddr = this.linkTable.enter(ctx, linkPage, dst);
@@ -176,7 +176,7 @@ export class Evaluator {
 
     private evalParenExpr(ctx: Context, expr: Nodes.ParenExpr): number | null {
         const val = this.tryEval(ctx, expr.expr);
-        if (val === null || !ctx.generateCode) {
+        if (val === null) {
             return null;
         }
 

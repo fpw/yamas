@@ -83,7 +83,7 @@ export class Parser {
             case NodeType.ExpressionStmt:   return Parser.mkNodeError(msg, lastNode.expr);
             case NodeType.Invocation:       return Parser.mkTokError(msg, lastNode.name.token);
             case NodeType.SymbolGroup:      return Parser.mkNodeError(msg, lastNode.first);
-            case Nodes.NodeType.Element:    return Parser.mkNodeError(msg, lastNode);
+            case Nodes.NodeType.Element:    return Parser.mkNodeError(msg, lastNode.node);
         }
     }
 

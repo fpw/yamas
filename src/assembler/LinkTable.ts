@@ -28,10 +28,6 @@ export class LinkTable {
     }
 
     public enter(ctx: Context, page: number, value: number): number {
-        if (!ctx.generateCode) {
-            throw Error("Can't generate links in pass 1");
-        }
-
         let delta = 0;
         if (page != 0 && ctx.reloc != 0) {
             if (ctx.reloc % PDP8.PageSize != 0) {

@@ -56,6 +56,32 @@ describe("GIVEN a program containing statements", () => {
         });
     });
 
+    describe("WHEN evaluating assigned statements with links", () => {
+        const data = assemble(`
+                CALLC
+                CALLC=JMS 1234
+            `);
+        test("THEN they should be generated", () => {
+            expect(data.symbols["CALLC"]).toEqual(0o4777);
+        });
+    });
+
+    describe("WHEN evaluating assigned statements and MRIs with links", () => {
+        const data = assemble(`
+                CALLC
+                TAD 1235
+                CALLC=JMS 1234
+            `);
+        test("THEN they should be generated", () => {
+            expect(data.symbols["CALLC"]).toEqual(0o4776);
+            expect(data.memory[0o200]).toEqual(0o4776);
+            expect(data.memory[0o201]).toEqual(0o1777);
+            expect(data.memory[0o376]).toEqual(0o1234);
+            expect(data.memory[0o377]).toEqual(0o1235);
+        });
+    });
+
+
     describe("WHEN evaluating assignment statements with undefined right-hand sides", () => {
         const data = assemble(`
             A=B+2

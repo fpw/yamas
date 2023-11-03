@@ -30,6 +30,11 @@ const cmd = command({
     name: "yamas",
     description: "Yet Another Macro Assembler (for PDP-8)",
     args: {
+        version: flag({
+            long: "version",
+            short: "v",
+            description: "Show version",
+        }),
         noPrelude: flag({
             long: "no-prelude",
             description: "Do not set default symbols",
@@ -58,10 +63,21 @@ const cmd = command({
         filesStr: positional({
             description: "Input source files",
             displayName: "sources",
+            type: optional(string),
         }),
     },
     // eslint-disable-next-line max-lines-per-function
     handler: (args) => {
+        if (args.version) {
+            console.log(`Yamas ${process.env.npm_package_version}`);
+            process.exit(0);
+        }
+
+        if (!args.filesStr) {
+            console.error("No sources given");
+            process.exit(-1);
+        }
+
         const opts: YamasOptions = {};
         opts.loadPrelude = !args.noPrelude;
         opts.orDoesShift = args.orShifts;
@@ -93,10 +109,13 @@ const cmd = command({
             const name = basename(args.compareWith);
             if (compareBin(name, output.binary, otherBin)) {
                 console.log("No differences");
+                process.exit(0);
             } else {
                 process.exit(-1);
             }
         }
+
+        process.exit(output.errors.length == 0 ? 0 : -1);
     }
 });
 

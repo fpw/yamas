@@ -25,6 +25,7 @@ import { PseudoParser } from "./parsers/PseudoParser.js";
 import { StatementParser } from "./parsers/StatementParser.js";
 
 export interface ParserOptions {
+    // disable given pseudos to use them as custom symbol names
     disabledPseudos?: string[];
 }
 

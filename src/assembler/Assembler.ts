@@ -35,18 +35,22 @@ export interface OutputHandler {
 }
 
 export interface AssemblerOptions extends ParserOptions {
+    orDoesShift?: boolean;  // like /B in PAL8: A!B becomes A * 100 + B
+    noNullTermination?: boolean; // like /F in PAL8: do not null-terminat even-length TEXTs
 }
 
 export class Assembler {
     private opts: AssemblerOptions;
     private syms = new SymbolTable();
-    private output = new OutputGenerator();
+    private output: OutputGenerator;
     private programs: Nodes.Program[] = [];
     private linkTable = new LinkTable();
-    private evaluator = new Evaluator(this.syms, this.linkTable);
+    private evaluator: Evaluator;
 
     public constructor(options: AssemblerOptions) {
         this.opts = options;
+        this.output = new OutputGenerator(this.opts);
+        this.evaluator = new Evaluator(this.opts, this.syms, this.linkTable);
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
 
@@ -74,7 +78,7 @@ export class Assembler {
     public assembleAll(): CodeError[] {
         const errors: CodeError[] = this.programs.map(p => p.errors).flat();
 
-        // pass 1: assign all symbols that can be evaluated in a single pass
+        // pass 1: assign all symbols and links that can be evaluated in a single pass
         const symCtx = new Context(false);
         for (const prog of this.programs) {
             const symErrors = this.assignSymbols(symCtx, prog);
@@ -84,8 +88,11 @@ export class Assembler {
             return errors;
         }
 
-        // pass 2: generate code and assign missing symbols on the go
+        // pass 2: generate code and assign missing symbols and links on the go
+        // we must clear the link table because it's possible that the previous pass left it
+        // in another field, so we'll just fill it again in pass 2
         this.linkTable.clear();
+
         const asmCtx = new Context(true);
         this.output.punchOrigin(asmCtx);
         for (const prog of this.programs) {
@@ -145,7 +152,7 @@ export class Assembler {
         }
 
         if (gen) {
-            // we just put something at CLC - check if it overlaps with a link
+            // we just put something at CLC - check if it overlapped with a link
             this.linkTable.checkOverlap(ctx.getClc(false));
         }
 
@@ -156,8 +163,13 @@ export class Assembler {
     }
 
     private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): boolean {
-        const val = this.evaluator.safeEval(ctx, stmt.expr);
-        this.output.punchData(ctx, ctx.getClc(false), val);
+        const val = this.evaluator.tryEval(ctx, stmt.expr);
+        if (ctx.generateCode) {
+            if (val === null) {
+                throw Assembler.mkError("Undefined expression", stmt);
+            }
+            this.output.punchData(ctx, ctx.getClc(false), val);
+        }
         return true;
     }
 
@@ -222,6 +234,12 @@ export class Assembler {
             case NodeType.Reloc:
                 this.handleReloc(ctx, stmt);
                 break;
+            case NodeType.ExpressionStmt:
+                // must also handle them here to assign links
+                if (!ctx.generateCode) {
+                    this.handleExprStmt(ctx, stmt);
+                }
+                break;
         }
     }
 
@@ -238,7 +256,7 @@ export class Assembler {
                 newClc += this.evaluator.safeEval(ctx, stmt.expr);
                 break;
             case NodeType.Text:
-                newClc += CharSets.asciiStringToDec(stmt.str.str, true).length;
+                newClc += CharSets.asciiStringToDec(stmt.str.str, !this.opts.noNullTermination).length;
                 break;
             case NodeType.DeviceName:
                 newClc += 2;
@@ -272,7 +290,6 @@ export class Assembler {
             }
         }
         ctx.setClc(PDP8.firstAddrInPage(newPage), true);
-        this.linkTable.checkOverlap(PDP8.calcPageNum(ctx.getClc(true)));
         if (ctx.generateCode) {
             this.output.punchOrigin(ctx);
         }

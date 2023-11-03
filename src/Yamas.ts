@@ -24,11 +24,8 @@ import { Prelude8E } from "./prelude/PDP8E.js";
 import { BinTapeWriter } from "./tapeformats/BinTapeWriter.js";
 import { CodeError } from "./utils/CodeError.js";
 
-export interface YamasOptions {
+export interface YamasOptions extends AssemblerOptions {
     loadPrelude?: boolean;
-
-    // to disable given pseudos, e.g. to assemble code that uses DEFINE as symbol
-    disabledPseudos?: string[];
 
     // Ideas:
 
@@ -48,7 +45,7 @@ export class Yamas {
 
     public constructor(opts: YamasOptions) {
         this.opts = opts;
-        this.asm = new Assembler(this.convertOpts(opts));
+        this.asm = new Assembler(opts);
 
         this.asm.setOutputHandler({
             changeField: field => this.binTape.writeField(field),
@@ -61,12 +58,6 @@ export class Yamas {
             this.asm.parseInput("prelude/iot.pa", PreludeIO);
             this.asm.parseInput("prelude/pdp8e.pa", Prelude8E);
         }
-    }
-
-    private convertOpts(opts: YamasOptions): AssemblerOptions {
-        return {
-            disabledPseudos: opts.disabledPseudos,
-        };
     }
 
     public addInput(name: string, content: string): Program {

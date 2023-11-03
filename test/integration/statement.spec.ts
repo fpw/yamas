@@ -53,27 +53,18 @@ describe("GIVEN a program containing statements", () => {
         test("THEN they should support MRIs", () => {
             expect(data.symbols["CALLC"]).toEqual(0o4602);
             expect(data.memory[0o201]).toEqual(0o4602);
+            expect(data.memory[0o203]).toEqual(0o5602);
         });
     });
 
-    describe("WHEN evaluating assigned statements with links", () => {
+    describe("WHEN evaluating assigned statements with links before they appear", () => {
         const data = assemble(`
-                CALLC
-                CALLC=JMS 1234
-            `);
-        test("THEN they should be generated", () => {
-            expect(data.symbols["CALLC"]).toEqual(0o4777);
-        });
-    });
-
-    describe("WHEN evaluating assigned statements and MRIs with links", () => {
-        const data = assemble(`
-                CALLC
+                CALLX
                 TAD 1235
-                CALLC=JMS 1234
+                CALLX=JMS 1234
             `);
-        test("THEN they should be generated", () => {
-            expect(data.symbols["CALLC"]).toEqual(0o4776);
+        test("THEN they should be linked correctly", () => {
+            expect(data.symbols["CALLX"]).toEqual(0o4776);
             expect(data.memory[0o200]).toEqual(0o4776);
             expect(data.memory[0o201]).toEqual(0o1777);
             expect(data.memory[0o376]).toEqual(0o1234);
@@ -81,6 +72,19 @@ describe("GIVEN a program containing statements", () => {
         });
     });
 
+    describe("WHEN evaluating assigned statements with links before they appear even in pass 2", () => {
+        const data = assembleWithErrors(`
+                CALLX
+                CALLX=JMS X
+                X=1234
+            `);
+        test("THEN they should be linked correctly", () => {
+            // Note: PAL8 claims to assemble this without errors and even generates a listing with
+            // CALLX pointing at a correct link - but that's only because the listing is generated in
+            // *another* pass - the binary is in fact wrong and contains a zero at 0o200!
+            expect(data.errors.length).toBeGreaterThan(0);
+        });
+    });
 
     describe("WHEN evaluating assignment statements with undefined right-hand sides", () => {
         const data = assemble(`

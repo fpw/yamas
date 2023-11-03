@@ -21,13 +21,13 @@ import { NodeType } from "../../parser/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
 import * as PDP8 from "../../utils/PDP8.js";
 import { parseIntSafe } from "../../utils/Strings.js";
-import { Assembler } from "../Assembler.js";
+import { Assembler, AssemblerOptions } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { LinkTable } from "../LinkTable.js";
 import { SymbolTable, SymbolType } from "../SymbolTable.js";
 
 export class Evaluator {
-    public constructor(private syms: SymbolTable, private linkTable: LinkTable) {
+    public constructor(private opts: AssemblerOptions, private syms: SymbolTable, private linkTable: LinkTable) {
     }
 
     public safeEval(ctx: Context, expr: Nodes.Expression): number {
@@ -225,7 +225,7 @@ export class Evaluator {
             case "-":   return (lhs - rhs) & 0o7777;
             case "^":   return (lhs * rhs) & 0o7777;
             case "%":   return (lhs / rhs) & 0o7777;
-            case "!":   return lhs | rhs;
+            case "!":   return !this.opts.orDoesShift ? (lhs | rhs) : (lhs * 0o100 + rhs);
             case "&":   return lhs & rhs;
         }
     }

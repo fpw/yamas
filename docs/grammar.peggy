@@ -49,7 +49,7 @@
 Program                 = stmts:Statement* _* (EOF .*)?
                             { return {type: "Program", statements: stmts}; }
 
-Statement "Statement"   = _* stmt:(
+Statement "Statement"   = _* @(
                             Origin /
                             Invocation /
                             Label /
@@ -60,7 +60,6 @@ Statement "Statement"   = _* stmt:(
                             Comment /
                             EOL
                         )
-                        { return stmt; }
 
 Origin                  = "*" expr:Expression
                             { return {type: "Origin", expr: expr}; }
@@ -128,8 +127,7 @@ Integer                 = int:$[0-9]+
 Symbol "Symbol"         = name:SymbolName &{return !pseudos.has(name) && !macros.has(name);}
                             { return {type: "Symbol", name: name}; }
 
-Macro "Macro Name"      = name:SymbolName &{return macros.has(name);}
-                            {return name;}
+Macro "Macro Name"      = @name:SymbolName &{return macros.has(name);}
 
 SymbolName              = $([A-Z][A-Z0-9]*)
 
@@ -178,7 +176,7 @@ IfDef                   = "IFDEF" _ sym:Symbol _* body:MacroBody
                             { return {type: "IfDef", symbol: sym, body: body}; }
 IfNDef                  = "IFNDEF" _ sym:Symbol _* body:MacroBody
                             { return {type: "IfNotDef", symbol: sym, body: body}; }
-// Even thought the PAL8 manual claims that the expression may not contain spaces,
+// Even though the PAL8 manual claims that the expression may not contain spaces,
 // it works fine in PAL8 to do something like IFZERO 0 1 < ... >, so it's a full expression and not only binop
 IfZero                  = "IFZERO" _ p:Expression _* body:MacroBody
                             { return {type: "IfZero", expr: p, body: body}; }

@@ -21,11 +21,14 @@ import { NodeType } from "../../parser/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
 import { toDECFloat } from "../../utils/Floats.js";
 import { parseIntSafe } from "../../utils/Strings.js";
-import { OutputHandler } from "../Assembler.js";
+import { AssemblerOptions, OutputHandler } from "../Assembler.js";
 import { Context } from "../Context.js";
 
 export class OutputGenerator {
     private outputHandler?: OutputHandler;
+
+    public constructor(private options: AssemblerOptions) {
+    }
 
     public setOutputHandler(out: OutputHandler) {
         this.outputHandler = out;
@@ -41,7 +44,7 @@ export class OutputGenerator {
     }
 
     public outputText(ctx: Context, text: string): boolean {
-        const outStr = CharSets.asciiStringToDec(text, true);
+        const outStr = CharSets.asciiStringToDec(text, !this.options.noNullTermination);
         const addr = ctx.getClc(false);
         outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
         return true;

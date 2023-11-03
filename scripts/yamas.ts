@@ -32,12 +32,22 @@ const cmd = command({
     args: {
         noPrelude: flag({
             long: "no-prelude",
-            description: "Do not set default symbols"
+            description: "Do not set default symbols",
+        }),
+        orShifts: flag({
+            long: "or-shifts",
+            short: "b",
+            description: "OR operator performs left shift first, like /B in PAL8",
+        }),
+        noNullTermination: flag({
+            long: "no-text-termination",
+            short: "f",
+            description: "do not add null termination to TEXT strings, like /F in PAL8",
         }),
         outputAst: flag({
             long: "write-ast",
             short: "a",
-            description: "Write abstract syntax tree"
+            description: "Write abstract syntax tree",
         }),
         compareWith: option({
             long: "compare",
@@ -50,9 +60,12 @@ const cmd = command({
             displayName: "sources",
         }),
     },
+    // eslint-disable-next-line max-lines-per-function
     handler: (args) => {
         const opts: YamasOptions = {};
         opts.loadPrelude = !args.noPrelude;
+        opts.orDoesShift = args.orShifts;
+        opts.noNullTermination = args.noNullTermination;
 
         const files = args.filesStr.split(" ");
 

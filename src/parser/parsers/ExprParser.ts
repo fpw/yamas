@@ -44,7 +44,7 @@ export class ExprParser {
         const exprs: Nodes.Expression[] = this.parseExprParts();
 
         const firstElem = exprs[0];
-        if (firstElem.type == NodeType.Symbol) {
+        if (firstElem.type == NodeType.Element) {
             const group: Nodes.SymbolGroup = {
                 type: NodeType.SymbolGroup,
                 first: firstElem,
@@ -88,16 +88,12 @@ export class ExprParser {
         const exprs: Nodes.Expression[] = [];
         while (true) {
             const tok = this.lexer.nextNonBlank();
-            if (!this.couldBeInExpr(tok)) {
+            if (!this.couldBeInExpr(tok) || (tok.type == TokenType.Char && [")", "]"].includes(tok.char))) {
                 this.lexer.unget(tok);
                 if (exprs.length == 0) {
                     throw Parser.mkTokError("Expression expected", tok);
                 }
                 break;
-            } else if (tok.type == TokenType.Char) {
-                if (tok.char == ")" || tok.char == "]") {
-                    break;
-                }
             }
             this.lexer.unget(tok);
             const expr = this.parseExpressionPart();
@@ -119,19 +115,9 @@ export class ExprParser {
         const first = this.lexer.nextNonBlank();
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
-                const afterParen = this.lexer.nextNonBlank();
-                this.lexer.unget(afterParen);
-                let expr: Nodes.Expression;
-                if (afterParen.type == TokenType.Symbol) {
-                    // starts with symbol -> could be group, e.g. (TAD I 1234)
-                    expr = this.parseExpr();
-                } else {
-                    // starts with something else -> don't try as group, e.g. (-CDF 0)
-                    expr = this.parseExpressionPart();
-                }
-
-                const closingMatch = (first.char == "(" ? ")" : "]");
+                const expr = this.parseExpr();
                 const closingParen = this.lexer.nextNonBlank();
+                const closingMatch = (first.char == "(" ? ")" : "]");
                 if (closingParen.type != TokenType.Char || closingParen.char != closingMatch) {
                     this.lexer.unget(closingParen); // ignore non-closed parentheses
                 }

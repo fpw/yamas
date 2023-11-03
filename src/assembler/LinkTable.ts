@@ -37,7 +37,7 @@ export class LinkTable {
             if (ctx.reloc % PDP8.PageSize != 0) {
                 throw Error("Relocating link tables to mid-page not supported");
             }
-            const relocPage = PDP8.calcPageNum(ctx.clc + ctx.reloc);
+            const relocPage = PDP8.calcPageNum(ctx.getClc(true));
             delta = PDP8.firstAddrInPage(relocPage) - PDP8.firstAddrInPage(page);
         }
 

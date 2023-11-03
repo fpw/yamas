@@ -28,26 +28,46 @@ export class CommonParser {
     }
 
     public parseElement(): Nodes.Element {
-        const tok = this.lexer.nextNonBlank();
+        let tok = this.lexer.nextNonBlank();
+        let unary: Nodes.UnaryOp | undefined;
+
+        if (tok.type == TokenType.Char && (tok.char == "+" || tok.char == "-")) {
+            unary = this.toUnaryOp(tok);
+            tok = this.lexer.next();
+        }
+
+        const base: Omit<Nodes.Element, "node"> = {
+            type: NodeType.Element,
+            unaryOp: unary,
+        };
 
         switch (tok.type) {
-            case TokenType.ASCII:   return { type: NodeType.ASCIIChar, token: tok };
-            case TokenType.Symbol:  return this.parseSymbol(tok);
-            case TokenType.Integer: return this.parseInteger(tok);
+            case TokenType.ASCII:   return { ...base, node: this.toAscii(tok) };
+            case TokenType.Symbol:  return { ...base, node: this.parseSymbol(tok) };
+            case TokenType.Integer: return { ...base, node: this.parseInteger(tok) };
             case TokenType.Char:
                 if (tok.char == ".") {
-                    return { type: NodeType.CLCValue, token: tok };
-                } else if (tok.char == "+" || tok.char == "-") {
-                    return {
-                        type: NodeType.UnaryOp,
-                        operator: tok.char,
-                        elem: this.parseElement(),
-                        token: tok,
-                    };
+                    return { ...base, node: this.toCLC(tok) };
                 }
                 break;
         }
+
         throw Parser.mkTokError(`Element expected, got ${Tokens.tokenToString(tok)}`, tok);
+    }
+
+    public toUnaryOp(tok: Tokens.CharToken): Nodes.UnaryOp {
+        if ((tok.char == "+" || tok.char == "-")) {
+            return { type: NodeType.UnaryOp, operator: tok.char, token: tok };
+        }
+        throw Error(`Invalid unary operator: ${tok.char}`);
+    }
+
+    private toCLC(tok: Tokens.CharToken): Nodes.CLCValue {
+        return { type: NodeType.CLCValue, token: tok };
+    }
+
+    private toAscii(tok: Tokens.ASCIIToken): Nodes.ASCIIChar {
+        return { type: NodeType.ASCIIChar, token: tok };
     }
 
     public parseSymbol(gotTok?: Tokens.SymbolToken): Nodes.SymbolNode {

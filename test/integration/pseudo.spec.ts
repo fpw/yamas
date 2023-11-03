@@ -151,6 +151,19 @@ describe("GIVEN a program containing pseudo statements", () => {
         });
     });
 
+    describe("WHEN evaluating the XLIST statement", () => {
+        const data = assemble(`
+            XLIST
+            TAD 2
+            XLIST
+            TAD 3
+       `);
+        test("THEN it should ignore it", () => {
+            expect(data.memory[0o200]).toEqual(0o1002);
+            expect(data.memory[0o201]).toEqual(0o1003);
+        });
+    });
+
     describe("WHEN evaluating the FILENAME statement", () => {
         const data = assemble(`
             FILENAME PIP.SV

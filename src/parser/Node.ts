@@ -38,12 +38,9 @@ export enum NodeType {
     ParenExpr,
     BinaryOp,
 
-    // Element
-    UnaryOp,
-    Integer,
-    ASCIIChar,
+    // Elements
+    Element,
     Symbol,
-    CLCValue,
 
     // Pseudos
     Text,
@@ -55,6 +52,7 @@ export enum NodeType {
     FileName,
     Radix,
     PunchControl,
+    XList,
     FixTab,
     Expunge,
     ChangePage,
@@ -68,6 +66,10 @@ export enum NodeType {
     DeviceName,
 
     // Leaf only
+    UnaryOp,
+    Integer,
+    ASCIIChar,
+    CLCValue,
     DoubleInt,
     Float,
     MacroBody,
@@ -75,7 +77,9 @@ export enum NodeType {
 
 export type Node =
     Program | Statement | Expression | Element |
-    MacroBody | DoubleInt | Float;
+    MacroBody | DoubleInt | Float | ElementType;
+
+export type ElementType = Integer | ASCIIChar | SymbolNode | CLCValue;
 
 export type Statement =
     PseudoStatement |
@@ -85,7 +89,7 @@ export type Statement =
 
 export type PseudoStatement =
     DataStatement |
-    DefineStatement | EjectStatement | FixMriStatement |
+    DefineStatement | EjectStatement | FixMriStatement | XListStatement |
     RadixStatement | PunchCtrlStatement | FixTabStatement | ExpungeStatement |
     IfZeroStatement | IfNotZeroStatement | IfDefStatement | IfNotDefStatement |
     ChangeFieldStatement | ChangePageStatement | RelocStatement;
@@ -96,8 +100,6 @@ export type DataStatement =
 
 export type Expression =
     SymbolGroup | ParenExpr | BinaryOp | Element;
-
-export type Element = UnaryOp | Integer | ASCIIChar | SymbolNode | CLCValue;
 
 export interface BaseNode {
     type: NodeType;
@@ -166,7 +168,7 @@ export interface DoubleIntList extends BaseNode {
 
 export interface DoubleInt extends BaseNode {
     type: NodeType.DoubleInt;
-    unaryOp?: Tokens.CharToken;
+    unaryOp?: UnaryOp;
     token: Tokens.IntegerToken;
 }
 
@@ -272,6 +274,11 @@ export interface PunchCtrlStatement extends BaseNode {
     token: Tokens.SymbolToken; // on ENPUNCH / NOPUNCH
 }
 
+export interface XListStatement extends BaseNode {
+    type: NodeType.XList;
+    token: Tokens.SymbolToken; // on XLIST
+}
+
 // /Comment
 export interface Comment extends BaseNode {
     type: NodeType.Comment;
@@ -281,7 +288,7 @@ export interface Comment extends BaseNode {
 // Symbol<blank>[Expression]
 export interface SymbolGroup extends BaseNode {
     type: NodeType.SymbolGroup;
-    first: SymbolNode;
+    first: Element;
     exprs: Expression[];
 };
 
@@ -322,11 +329,16 @@ export interface BinaryOp extends BaseNode {
     token: Tokens.CharToken; // on op
 }
 
+export interface Element {
+    type: NodeType.Element;
+    unaryOp?: UnaryOp;
+    node: ElementType;
+}
+
 // -2
 export interface UnaryOp extends BaseNode {
     type: NodeType.UnaryOp;
     operator: Tokens.UnaryOpChr;
-    elem: Element;
     token: Tokens.CharToken;
 }
 
@@ -399,6 +411,14 @@ export function formatNode(node: Node): string {
             return `Text("${node.str.str}")`;
         case NodeType.Comment:
             return `Comment("${node.token.comment}")`;
+        case NodeType.Integer:
+            return `Integer(${node.token.value})`;
+        case NodeType.ASCIIChar:
+            return `ASCII('${node.token.char}')`;
+        case NodeType.Symbol:
+            return `Symbol("${node.token.symbol}")`;
+        case NodeType.CLCValue:
+            return "CLC()";
         case NodeType.SymbolGroup:
             str = "Group(";
             str += `${formatNode(node.first)}, [`;
@@ -420,18 +440,10 @@ export function formatNode(node: Node): string {
             return `IfZero(${formatNode(node.expr)}, ${formatNode(node.body)})`;
         case NodeType.BinaryOp:
             return `BinOp(${formatNode(node.lhs)}, '${node.operator}', ${formatNode(node.rhs)})`;
-        case NodeType.UnaryOp:
-            return `Unary(${node.operator}, ${formatNode(node.elem)})`;
-        case NodeType.Integer:
-            return `Integer(${node.token.value})`;
-        case NodeType.ASCIIChar:
-            return `ASCII('${node.token.char}')`;
-        case NodeType.Symbol:
-            return `Symbol("${node.token.symbol}")`;
         case NodeType.DoubleIntList:
             return `DublList([${node.list.map(x => formatNode(x))}])`;
         case NodeType.DoubleInt:
-            return `Dubl(${node.unaryOp ? node.unaryOp.char : ""}${node.token.value})`;
+            return `Dubl(${node.unaryOp?.operator ?? ""}${node.token.value})`;
         case NodeType.FloatList:
             return `FltgList([${node.list.map(x => formatNode(x))}}])`;
         case NodeType.Float:
@@ -440,14 +452,14 @@ export function formatNode(node: Node): string {
             return `ZeroBlock(${formatNode(node.expr)})`;
         case NodeType.DeviceName:
             return `DeviceName("${node.name.token.symbol}")`;
-        case NodeType.CLCValue:
-            return "CLC()";
         case NodeType.MacroBody:
             return `MacroBody("${replaceBlanks(Tokens.tokenToString(node.token))}")`;
         case NodeType.FileName:
             return `Filename("${node.name.str}")`;
         case NodeType.Eject:
             return `Eject("${node.str.str}")`;
+        case NodeType.XList:
+            return "XList()";
         case NodeType.Radix:
             return `Radix(${node.radix})`;
         case NodeType.FixTab:
@@ -464,6 +476,8 @@ export function formatNode(node: Node): string {
             return `PunchCtrl(enable=${node.enable})`;
         case NodeType.FixMri:
             return `FixMri("${formatNode(node.assignment)}")`;
+        case NodeType.Element:
+            return `Element(${node.unaryOp?.operator ?? ""}${formatNode(node.node)})`;
         case NodeType.Invocation:
         case NodeType.Program:
             throw Error("Can't handle compound");

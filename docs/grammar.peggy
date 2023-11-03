@@ -24,7 +24,7 @@
         "EXPUNGE",  "FIXTAB",       "FIXMRI",
         "DECIMAL",  "OCTAL",
         "NOPUNCH",  "ENPUNCH",
-        "EJECT",
+        "EJECT",    "XLIST",
     ];
 
     // converts head and tail[t1, t2, t3, ...] to {lhs: {lhs: {lhs: head, ...t1}, ...t2}, ...t3}
@@ -103,7 +103,7 @@ ParenExpr               = "(" _* expr:Expression _* ")"?
                         / "[" _* expr:Expression _* "]"?
                             { return {type: "Paren", where: "zero", expr: expr}; }
 
-SymbolGroup             = sym:Symbol exprs:(_ @Expression)*
+SymbolGroup             = sym:Element exprs:(_ @Expression)*
                             { return {type: "SymbolGroup", symbol: sym, exprs: exprs}; }
 
 BinaryOp                = head:Element tail:BinOpFragment+
@@ -178,6 +178,8 @@ IfDef                   = "IFDEF" _ sym:Symbol _* body:MacroBody
                             { return {type: "IfDef", symbol: sym, body: body}; }
 IfNDef                  = "IFNDEF" _ sym:Symbol _* body:MacroBody
                             { return {type: "IfNotDef", symbol: sym, body: body}; }
+// Even thought the PAL8 manual claims that the expression may not contain spaces,
+// it works fine in PAL8 to do something like IFZERO 0 1 < ... >, so it's a full expression and not only binop
 IfZero                  = "IFZERO" _ p:Expression _* body:MacroBody
                             { return {type: "IfZero", expr: p, body: body}; }
 IfNZro                  = "IFNZRO" _ p:Expression _* body:MacroBody

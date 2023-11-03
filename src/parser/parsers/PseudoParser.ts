@@ -36,7 +36,7 @@ export class PseudoParser {
         "EXPUNGE",  "FIXTAB",       "FIXMRI",
         "DECIMAL",  "OCTAL",
         "NOPUNCH",  "ENPUNCH",
-        "EJECT",
+        "EJECT",    "XLIST",
     ];
     private pseudoActions = new Map<string, PseudoHandler>();
 
@@ -86,6 +86,7 @@ export class PseudoParser {
         mkPseudo("FILENAME", token => this.parseFilename(token));
 
         mkPseudo("EJECT", token => ({ type: NodeType.Eject, str: this.lexer.nextStringLiteral(false), token }));
+        mkPseudo("XLIST", token => ({ type: NodeType.XList, token }));
         mkPseudo("ENPUNCH", token => ({ type: NodeType.PunchControl, enable: true, token }));
         mkPseudo("NOPUNCH", token => ({ type: NodeType.PunchControl, enable: false, token }));
     }
@@ -269,7 +270,7 @@ export class PseudoParser {
                     if (nextInt.type != TokenType.Integer) {
                         throw Parser.mkTokError("Unexpected unary operand", nextInt);
                     }
-                    return { type: NodeType.DoubleInt, unaryOp: next, token: nextInt };
+                    return { type: NodeType.DoubleInt, unaryOp: this.commonParser.toUnaryOp(next), token: nextInt };
                 } else {
                     this.lexer.unget(next);
                     return undefined;

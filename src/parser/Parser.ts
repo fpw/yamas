@@ -79,10 +79,11 @@ export class Parser {
         }
 
         switch (lastNode.type) {
-            case NodeType.Program:        return new CodeError(msg, lastNode.inputName, 0, 0);
-            case NodeType.ExpressionStmt: return Parser.mkNodeError(msg, lastNode.expr);
-            case NodeType.Invocation:     return Parser.mkTokError(msg, lastNode.name.token);
-            case NodeType.SymbolGroup:    return Parser.mkTokError(msg, lastNode.first.token);
+            case NodeType.Program:          return new CodeError(msg, lastNode.inputName, 0, 0);
+            case NodeType.ExpressionStmt:   return Parser.mkNodeError(msg, lastNode.expr);
+            case NodeType.Invocation:       return Parser.mkTokError(msg, lastNode.name.token);
+            case NodeType.SymbolGroup:      return Parser.mkNodeError(msg, lastNode.first);
+            case Nodes.NodeType.Element:    return Parser.mkNodeError(msg, lastNode);
         }
     }
 

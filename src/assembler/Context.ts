@@ -16,11 +16,61 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export interface Context {
-    radix: 8 | 10;
-    field: number;
-    clc: number;
-    reloc: number;
-    punchEnabled: boolean;
-    generateCode: boolean;
+import * as PDP8 from "../utils/PDP8.js";
+
+export class Context {
+    private radix_: 8 | 10 = 8;
+    private field_ = 0;
+    private reloc_ = 0;
+    private punchEnabled_ = true;
+    private readonly generateCode_: boolean;
+    private clc = PDP8.firstAddrInPage(1);
+
+    public constructor(generateCode: boolean) {
+        this.generateCode_ = generateCode;
+    }
+
+    public get reloc() {
+        return this.reloc_;
+    }
+
+    public set reloc(newReloc: number) {
+        this.reloc_ = newReloc;
+    }
+
+    public get field() {
+        return this.field_;
+    }
+
+    public set field(newField: number) {
+        this.field_ = newField;
+    }
+
+    public get radix() {
+        return this.radix_;
+    }
+
+    public set radix(r: 8 | 10) {
+        this.radix_ = r;
+    }
+
+    public get punchEnabled() {
+        return this.punchEnabled_;
+    }
+
+    public set punchEnabled(en: boolean) {
+        this.punchEnabled_ = en;
+    }
+
+    public get generateCode() {
+        return this.generateCode_;
+    }
+
+    public getClc(doReloc: boolean) {
+        return (this.clc + (doReloc ? this.reloc : 0)) & 0o7777;
+    }
+
+    public setClc(clc: number, doReloc: boolean) {
+        this.clc = (clc - (doReloc ? this.reloc : 0)) & 0o7777;
+    }
 }

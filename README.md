@@ -24,7 +24,7 @@ Data output             |`TEXT`,     `ZBLOCK`,       `DUBL`,     `FLTG`,     `DE
 Symbol table control    |`EXPUNGE`,  `FIXTAB`,       `FIXMRI`
 Radix control           |`DECIMAL`,  `OCTAL`
 Output control          |`NOPUNCH`,  `ENPUNCH`
-No-ops                  |`EJECT`
+No-ops                  |`EJECT`,    `XLIST`
 
 ### Is the generated code correct?
 "Correct" is hard to define since there are many different dialects of the language that are treated

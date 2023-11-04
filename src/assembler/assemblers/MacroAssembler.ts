@@ -54,13 +54,13 @@ export class MacroAssembler {
     private handleDefine(ctx: Context, stmt: Nodes.DefineStatement): StatementEffect {
         if (!ctx.generateCode) {
             // define macros only once so we don't get duplicates in next pass
-            this.syms.defineMacro(stmt.name.token.symbol);
+            this.syms.defineMacro(stmt.name.name);
         }
         return {};
     }
 
     private handleIfDef(ctx: Context, stmt: Nodes.IfDefStatement | Nodes.IfNotDefStatement): StatementEffect {
-        const sym = this.syms.tryLookup(stmt.symbol.token.symbol);
+        const sym = this.syms.tryLookup(stmt.symbol.name);
         if ((sym && stmt.type == NodeType.IfDef) || (!sym && stmt.type == NodeType.IfNotDef)) {
             return this.handleConditionBody(ctx, stmt.body);
         }
@@ -89,7 +89,7 @@ export class MacroAssembler {
     private handleConditionBody(ctx: Context, body: Nodes.MacroBody): StatementEffect {
         if (!ctx.generateCode) {
             const name = body.token.cursor.inputName + `:ConditionOnLine${body.token.cursor.lineIdx + 1}`;
-            const parser = new Parser(this.opts, name, body.token.body);
+            const parser = new Parser(this.opts, name, body.code);
             body.parsed = parser.parseProgram();
         } else {
             if (!body.parsed) {

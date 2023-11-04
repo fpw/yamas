@@ -21,7 +21,7 @@ import { NodeType } from "../../parser/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
 import { toDECFloat } from "../../utils/Floats.js";
 import { parseIntSafe } from "../../utils/Strings.js";
-import { AssemblerOptions } from "../Assembler.js";
+import { Assembler, AssemblerOptions } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
 import { OutputFilter } from "../util/OutputFilter.js";
@@ -83,21 +83,21 @@ export class DataAssembler {
     }
 
     private handleText(ctx: Context, stmt: Nodes.TextStatement): StatementEffect {
-        const outStr = CharSets.asciiStringToDec(stmt.str.str, !this.opts.noNullTermination);
+        const outStr = CharSets.asciiStringToDec(stmt.text, !this.opts.noNullTermination);
         const addr = ctx.getClc(false);
         outStr.forEach((w, i) => this.output.punchData(ctx, addr + i, w));
         return { incClc: outStr.length };
     }
 
     private handleFileName(ctx: Context, stmt: Nodes.FilenameStatement): StatementEffect {
-        const outStr = CharSets.asciiStringToOS8Name(stmt.name.str);
+        const outStr = CharSets.asciiStringToOS8Name(stmt.name);
         const addr = ctx.getClc(false);
         outStr.forEach((w, i) => this.output.punchData(ctx, addr + i, w));
         return { incClc: outStr.length };
     }
 
     private handleDevice(ctx: Context, name: Nodes.DevNameStatement): StatementEffect {
-        const dev = name.name.token.symbol.padEnd(4, "\0");
+        const dev = name.name.padEnd(4, "\0");
         const outStr = CharSets.asciiStringToDec(dev, false);
         const addr = ctx.getClc(false);
         outStr.forEach((w, i) => this.output.punchData(ctx, addr + i, w));
@@ -115,7 +115,7 @@ export class DataAssembler {
             if (dubl.type != NodeType.DoubleInt) {
                 continue;
             }
-            let num = parseIntSafe(dubl.token.value, 10);
+            let num = parseIntSafe(dubl.value, 10);
             if (dubl.unaryOp?.operator === "-") {
                 num = -num;
             }
@@ -137,7 +137,12 @@ export class DataAssembler {
                 continue;
             }
 
-            const [e, m1, m2] = toDECFloat(fltg.token.float);
+            let num = Number.parseFloat(fltg.value);
+            if (fltg.unaryOp?.operator == "-") {
+                num *= -1;
+            }
+
+            const [e, m1, m2] = toDECFloat(num);
             this.output.punchData(ctx, loc++, e);
             this.output.punchData(ctx, loc++, m1);
             this.output.punchData(ctx, loc++, m2);

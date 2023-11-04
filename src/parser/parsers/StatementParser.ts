@@ -74,10 +74,10 @@ export class StatementParser {
         if (pseudo) {
             if (pseudo.type == NodeType.Define) {
                 // need to remember macro names so that we can distinguish invocations from symbol groups
-                this.macros.set(pseudo.name.token.symbol, pseudo);
+                this.macros.set(pseudo.name.name, pseudo);
             }
             return pseudo;
-        } else if (this.macros.has(startSym.symbol)) {
+        } else if (this.macros.has(startSym.name)) {
             this.lexer.unget(startSym);
             return this.parseInvocation();
         }
@@ -118,6 +118,7 @@ export class StatementParser {
             type: NodeType.Label,
             sym: {
                 type: NodeType.Symbol,
+                name: sym.name,
                 token: sym,
             },
             token: chr,
@@ -129,6 +130,7 @@ export class StatementParser {
             type: NodeType.Assignment,
             sym: {
                 type: NodeType.Symbol,
+                name: sym.name,
                 token: sym,
             },
             val: this.exprParser.parseExpr(),
@@ -137,10 +139,10 @@ export class StatementParser {
     }
 
     private parseInvocation(): Nodes.Invocation {
-        const nameSym = this.commonParser.parseSymbol();
-        const macro = this.macros.get(nameSym.token.symbol);
+        const macroSym = this.commonParser.parseSymbol();
+        const macro = this.macros.get(macroSym.name);
         if (!macro) {
-            throw Nodes.mkNodeError("Not a macro", nameSym);
+            throw Nodes.mkNodeError("Not a macro", macroSym);
         }
 
         const args: Tokens.MacroBodyToken[] = [];
@@ -157,9 +159,9 @@ export class StatementParser {
 
         return {
             type: NodeType.Invocation,
-            name: nameSym,
+            macro: macroSym,
             args: args,
-            program: this.createInvocationProgram(nameSym.token, macro, args),
+            program: this.createInvocationProgram(macroSym.token, macro, args),
         };
     }
 
@@ -168,10 +170,10 @@ export class StatementParser {
         macro: Nodes.DefineStatement,
         args: Tokens.MacroBodyToken[]
     ): Nodes.Program {
-        const name = `${this.lexer.getInputName()}:${macro.name.token.symbol}`;
-        const macroParser = new Parser(this.opts, name, macro.body.token.body);
+        const name = `${this.lexer.getInputName()}:${macro.name.name}`;
+        const macroParser = new Parser(this.opts, name, macro.body.code);
         for (let i = 0; i < args.length; i++) {
-            macroParser.addSubstitution(macro.params[i].token.symbol, args[i].body);
+            macroParser.addSubstitution(macro.params[i].name, args[i].body);
         }
 
         try {
@@ -180,7 +182,7 @@ export class StatementParser {
             if (!(e instanceof CodeError)) {
                 throw e;
             }
-            const name = macro.name.token.symbol;
+            const name = macro.name.name;
             const line = e.line;
             const col = e.col;
             const msg = e.message;

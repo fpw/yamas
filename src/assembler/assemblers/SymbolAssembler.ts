@@ -47,13 +47,13 @@ export class SymbolAssembler {
     }
 
     private handleLabel(ctx: Context, stmt: Nodes.LabelDef): StatementEffect {
-        this.syms.defineLabel(stmt.sym.token.symbol, ctx.getClc(true));
+        this.syms.defineLabel(stmt.sym.name, ctx.getClc(true));
         return {};
     }
 
     private handleFixMri(ctx: Context, stmt: Nodes.FixMriStatement): StatementEffect {
         const val = this.evaluator.safeEval(ctx, stmt.assignment.val);
-        this.syms.defineForcedMri(stmt.assignment.sym.token.symbol, val);
+        this.syms.defineForcedMri(stmt.assignment.sym.name, val);
         return {};
     }
 
@@ -62,7 +62,7 @@ export class SymbolAssembler {
 
         // undefined expressions lead to undefined symbols
         if (paramVal !== null) {
-            this.syms.defineParameter(stmt.sym.token.symbol, paramVal);
+            this.syms.defineParameter(stmt.sym.name, paramVal);
         }
 
         return {};

@@ -123,7 +123,7 @@ export class Lexer {
 
         return {
             type: TokenType.Float,
-            float: Number.parseFloat(match[0]),
+            value: match[0],
             ...this.getTokenMeasurement(startCursor),
         };
     }
@@ -200,8 +200,8 @@ export class Lexer {
             return this.toBlank(first);
         } else if ((first >= "A" && first <= "Z") || (first >= "a" && first <= "z")) {
             const sym = this.scanSymbol(data);
-            if (sym.type == TokenType.Symbol && this.substitutions.has(sym.symbol)) {
-                this.activateSubstitution(sym.symbol);
+            if (sym.type == TokenType.Symbol && this.substitutions.has(sym.name)) {
+                this.activateSubstitution(sym.name);
                 return this.next();
             } else {
                 return sym;
@@ -270,7 +270,7 @@ export class Lexer {
 
         return {
             type: TokenType.Symbol,
-            symbol: symbol,
+            name: symbol,
             ...this.getTokenMeasurement(startCursor),
         };
     }

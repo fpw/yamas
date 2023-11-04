@@ -72,7 +72,7 @@ export interface EOLToken extends BaseToken {
 
 export interface SymbolToken extends BaseToken {
     type: TokenType.Symbol;
-    symbol: string;
+    name: string;
 }
 
 export interface IntegerToken extends BaseToken {
@@ -82,7 +82,7 @@ export interface IntegerToken extends BaseToken {
 
 export interface FloatToken extends BaseToken {
     type: TokenType.Float;
-    float: number;
+    value: string;
 }
 
 export interface CharToken extends BaseToken {
@@ -132,9 +132,9 @@ export function tokenToString(tok: Token): string {
         case TokenType.ASCII:       return `ASCII('${replaceBlanks(tok.char)}')`;
         case TokenType.Comment:     return `Comment("${tok.comment}")`;
         case TokenType.Integer:     return `Integer(${tok.value})`;
-        case TokenType.Float:       return `Float(${tok.float})`;
+        case TokenType.Float:       return `Float(${tok.value})`;
         case TokenType.MacroBody:   return `MacroBody(${replaceBlanks(tok.body)})`;
-        case TokenType.Symbol:      return `Symbol(${tok.symbol})`;
+        case TokenType.Symbol:      return `Symbol(${tok.name})`;
         case TokenType.String:      return `String("${tok.str}")`;
         case TokenType.Separator:   return `Separator('${replaceBlanks(tok.char)})`;
         case TokenType.EOL:         return `EOL('${replaceBlanks(tok.char)}')`;

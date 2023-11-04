@@ -147,7 +147,7 @@ export interface DefineStatement extends BaseNode {
 // M A1 A2 where M is macro
 export interface Invocation extends BaseNode {
     type: NodeType.Invocation;
-    name: SymbolNode;
+    macro: SymbolNode;
     args: Tokens.MacroBodyToken[];
     program: Program;
 }
@@ -170,6 +170,7 @@ export interface DoubleIntList extends BaseNode {
 export interface DoubleInt extends BaseNode {
     type: NodeType.DoubleInt;
     unaryOp?: UnaryOp;
+    value: string; // not including unary
     token: Tokens.IntegerToken;
 }
 
@@ -183,14 +184,18 @@ export interface FloatList extends BaseNode {
 
 export interface Float extends BaseNode {
     type: NodeType.Float;
+    unaryOp?: UnaryOp;
+    value: string; // not including unary
     token: Tokens.FloatToken;
 }
 
 // TEXT x...x
 export interface TextStatement extends BaseNode {
     type: NodeType.Text;
-    str: Tokens.StringToken;
-    token: Tokens.SymbolToken;
+    text: string;
+
+    strToken: Tokens.StringToken;
+    token: Tokens.SymbolToken; // on TEXT
 }
 
 export interface IfDefStatement extends BaseNode {
@@ -223,13 +228,17 @@ export interface IfNotZeroStatement extends BaseNode {
 
 export interface EjectStatement extends BaseNode {
     type: NodeType.Eject;
-    str: Tokens.StringToken;
+    text?: string;
+
+    str?: Tokens.StringToken;
     token: Tokens.SymbolToken;
 }
 
 export interface FilenameStatement extends BaseNode {
     type: NodeType.FileName;
-    name: Tokens.StringToken;
+    name: string;
+
+    strTok: Tokens.StringToken;
     token: Tokens.SymbolToken; // on FILENAME
 }
 
@@ -247,7 +256,8 @@ export interface ZBlockStatement extends BaseNode {
 
 export interface DevNameStatement extends BaseNode {
     type: NodeType.DeviceName;
-    name: SymbolNode;
+    name: string;
+    nameTok: Tokens.SymbolToken;
     token: Tokens.SymbolToken; // on DEVICE
 }
 
@@ -283,6 +293,7 @@ export interface XListStatement extends BaseNode {
 // /Comment
 export interface Comment extends BaseNode {
     type: NodeType.Comment;
+    comment: string;
     token: Tokens.CommentToken;
 }
 
@@ -340,29 +351,33 @@ export interface Element {
 export interface UnaryOp extends BaseNode {
     type: NodeType.UnaryOp;
     operator: Tokens.UnaryOpChr;
-    token: Tokens.CharToken;
+    token: Tokens.CharToken; // on operator
 }
 
 // < ... >
 export interface MacroBody extends BaseNode {
     type: NodeType.MacroBody;
-    parsed?: Program;
+    code: string;
     token: Tokens.MacroBodyToken;
+    parsed?: Program; // cache for assembler, TODO: move somewhere else
 }
 
 export interface Integer extends BaseNode {
     // unparsed because interpretation depends on environment (i.e. DECIMAL or OCTAL)
     type: NodeType.Integer;
+    value: string;
     token: Tokens.IntegerToken;
 }
 
 export interface ASCIIChar extends BaseNode {
     type: NodeType.ASCIIChar;
+    char: string;
     token: Tokens.ASCIIToken;
 }
 
 export interface SymbolNode extends BaseNode {
     type: NodeType.Symbol;
+    name: string;
     token: Tokens.SymbolToken;
 }
 
@@ -380,7 +395,7 @@ export function mkNodeError(msg: string, lastNode: Node): CodeError {
     switch (lastNode.type) {
         case NodeType.Program:          return new CodeError(msg, lastNode.inputName, 0, 0);
         case NodeType.ExpressionStmt:   return mkNodeError(msg, lastNode.expr);
-        case NodeType.Invocation:       return mkTokError(msg, lastNode.name.token);
+        case NodeType.Invocation:       return mkTokError(msg, lastNode.macro.token);
         case NodeType.SymbolGroup:      return mkNodeError(msg, lastNode.first);
         case NodeType.Element:          return mkNodeError(msg, lastNode.node);
     }
@@ -397,7 +412,7 @@ export function dumpNode(prog: Program, write: (line: string) => void, indent = 
         switch (node.type) {
             case NodeType.Invocation:
                 const args = node.args.map(a => Tokens.tokenToString(a)).join(", ");
-                w(`Invoke(${formatNode(node.name)}, [${args}], program=`, indent);
+                w(`Invoke(${formatNode(node.macro)}, [${args}], program=`, indent);
                 dumpNode(node.program, write, indent + 1);
                 w(")", indent);
                 break;
@@ -423,15 +438,15 @@ export function formatNode(node: Node): string {
         case NodeType.ExpressionStmt:
             return `ExprStmt(${formatNode(node.expr)})`;
         case NodeType.Text:
-            return `Text("${node.str.str}")`;
+            return `Text("${node.text}")`;
         case NodeType.Comment:
-            return `Comment("${node.token.comment}")`;
+            return `Comment("${node.comment}")`;
         case NodeType.Integer:
-            return `Integer(${node.token.value})`;
+            return `Integer(${node.value})`;
         case NodeType.ASCIIChar:
-            return `ASCII('${node.token.char}')`;
+            return `ASCII('${node.char}')`;
         case NodeType.Symbol:
-            return `Symbol("${node.token.symbol}")`;
+            return `Symbol("${node.name}")`;
         case NodeType.CLCValue:
             return "CLC()";
         case NodeType.SymbolGroup:
@@ -458,21 +473,21 @@ export function formatNode(node: Node): string {
         case NodeType.DoubleIntList:
             return `DublList([${node.list.map(x => formatNode(x))}])`;
         case NodeType.DoubleInt:
-            return `Dubl(${node.unaryOp?.operator ?? ""}${node.token.value})`;
+            return `Dubl(${node.unaryOp?.operator ?? ""}${node.value})`;
         case NodeType.FloatList:
             return `FltgList([${node.list.map(x => formatNode(x))}}])`;
         case NodeType.Float:
-            return `Float(${node.token.float})`;
+            return `Float(${node.unaryOp?.operator ?? ""}${node.value})`;
         case NodeType.ZeroBlock:
             return `ZeroBlock(${formatNode(node.expr)})`;
         case NodeType.DeviceName:
-            return `DeviceName("${node.name.token.symbol}")`;
+            return `DeviceName("${node.name}")`;
         case NodeType.MacroBody:
-            return `MacroBody("${replaceBlanks(Tokens.tokenToString(node.token))}")`;
+            return `MacroBody("${replaceBlanks(node.code)}")`;
         case NodeType.FileName:
-            return `Filename("${node.name.str}")`;
+            return `Filename("${node.name}")`;
         case NodeType.Eject:
-            return `Eject("${node.str.str}")`;
+            return `Eject("${node.text ? node.text : ""}")`;
         case NodeType.XList:
             return "XList()";
         case NodeType.Radix:

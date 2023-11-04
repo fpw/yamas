@@ -60,8 +60,8 @@ export class ExprEvaluator {
     private evalElement(ctx: Context, elem: Nodes.Element): number | null {
         let nodeVal: number | null;
         switch (elem.node.type) {
-            case NodeType.Integer:      nodeVal = parseIntSafe(elem.node.token.value, ctx.radix); break;
-            case NodeType.ASCIIChar:    nodeVal = CharSets.asciiCharTo7Bit(elem.node.token.char, true); break;
+            case NodeType.Integer:      nodeVal = parseIntSafe(elem.node.value, ctx.radix); break;
+            case NodeType.ASCIIChar:    nodeVal = CharSets.asciiCharTo7Bit(elem.node.char, true); break;
             case NodeType.Symbol:       nodeVal = nodeVal = this.evalSymbol(ctx, elem.node); break;
             case NodeType.CLCValue:     nodeVal = ctx.getClc(true); break;
         }
@@ -76,7 +76,7 @@ export class ExprEvaluator {
     }
 
     private evalSymbol(ctx: Context, node: Nodes.SymbolNode): number | null {
-        const sym = this.syms.tryLookup(node.token.symbol);
+        const sym = this.syms.tryLookup(node.name);
         if (!sym) {
             return null;
         }
@@ -115,7 +115,7 @@ export class ExprEvaluator {
         if (group.first.node.type != NodeType.Symbol) {
             throw Nodes.mkNodeError("Tried to evaluate MRI-group with non-MRI", group);
         }
-        const mri = this.syms.lookup(group.first.node.token.symbol);
+        const mri = this.syms.lookup(group.first.node.name);
 
         // It's allowed to have a negative MRI such as -TAD. Then the value is -TAD according
         // to PAL8. However, that's not allowed if any other operand is OR-ed after the space, e.g.
@@ -140,7 +140,7 @@ export class ExprEvaluator {
         for (let i = 0; i < exprs.length; i++) {
             const ex = exprs[i];
             if (ex.type == NodeType.Element && ex.node.type == NodeType.Symbol) {
-                const sym = this.syms.tryLookup(ex.node.token.symbol);
+                const sym = this.syms.tryLookup(ex.node.name);
                 if (!sym) {
                     return null;
                 } else if (sym.type == SymbolType.Permanent && i == 0) {
@@ -246,7 +246,7 @@ export class ExprEvaluator {
             return false;
         }
 
-        const sym = this.syms.tryLookup(expr.first.node.token.symbol);
+        const sym = this.syms.tryLookup(expr.first.node.name);
         if (!sym || sym.type != SymbolType.Fixed) {
             return false;
         }

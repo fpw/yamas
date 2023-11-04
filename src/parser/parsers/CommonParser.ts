@@ -67,7 +67,7 @@ export class CommonParser {
     }
 
     private toAscii(tok: Tokens.ASCIIToken): Nodes.ASCIIChar {
-        return { type: NodeType.ASCIIChar, token: tok };
+        return { type: NodeType.ASCIIChar, char: tok.char, token: tok };
     }
 
     public parseSymbol(gotTok?: Tokens.SymbolToken): Nodes.SymbolNode {
@@ -78,11 +78,11 @@ export class CommonParser {
             }
             gotTok = next;
         }
-        return { type: NodeType.Symbol, token: gotTok };
+        return { type: NodeType.Symbol, name: gotTok.name, token: gotTok };
     }
 
     public parseInteger(tok: Tokens.IntegerToken): Nodes.Integer {
-        return { type: NodeType.Integer, token: tok };
+        return { type: NodeType.Integer, value: tok.value, token: tok };
     }
 
     public parseSeparator(tok: Tokens.EOLToken | Tokens.SeparatorToken): Nodes.StatementSeparator {
@@ -94,6 +94,6 @@ export class CommonParser {
     }
 
     public parseComment(tok: Tokens.CommentToken): Nodes.Comment {
-        return { type: NodeType.Comment, token: tok };
+        return { type: NodeType.Comment, comment: tok.comment, token: tok };
     }
 }

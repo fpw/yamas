@@ -78,10 +78,8 @@ ExpressionStmt          = expr:Expression
 Separator               = ";"
                             { return {type: "Separator"}; }
 
-// Not using the |.., ","| syntax yet because peggy-tracks doesn't support it:
-// https://github.com/peggyjs/peggy-tracks/issues/11
-Invocation              = macro:Macro head:(_* @$[^,\r\n/]+)? tail:(("," _* @$[^,\r\n/]+)*)? _*
-                            { return {type: "Invocation", macro: macro, args: [head, ...tail]}; }
+Invocation              = macro:Macro args:(_* @$[^,\r\n/]+)|.., ","|
+                            { return {type: "Invocation", macro: macro, args: args}; }
 
 Comment                 = "/" text:$([^\r\n]*) EOL?
                             { return {type: "Comment", text: text}; }

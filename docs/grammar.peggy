@@ -24,7 +24,7 @@
         "EXPUNGE",  "FIXTAB",       "FIXMRI",
         "DECIMAL",  "OCTAL",
         "NOPUNCH",  "ENPUNCH",
-        "EJECT",    "XLIST",
+        "EJECT",    "XLIST",        "PAUSE",
     ];
 
     // converts head and tail[t1, t2, t3, ...] to {lhs: {lhs: {lhs: head, ...t1}, ...t2}, ...t3}
@@ -197,11 +197,15 @@ Device                  = "DEVICE" _ dev:StringContent
 FileName                = "FILENAME" _ name:StringContent
                             { return {type: "FileName", text: name}; }
 
-OutputCtrlPseudo        = EnPunch / NoPunch / Eject
+OutputCtrlPseudo        = EnPunch / NoPunch / Eject / Pause / XList
 EnPunch                 = "ENPUNCH"
                             { return {type: "EnPunch"}; }
 NoPunch                 = "NOPUNCH"
                             { return {type: "NoPunch"}; }
+Pause                   = "PAUSE"
+                            { return {type: "Pause"}; }
+XList                   = "XLIST"
+                            { return {type: "XList"}; }
 Eject                   = "EJECT" title:(_ @$[^\r\n/;]*)?
                             { return {type: "Eject", title: title}; }
 IntWithUnary            = u:[-+]? i:Integer

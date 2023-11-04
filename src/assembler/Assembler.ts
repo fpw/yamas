@@ -91,6 +91,7 @@ export class Assembler {
 
         register(NodeType.Eject, nullEffect);
         register(NodeType.XList, nullEffect);
+        register(NodeType.Pause, nullEffect);
     }
 
     private register<T extends Nodes.Statement>(type: T["type"], handler: StatementHandler<T>) {
@@ -147,15 +148,12 @@ export class Assembler {
         const errors: CodeError[] = [];
 
         const ctx = new Context(generateCode);
-
         this.output.punchOrigin(ctx);
 
         for (const prog of this.programs) {
             const asmErrors = this.assembleProgram(ctx, prog);
             errors.push(...asmErrors);
         }
-
-        this.output.punchOrigin(ctx);
         this.outputLinks(ctx);
 
         return errors;

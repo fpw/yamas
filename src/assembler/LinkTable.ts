@@ -42,8 +42,11 @@ export class LinkTable {
             return idx + delta;
         }
 
-        if (this.entries[page].length == PDP8.PageSize) {
-            throw Error(`No more space in link page ${page}`);
+        // on page 0, also make sure it doesn't collide with auto-index region
+        if (page == 0 && this.entries[0].length >= 0o160) {
+            throw Error("No more space on page 0");
+        } else if (this.entries[page].length >= 0o200) {
+            throw Error(`No more space on link page ${page}`);
         }
 
         this.entries[page].push(value);

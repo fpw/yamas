@@ -54,6 +54,7 @@ export enum NodeType {
     Radix,
     PunchControl,
     XList,
+    Pause,
     FixTab,
     Expunge,
     ChangePage,
@@ -90,7 +91,7 @@ export type Statement =
 
 export type PseudoStatement =
     DataStatement |
-    DefineStatement | EjectStatement | FixMriStatement | XListStatement |
+    DefineStatement | EjectStatement | FixMriStatement | XListStatement | PauseStatement |
     RadixStatement | PunchCtrlStatement | FixTabStatement | ExpungeStatement |
     IfZeroStatement | IfNotZeroStatement | IfDefStatement | IfNotDefStatement |
     ChangeFieldStatement | ChangePageStatement | RelocStatement;
@@ -288,6 +289,11 @@ export interface PunchCtrlStatement extends BaseNode {
 export interface XListStatement extends BaseNode {
     type: NodeType.XList;
     token: Tokens.SymbolToken; // on XLIST
+}
+
+export interface PauseStatement extends BaseNode {
+    type: NodeType.Pause;
+    token: Tokens.SymbolToken; // on PAUSE
 }
 
 // /Comment
@@ -490,6 +496,8 @@ export function formatNode(node: Node): string {
             return `Eject("${node.text ? node.text : ""}")`;
         case NodeType.XList:
             return "XList()";
+        case NodeType.Pause:
+            return "Pause()";
         case NodeType.Radix:
             return `Radix(${node.radix})`;
         case NodeType.FixTab:

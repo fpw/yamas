@@ -36,7 +36,7 @@ export class PseudoParser {
         "EXPUNGE",  "FIXTAB",       "FIXMRI",
         "DECIMAL",  "OCTAL",
         "NOPUNCH",  "ENPUNCH",
-        "EJECT",    "XLIST",
+        "EJECT",    "XLIST",        "PAUSE",
     ];
     private pseudoActions = new Map<string, PseudoHandler>();
 
@@ -87,6 +87,7 @@ export class PseudoParser {
 
         mkPseudo("EJECT", token => this.parseEject(token));
         mkPseudo("XLIST", token => ({ type: NodeType.XList, token }));
+        mkPseudo("PAUSE", token => ({ type: NodeType.Pause, token }));
         mkPseudo("ENPUNCH", token => ({ type: NodeType.PunchControl, enable: true, token }));
         mkPseudo("NOPUNCH", token => ({ type: NodeType.PunchControl, enable: false, token }));
     }

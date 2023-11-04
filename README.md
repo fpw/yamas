@@ -21,13 +21,13 @@ Currently, the following pseudos are supported:
 
  Type | Pseudos
 ------|---------
-Control of origin       |`PAGE`,     `FIELD`,        `RELOC`
-Conditionals and macros |`IFDEF`,    `IFNDEF`,       `IFNZRO`,   `IFZERO`,   `DEFINE`
-Data output             |`TEXT`,     `ZBLOCK`,       `DUBL`,     `FLTG`,     `DEVICE`,   `FILENAME`
-Symbol table control    |`EXPUNGE`,  `FIXTAB`,       `FIXMRI`
-Radix control           |`DECIMAL`,  `OCTAL`
-Output control          |`NOPUNCH`,  `ENPUNCH`
-No-ops                  |`EJECT`,    `XLIST`
+Control of origin       |`PAGE`,    `FIELD`,    `RELOC`
+Conditionals and macros |`IFDEF`,   `IFNDEF`,   `IFNZRO`,   `IFZERO`,   `DEFINE`
+Data output             |`TEXT`,    `ZBLOCK`,   `DUBL`,     `FLTG`,     `DEVICE`,   `FILENAME`
+Symbol table control    |`EXPUNGE`, `FIXTAB`,   `FIXMRI`
+Radix control           |`DECIMAL`, `OCTAL`
+Output control          |`NOPUNCH`, `ENPUNCH`
+No-ops                  |`EJECT`,   `XLIST`,    `PAUSE`,
 
 ### Is the generated code correct?
 "Correct" is hard to define since there are many different dialects of the language that are treated

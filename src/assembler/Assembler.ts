@@ -23,14 +23,14 @@ import { CodeError } from "../utils/CodeError.js";
 import * as PDP8 from "../utils/PDP8.js";
 import { Context } from "./Context.js";
 import { LinkTable } from "./LinkTable.js";
-import { StatementEffect, StatementHandler } from "./util/StatementEffect.js";
 import { SymbolData, SymbolTable } from "./SymbolTable.js";
 import { DataAssembler } from "./assemblers/DataAssembler.js";
 import { MacroAssembler } from "./assemblers/MacroAssembler.js";
 import { OriginAssembler } from "./assemblers/OriginAssembler.js";
 import { SymbolAssembler } from "./assemblers/SymbolAssembler.js";
 import { ExprEvaluator } from "./util/ExprEvaluator.js";
-import { OutputGenerator } from "./util/OutputGenerator.js";
+import { OutputFilter } from "./util/OutputFilter.js";
+import { RegisterFunction, StatementEffect, StatementHandler } from "./util/StatementEffect.js";
 
 export interface OutputHandler {
     changeOrigin(clc: number): void;
@@ -47,12 +47,12 @@ export interface AssemblerOptions extends ParserOptions {
 export class Assembler {
     private opts: AssemblerOptions;
     private syms = new SymbolTable();
-    private output: OutputGenerator;
+    private output: OutputFilter;
     private evaluator: ExprEvaluator;
     private programs: Nodes.Program[] = [];
     private linkTable = new LinkTable();
 
-    private stmtHandlers: StatementHandler[] = [];
+    private stmtHandlers: StatementHandler<Nodes.Statement>[] = [];
     private dataAssembler: DataAssembler;
     private macroAssembler: MacroAssembler;
     private symAssembler: SymbolAssembler;
@@ -60,22 +60,22 @@ export class Assembler {
 
     public constructor(options: AssemblerOptions) {
         this.opts = options;
-        this.output = new OutputGenerator(this.opts);
+        this.output = new OutputFilter(this.opts);
         this.evaluator = new ExprEvaluator(this.opts, this.syms, this.linkTable);
 
         this.dataAssembler = new DataAssembler(this.opts, this.output, this.evaluator);
-        this.registerHandlers(this.dataAssembler.handlers);
+        this.dataAssembler.registerHandlers(this.register.bind(this));
 
         this.macroAssembler = new MacroAssembler(this.opts, this.syms, this.output, this.evaluator);
-        this.registerHandlers(this.macroAssembler.handlers);
+        this.macroAssembler.registerHandlers(this.register.bind(this));
 
         this.symAssembler = new SymbolAssembler(this.opts, this.syms, this.evaluator);
-        this.registerHandlers(this.symAssembler.handlers);
+        this.symAssembler.registerHandlers(this.register.bind(this));
 
         this.originAssembler = new OriginAssembler(this.opts, this.evaluator);
-        this.registerHandlers(this.originAssembler.handlers);
+        this.originAssembler.registerHandlers(this.register.bind(this));
 
-        this.registerHandlers(this.handlers);
+        this.registerHandlers(this.register.bind(this));
 
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
@@ -86,22 +86,21 @@ export class Assembler {
             .forEach(k => this.syms.definePseudo(k));
     }
 
-    private get handlers(): [NodeType, StatementHandler][] {
-        const nullEffect = (ctx: Context, stmt: Nodes.Statement): StatementEffect => ({
-        });
+    private registerHandlers(register: RegisterFunction) {
+        const nullEffect = (ctx: Context, stmt: Nodes.Statement): StatementEffect => ({});
 
-        return [
-            [NodeType.Separator, nullEffect],
-            [NodeType.Comment, nullEffect],
-            [NodeType.Eject, nullEffect],
-            [NodeType.XList, nullEffect],
-        ];
+        register(NodeType.Eject, nullEffect);
+        register(NodeType.XList, nullEffect);
     }
 
-    private registerHandlers(hs: [NodeType, StatementHandler][]) {
-        hs.forEach(([type, handler]) => {
-            this.stmtHandlers[type] = handler;
-        });
+    private register<T extends Nodes.Statement>(type: T["type"], handler: StatementHandler<T>) {
+        if (this.stmtHandlers[type]) {
+            throw Error(`Multiple handlers for ${Nodes.NodeType[type]}`);
+        }
+
+        // storing as if it was a generic handler for any handler, so promise:
+        // only calling [x] with matching type index
+        this.stmtHandlers[type] = handler as StatementHandler<Nodes.Statement>;
     }
 
     public setOutputHandler(out: OutputHandler) {
@@ -120,31 +119,44 @@ export class Assembler {
     }
 
     public assembleAll(): CodeError[] {
-        const errors: CodeError[] = this.programs.map(p => p.errors).flat();
+        // protect against being called with parse errors present
+        const parseErrors = this.programs.map(p => p.errors).flat();
+        if (parseErrors.length > 0) {
+            return parseErrors;
+        }
 
         // pass 1: assign all symbols and links that can be evaluated in a single pass
-        const symCtx = new Context(false);
-        for (const prog of this.programs) {
-            const symErrors = this.assembleProgram(symCtx, prog);
-            errors.push(...symErrors);
-        }
-        if (errors.length > 0) {
-            return errors;
+        const pass1Errors = this.doPass(false);
+        if (pass1Errors.length > 0) {
+            return pass1Errors;
         }
 
         // pass 2: generate code and assign missing symbols and links on the go
         // we must clear the link table because it's possible that the previous pass left it
         // in another field, so we'll just fill it again in pass 2
         this.linkTable.clear();
+        const pass2Errors = this.doPass(true);
+        if (pass2Errors.length > 0) {
+            return pass2Errors;
+        }
 
-        const asmCtx = new Context(true);
-        this.output.punchOrigin(asmCtx);
+        return [];
+    }
+
+    private doPass(generateCode: boolean) {
+        const errors: CodeError[] = [];
+
+        const ctx = new Context(generateCode);
+
+        this.output.punchOrigin(ctx);
+
         for (const prog of this.programs) {
-            const asmErrors = this.assembleProgram(asmCtx, prog);
+            const asmErrors = this.assembleProgram(ctx, prog);
             errors.push(...asmErrors);
         }
 
-        this.outputLinks(asmCtx);
+        this.output.punchOrigin(ctx);
+        this.outputLinks(ctx);
 
         return errors;
     }
@@ -169,8 +181,9 @@ export class Assembler {
     private handleStatement(ctx: Context, stmt: Nodes.Statement): CodeError[] {
         const handler = this.stmtHandlers[stmt.type];
         if (!handler) {
-            throw Error(`No handler for ${NodeType[stmt.type]}`);
+            return [];
         }
+
         const effect = handler(ctx, stmt);
 
         if (effect.incClc !== undefined) {
@@ -185,8 +198,8 @@ export class Assembler {
             this.relocClc(ctx, effect.relocClc);
         }
 
-        if (effect.executeProgram) {
-            const subErrors = this.assembleProgram(ctx, effect.executeProgram);
+        if (effect.assembleSubProgram) {
+            const subErrors = this.assembleProgram(ctx, effect.assembleSubProgram);
             return subErrors;
         }
         return [];

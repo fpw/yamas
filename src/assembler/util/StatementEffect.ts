@@ -1,7 +1,8 @@
-import { Program, Statement } from "../../index.js";
+import { Node, Program, Statement } from "../../parser/Node.js";
 import { Context } from "../Context.js";
 
-export type StatementHandler = (ctx: Context, stmt: Statement) => StatementEffect;
+export type StatementHandler<T extends Node> = (ctx: Context, stmt: T) => StatementEffect;
+export type RegisterFunction =  <T extends Statement>(type: T["type"], handler: StatementHandler<T>) => void;
 
 export interface StatementEffect {
     // increase CLC by given amount
@@ -14,5 +15,5 @@ export interface StatementEffect {
     changeField?: number;
 
     // assembler and execute a sub-program
-    executeProgram?: Program;
+    assembleSubProgram?: Program;
 }

@@ -20,34 +20,35 @@ import { Parser } from "../../index.js";
 import * as Nodes from "../../parser/Node.js";
 import { NodeType } from "../../parser/Node.js";
 import { Assembler, AssemblerOptions } from "../Assembler.js";
-import { StatementEffect, StatementHandler } from "../util/StatementEffect.js";
 import { Context } from "../Context.js";
 import { SymbolTable } from "../SymbolTable.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
-import { OutputGenerator } from "../util/OutputGenerator.js";
+import { OutputFilter } from "../util/OutputFilter.js";
+import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 
+/**
+ * Assembler for conditional and macro statements.
+ */
 export class MacroAssembler {
     public opts: AssemblerOptions;
     private syms: SymbolTable;
-    public output: OutputGenerator;
+    public output: OutputFilter;
     public evaluator: ExprEvaluator;
 
-    public constructor(opts: AssemblerOptions, syms: SymbolTable, output: OutputGenerator, evaluator: ExprEvaluator) {
+    public constructor(opts: AssemblerOptions, syms: SymbolTable, output: OutputFilter, evaluator: ExprEvaluator) {
         this.opts = opts;
         this.syms = syms;
         this.evaluator = evaluator;
         this.output = output;
     }
 
-    public get handlers(): [NodeType, StatementHandler][] {
-        return [
-            [NodeType.Define, (ctx, stmt) => this.handleDefine(ctx, stmt as Nodes.DefineStatement)],
-            [NodeType.Invocation, (ctx, stmt) => this.handleInvocation(ctx, stmt as Nodes.Invocation)],
-            [NodeType.IfDef, (ctx, stmt) => this.handleIfDef(ctx, stmt as Nodes.IfDefStatement)],
-            [NodeType.IfNotDef, (ctx, stmt) => this.handleIfDef(ctx, stmt as Nodes.IfNotDefStatement)],
-            [NodeType.IfZero, (ctx, stmt) => this.handleIfZero(ctx, stmt as Nodes.IfZeroStatement)],
-            [NodeType.IfNotZero, (ctx, stmt) => this.handleIfZero(ctx, stmt as Nodes.IfNotZeroStatement)],
-        ];
+    public registerHandlers(register: RegisterFunction) {
+        register(NodeType.Define, this.handleDefine.bind(this));
+        register(NodeType.Invocation, this.handleInvocation.bind(this));
+        register(NodeType.IfDef, this.handleIfDef.bind(this));
+        register(NodeType.IfNotDef, this.handleIfDef.bind(this));
+        register(NodeType.IfZero, this.handleIfZero.bind(this));
+        register(NodeType.IfNotZero, this.handleIfZero.bind(this));
     }
 
     private handleDefine(ctx: Context, stmt: Nodes.DefineStatement): StatementEffect {
@@ -96,10 +97,10 @@ export class MacroAssembler {
             }
         }
 
-        return { executeProgram: body.parsed };
+        return { assembleSubProgram: body.parsed };
     }
 
     private handleInvocation(ctx: Context, stmt: Nodes.Invocation): StatementEffect {
-        return { executeProgram: stmt.program };
+        return { assembleSubProgram: stmt.program };
     }
 }

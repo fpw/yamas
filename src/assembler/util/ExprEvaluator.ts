@@ -26,6 +26,16 @@ import { Context } from "../Context.js";
 import { LinkTable } from "../LinkTable.js";
 import { SymbolTable, SymbolType } from "../SymbolTable.js";
 
+/**
+ * Class to evaluate expressions.
+ * Note that evaluating an expression can have side effects:
+ *  - an expression like (2) needs to evaluate to a link address, so a link must be generated
+ *  - likewise, "TAD 1234" is an expression that might need to create a link
+ *
+ * An expression can contain undefined symbols. tryEval returns null if an expression is undefined
+ * while safeEval throws on undefined expressions.
+ *
+ */
 export class ExprEvaluator {
     public constructor(private opts: AssemblerOptions, private syms: SymbolTable, private linkTable: LinkTable) {
     }

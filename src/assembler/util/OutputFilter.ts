@@ -19,7 +19,12 @@
 import { AssemblerOptions, OutputHandler } from "../Assembler.js";
 import { Context } from "../Context.js";
 
-export class OutputGenerator {
+/**
+ * A little helper class that puts a filter around OutputHandler to only
+ * output when we actually want to. This allows us to put all the logic
+ * that can disable output in this central location instead of every call site.
+ */
+export class OutputFilter {
     private outputHandler?: OutputHandler;
 
     public constructor(private options: AssemblerOptions) {

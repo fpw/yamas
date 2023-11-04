@@ -19,11 +19,14 @@
 import * as Nodes from "../../parser/Node.js";
 import { NodeType } from "../../parser/Node.js";
 import { AssemblerOptions } from "../Assembler.js";
-import { StatementEffect, StatementHandler } from "../util/StatementEffect.js";
 import { Context } from "../Context.js";
 import { SymbolTable } from "../SymbolTable.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
+import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 
+/**
+ * Assembler for statements related to symbol table manipulation.
+ */
 export class SymbolAssembler {
     public opts: AssemblerOptions;
     private syms: SymbolTable;
@@ -35,14 +38,12 @@ export class SymbolAssembler {
         this.evaluator = evaluator;
     }
 
-    public get handlers(): [NodeType, StatementHandler][] {
-        return [
-            [NodeType.Assignment, (ctx, stmt) => this.handleAssignment(ctx, stmt as Nodes.AssignStatement)],
-            [NodeType.FixMri, (ctx, stmt) => this.handleFixMri(ctx, stmt as Nodes.FixMriStatement)],
-            [NodeType.Label, (ctx, stmt) => this.handleLabel(ctx, stmt as Nodes.LabelDef)],
-            [NodeType.FixTab, (ctx, stmt) => this.handleFixTab(ctx, stmt as Nodes.FixTabStatement)],
-            [NodeType.Expunge, (ctx, stmt) => this.handleExpunge(ctx, stmt as Nodes.ExpungeStatement)],
-        ];
+    public registerHandlers(register: RegisterFunction) {
+        register(NodeType.Assignment, this.handleAssignment.bind(this));
+        register(NodeType.FixMri, this.handleFixMri.bind(this));
+        register(NodeType.Label, this.handleLabel.bind(this));
+        register(NodeType.FixTab, this.handleFixTab.bind(this));
+        register(NodeType.Expunge, this.handleExpunge.bind(this));
     }
 
     private handleLabel(ctx: Context, stmt: Nodes.LabelDef): StatementEffect {

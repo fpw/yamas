@@ -21,10 +21,13 @@ import * as Nodes from "../../parser/Node.js";
 import { NodeType } from "../../parser/Node.js";
 import * as PDP8 from "../../utils/PDP8.js";
 import { AssemblerOptions } from "../Assembler.js";
-import { StatementEffect, StatementHandler } from "../util/StatementEffect.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
+import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 
+/**
+ * Assembler for statements to origin changes.
+ */
 export class OriginAssembler {
     public opts: AssemblerOptions;
     public evaluator: ExprEvaluator;
@@ -34,13 +37,11 @@ export class OriginAssembler {
         this.evaluator = evaluator;
     }
 
-    public get handlers(): [NodeType, StatementHandler][] {
-        return [
-            [NodeType.ChangePage, (ctx, stmt) => this.handlePage(ctx, stmt as Nodes.ChangePageStatement)],
-            [NodeType.ChangeField, (ctx, stmt) => this.handleField(ctx, stmt as Nodes.ChangeFieldStatement)],
-            [NodeType.Reloc, (ctx, stmt) => this.handleReloc(ctx, stmt as Nodes.RelocStatement)],
-            [NodeType.Origin, (ctx, stmt) => this.handleOrigin(ctx, stmt as Nodes.OriginStatement)],
-        ];
+    public registerHandlers(register: RegisterFunction) {
+        register(NodeType.ChangePage, this.handlePage.bind(this));
+        register(NodeType.ChangeField, this.handleField.bind(this));
+        register(NodeType.Reloc, this.handleReloc.bind(this));
+        register(NodeType.Origin, this.handleOrigin.bind(this));
     }
 
     private handleOrigin(ctx: Context, stmt: Nodes.OriginStatement): StatementEffect {

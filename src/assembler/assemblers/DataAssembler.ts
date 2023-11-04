@@ -22,34 +22,49 @@ import * as CharSets from "../../utils/CharSets.js";
 import { toDECFloat } from "../../utils/Floats.js";
 import { parseIntSafe } from "../../utils/Strings.js";
 import { Assembler, AssemblerOptions } from "../Assembler.js";
-import { StatementEffect, StatementHandler } from "../util/StatementEffect.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
-import { OutputGenerator } from "../util/OutputGenerator.js";
+import { OutputFilter } from "../util/OutputFilter.js";
+import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 
+/**
+ * Assembler for statements related to data output.
+ */
 export class DataAssembler {
     public opts: AssemblerOptions;
     public evaluator: ExprEvaluator;
-    public output: OutputGenerator;
+    public output: OutputFilter;
 
-    public constructor(opts: AssemblerOptions, output: OutputGenerator, evaluator: ExprEvaluator) {
+    public constructor(opts: AssemblerOptions, output: OutputFilter, evaluator: ExprEvaluator) {
         this.opts = opts;
         this.evaluator = evaluator;
         this.output = output;
     }
 
-    public get handlers(): [NodeType, StatementHandler][] {
-        return [
-            [NodeType.Radix, (ctx, stmt) => this.handleRadix(ctx, stmt as Nodes.RadixStatement)],
-            [NodeType.ExpressionStmt, (ctx, stmt) => this.handleExprStmt(ctx, stmt as Nodes.ExpressionStatement)],
-            [NodeType.PunchControl, (ctx, stmt) => this.handlePunchControl(ctx, stmt as Nodes.PunchCtrlStatement)],
-            [NodeType.ZeroBlock, (ctx, stmt) => this.handleZBlock(ctx, stmt as Nodes.ZBlockStatement)],
-            [NodeType.Text, (ctx, stmt) => this.handleText(ctx, stmt as Nodes.TextStatement)],
-            [NodeType.FileName, (ctx, stmt) => this.handleFileName(ctx, stmt as Nodes.FilenameStatement)],
-            [NodeType.DeviceName, (ctx, stmt) => this.handleDevice(ctx, stmt as Nodes.DevNameStatement)],
-            [NodeType.DoubleIntList, (ctx, stmt) => this.handleDubl(ctx, stmt as Nodes.DoubleIntList)],
-            [NodeType.FloatList, (ctx, stmt) => this.handleFltg(ctx, stmt as Nodes.FloatList)],
-        ];
+    public registerHandlers(register: RegisterFunction) {
+        register(NodeType.ExpressionStmt, this.handleExprStmt.bind(this));
+        register(NodeType.Radix, this.handleRadix.bind(this));
+        register(NodeType.PunchControl, this.handlePunchControl.bind(this));
+        register(NodeType.ZeroBlock, this.handleZBlock.bind(this));
+        register(NodeType.Text, this.handleText.bind(this));
+        register(NodeType.FileName, this.handleFileName.bind(this));
+        register(NodeType.DeviceName, this.handleDevice.bind(this));
+        register(NodeType.DoubleIntList, this.handleDubl.bind(this));
+        register(NodeType.FloatList, this.handleFltg.bind(this));
+    }
+
+    private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): StatementEffect {
+        // we need to evaluate in both passes to generate links in MRI statements in correct order
+        const val = this.evaluator.tryEval(ctx, stmt.expr);
+
+        // but in pass 2, we really need to access the value
+        if (ctx.generateCode) {
+            if (val === null) {
+                throw Assembler.mkError("Undefined expression", stmt);
+            }
+            this.output.punchData(ctx, ctx.getClc(false), val);
+        }
+        return { incClc: 1 };
     }
 
     private handleRadix(ctx: Context, stmt: Nodes.RadixStatement): StatementEffect {
@@ -133,17 +148,5 @@ export class DataAssembler {
     private handlePunchControl(ctx: Context, stmt: Nodes.PunchCtrlStatement): StatementEffect {
         ctx.punchEnabled = stmt.enable;
         return {};
-    }
-
-    private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): StatementEffect {
-        // we need to evaluate in both passes to generate links in MRI statements in correct order
-        const val = this.evaluator.tryEval(ctx, stmt.expr);
-        if (ctx.generateCode) {
-            if (val === null) {
-                throw Assembler.mkError("Undefined expression", stmt);
-            }
-            this.output.punchData(ctx, ctx.getClc(false), val);
-        }
-        return { incClc: 1 };
     }
 }

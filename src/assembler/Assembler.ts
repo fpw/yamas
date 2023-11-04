@@ -23,7 +23,8 @@ import { CodeError } from "../utils/CodeError.js";
 import * as PDP8 from "../utils/PDP8.js";
 import { Context } from "./Context.js";
 import { LinkTable } from "./LinkTable.js";
-import { SymbolData, SymbolTable } from "./SymbolTable.js";
+import { SymbolData } from "./SymbolData.js";
+import { SymbolTable } from "./SymbolTable.js";
 import { DataAssembler } from "./assemblers/DataAssembler.js";
 import { MacroAssembler } from "./assemblers/MacroAssembler.js";
 import { OriginAssembler } from "./assemblers/OriginAssembler.js";
@@ -169,7 +170,7 @@ export class Assembler {
                 if (e instanceof CodeError) {
                     errors.push(e);
                 } else if (e instanceof Error) {
-                    errors.push(new CodeError(e.message, prog.inputName, 0, 0));
+                    errors.push(Nodes.mkNodeError(e.message, stmt));
                 }
             }
         }
@@ -219,10 +220,13 @@ export class Assembler {
     private incClc(ctx: Context, incClc: number) {
         // we just put something in interval [current CLC, current CLC + incClc)
         // -> check if it overlapped with a link by checking the last written address
-        const oldClc = ctx.getClc(false);
-        const newClc = oldClc + incClc;
+        const firstWrite = ctx.getClc(false);
+        const newClc = firstWrite + incClc;
         const lastWrite = newClc - 1;
-        this.linkTable.checkOverlap(lastWrite);
+        // TODO: This could be optimized
+        for (let addr = firstWrite; addr <= lastWrite; addr++) {
+            this.linkTable.checkOverlap(addr);
+        }
         ctx.setClc(newClc, false);
     }
 

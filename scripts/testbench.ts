@@ -77,7 +77,7 @@ function createOptions(json?: object): YamasOptions {
 
 function testOne(opts: YamasOptions, srcPath: string, bnPath: string): boolean {
     const shouldBin = readFileSync(bnPath);
-    const src = readFileSync(srcPath, "ascii");
+    const src = readFileSync(srcPath, "utf-8");
 
     try {
         const yamas = new Yamas(opts);

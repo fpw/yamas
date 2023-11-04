@@ -24,7 +24,8 @@ import { parseIntSafe } from "../../utils/Strings.js";
 import { AssemblerOptions } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { LinkTable } from "../LinkTable.js";
-import { SymbolTable, SymbolType } from "../SymbolTable.js";
+import { SymbolType } from "../SymbolData.js";
+import { SymbolTable } from "../SymbolTable.js";
 
 /**
  * Class to evaluate expressions.

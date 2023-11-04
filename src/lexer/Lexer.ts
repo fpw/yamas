@@ -49,6 +49,10 @@ export class Lexer {
         return this.inputName;
     }
 
+    public getCursor(): Cursor {
+        return this.cursor;
+    }
+
     public next(): Tokens.Token {
         const data = this.getData();
         if (this.cursor.dataIdx >= data.length) {

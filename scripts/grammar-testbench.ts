@@ -72,7 +72,7 @@ function createOptions(json?: object): YamasOptions {
 }
 
 function testOne(parser: peggy.Parser, opts: YamasOptions, srcPath: string): boolean {
-    const src = readFileSync(srcPath, "ascii");
+    const src = readFileSync(srcPath, "utf-8");
 
     try {
         parser.parse(src, opts);

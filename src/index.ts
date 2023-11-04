@@ -22,6 +22,7 @@ export * from "./lexer/Token.js";
 export * from "./parser/Node.js";
 export * from "./parser/Parser.js";
 export * from "./assembler/Assembler.js";
+export * from "./assembler/SymbolData.js";
 export * from "./tapeformats/BinTapeReader.js";
 export * from "./tapeformats/BinTapeWriter.js";
 export * from "./utils/CodeError.js";

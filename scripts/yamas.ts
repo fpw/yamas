@@ -101,7 +101,7 @@ const cmd = command({
 
         const yamas = new Yamas(opts);
         for (const file of files) {
-            const src = readFileSync(file, "ascii");
+            const src = readFileSync(file, "utf-8");
             const ast = yamas.addInput(file, src);
             if (args.outputAst) {
                 const astFile = openSync(basename(file) + ".ast.txt", "w");

@@ -17,6 +17,7 @@
  */
 
 import { Assembler, AssemblerOptions } from "./assembler/Assembler.js";
+import { SymbolData } from "./assembler/SymbolData.js";
 import { Program } from "./parser/Node.js";
 import { PreludeFamily8 } from "./prelude/Family8.js";
 import { PreludeIO } from "./prelude/IO.js";
@@ -36,6 +37,7 @@ export interface YamasOptions extends AssemblerOptions {
 export interface YamasOutput {
     binary: Uint8Array;
     errors: CodeError[];
+    symbols: SymbolData[];
 }
 
 export class Yamas {
@@ -66,7 +68,8 @@ export class Yamas {
 
     public run(): YamasOutput {
         const errors = this.asm.assembleAll();
+        const symbols = this.asm.getSymbols();
         const binary = this.binTape.finish();
-        return { binary, errors };
+        return { binary, symbols, errors };
     }
 }

@@ -17,22 +17,7 @@
  */
 
 import { normalizeSymbolName } from "../utils/Strings.js";
-
-export enum SymbolType {
-    Param,      // A=x
-    Label,      // A,
-    Pseudo,     // PAGE, DECIMAL, ...
-    Fixed,      // Converted from param using FIXTAB. Means no output in symbol table.
-    Permanent,  // I and Z
-    Macro,      // DEFINE
-}
-
-export interface SymbolData {
-    type: SymbolType;
-    name: string;
-    value: number;
-    forceMri?: boolean;
-}
+import { SymbolData, SymbolType } from "./SymbolData.js";
 
 export class SymbolTable {
     private symbols = new Map<string, SymbolData>();
@@ -117,7 +102,7 @@ export class SymbolTable {
 
     public getSymbols(): SymbolData[] {
         const all = [...this.symbols.values()];
-        return all.sort((a, b) => a.name.localeCompare(b.name, "ascii"));
+        return all.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     private defineSymbol(data: SymbolData) {

@@ -16,6 +16,7 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { mkCursorError } from "../lexer/Cursor.js";
 import { Lexer } from "../lexer/Lexer.js";
 import { CodeError } from "../utils/CodeError.js";
 import * as Nodes from "./Node.js";
@@ -64,7 +65,7 @@ export class Parser {
                 if (e instanceof CodeError) {
                     prog.errors.push(e);
                 } else if (e instanceof Error) {
-                    prog.errors.push(new CodeError(e.message, this.lexer.getInputName(), 0, 0));
+                    prog.errors.push(mkCursorError(e.message, this.lexer.getCursor()));
                 }
                 this.lexer.ignoreCurrentLine();
             }

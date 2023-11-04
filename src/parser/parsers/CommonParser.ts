@@ -21,7 +21,7 @@ import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
 import * as Nodes from "../Node.js";
 import { NodeType } from "../Node.js";
-import { Parser, ParserOptions } from "../Parser.js";
+import { ParserOptions } from "../Parser.js";
 
 export class CommonParser {
     public constructor(private opts: ParserOptions, private lexer: Lexer) {
@@ -52,7 +52,7 @@ export class CommonParser {
                 break;
         }
 
-        throw Parser.mkTokError(`Element expected, got ${Tokens.tokenToString(tok)}`, tok);
+        throw Tokens.mkTokError(`Element expected, got ${Tokens.tokenToString(tok)}`, tok);
     }
 
     public toUnaryOp(tok: Tokens.CharToken): Nodes.UnaryOp {
@@ -74,7 +74,7 @@ export class CommonParser {
         if (!gotTok) {
             const next = this.lexer.nextNonBlank();
             if (next.type != TokenType.Symbol) {
-                throw Parser.mkTokError("Symbol expected", next);
+                throw Tokens.mkTokError("Symbol expected", next);
             }
             gotTok = next;
         }

@@ -16,8 +16,9 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { CodeError } from "../utils/CodeError.js";
 import { replaceBlanks } from "../utils/Strings.js";
-import { Cursor } from "./Lexer.js";
+import { Cursor, mkCursorError } from "./Cursor.js";
 
 export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";
 export type ParenChr =  "(" | ")" | "[" | "]";
@@ -118,6 +119,10 @@ export interface SeparatorToken extends BaseToken {
 export interface EOFToken extends BaseToken {
     type: TokenType.EOF;
     char?: "$"; // if enforced
+}
+
+export function mkTokError(msg: string, curToken: Token): CodeError {
+    return mkCursorError(msg, curToken.cursor);
 }
 
 export function tokenToString(tok: Token): string {

@@ -19,7 +19,7 @@
 import { Parser } from "../../index.js";
 import * as Nodes from "../../parser/Node.js";
 import { NodeType } from "../../parser/Node.js";
-import { Assembler, AssemblerOptions } from "../Assembler.js";
+import { AssemblerOptions } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { SymbolTable } from "../SymbolTable.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
@@ -80,7 +80,7 @@ export class MacroAssembler {
             return this.handleConditionBody(ctx, stmt.body);
         } else {
             if (stmt.body.parsed) {
-                throw Assembler.mkError("Condition was true in pass 1, now false -> Illegal", stmt.body);
+                throw Nodes.mkNodeError("Condition was true in pass 1, now false -> Illegal", stmt.body);
             }
             return {};
         }
@@ -93,7 +93,7 @@ export class MacroAssembler {
             body.parsed = parser.parseProgram();
         } else {
             if (!body.parsed) {
-                throw Assembler.mkError("Condition was false in pass 1, now true -> Illegal", body);
+                throw Nodes.mkNodeError("Condition was false in pass 1, now true -> Illegal", body);
             }
         }
 

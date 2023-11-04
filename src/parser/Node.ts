@@ -19,6 +19,7 @@
 import { replaceBlanks } from "../utils/Strings.js";
 import * as Tokens from "../lexer/Token.js";
 import { CodeError } from "../utils/CodeError.js";
+import { mkTokError } from "../lexer/Token.js";
 
 export enum NodeType {
     // Program
@@ -369,6 +370,20 @@ export interface SymbolNode extends BaseNode {
 export interface CLCValue extends BaseNode {
     type: NodeType.CLCValue;
     token: Tokens.CharToken;
+}
+
+export function mkNodeError(msg: string, lastNode: Node): CodeError {
+    if ("token" in lastNode) {
+        return mkTokError(msg, lastNode.token);
+    }
+
+    switch (lastNode.type) {
+        case NodeType.Program:          return new CodeError(msg, lastNode.inputName, 0, 0);
+        case NodeType.ExpressionStmt:   return mkNodeError(msg, lastNode.expr);
+        case NodeType.Invocation:       return mkTokError(msg, lastNode.name.token);
+        case NodeType.SymbolGroup:      return mkNodeError(msg, lastNode.first);
+        case NodeType.Element:          return mkNodeError(msg, lastNode.node);
+    }
 }
 
 export function dumpNode(prog: Program, write: (line: string) => void, indent = 0) {

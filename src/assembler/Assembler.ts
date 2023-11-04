@@ -248,8 +248,4 @@ export class Assembler {
             curAddr++;
         });
     }
-
-    public static mkError(msg: string, node: Nodes.Node) {
-        return Parser.mkNodeError(msg, node);
-    }
 }

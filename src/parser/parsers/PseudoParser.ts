@@ -22,9 +22,9 @@ import { TokenType } from "../../lexer/Token.js";
 import { normalizeSymbolName } from "../../utils/Strings.js";
 import * as Nodes from "../Node.js";
 import { NodeType } from "../Node.js";
-import { Parser, ParserOptions } from "../Parser.js";
-import { ExprParser } from "./ExprParser.js";
+import { ParserOptions } from "../Parser.js";
 import { CommonParser } from "./CommonParser.js";
+import { ExprParser } from "./ExprParser.js";
 
 type PseudoHandler = (symbol: Tokens.SymbolToken) => Nodes.Statement;
 
@@ -106,7 +106,7 @@ export class PseudoParser {
     private parseParam(startSym: Tokens.SymbolToken): Nodes.Expression {
         const expr = this.parseOptionalParam(startSym);
         if (!expr) {
-            throw Parser.mkTokError("Parameter expected", startSym);
+            throw Tokens.mkTokError("Parameter expected", startSym);
         }
         return expr;
     }
@@ -115,7 +115,7 @@ export class PseudoParser {
         this.lexer.unget(startSym);
         const expr = this.exprParser.parseExpr();
         if (expr.type != NodeType.SymbolGroup) {
-            throw Parser.mkNodeError("Symbol group expected", expr);
+            throw Nodes.mkNodeError("Symbol group expected", expr);
         }
 
         if (expr.exprs.length == 0) {
@@ -123,7 +123,7 @@ export class PseudoParser {
         }
 
         if (expr.exprs.length != 1) {
-            throw Parser.mkNodeError("Too many arguments", expr);
+            throw Nodes.mkNodeError("Too many arguments", expr);
         }
 
         return expr.exprs[0];
@@ -161,7 +161,7 @@ export class PseudoParser {
                 body = this.parseMacroBody(next);
                 break;
             } else {
-                throw Parser.mkTokError("Invalid DEFINE syntax: Expecting symbols and body", next);
+                throw Tokens.mkTokError("Invalid DEFINE syntax: Expecting symbols and body", next);
             }
         }
 
@@ -182,7 +182,7 @@ export class PseudoParser {
                 return { type: NodeType.FixMri, assignment: assign, token: startSym };
             }
         }
-        throw Parser.mkTokError("FIXMRI must be followed by assignment statement", startSym);
+        throw Tokens.mkTokError("FIXMRI must be followed by assignment statement", startSym);
     }
 
     private parseFilename(startSym: Tokens.SymbolToken): Nodes.FilenameStatement {
@@ -197,7 +197,7 @@ export class PseudoParser {
         if (!gotTok) {
             const next = this.lexer.nextNonBlank(true);
             if (next.type != TokenType.MacroBody) {
-                throw Parser.mkTokError("Macro body expected", next);
+                throw Tokens.mkTokError("Macro body expected", next);
             }
             gotTok = next;
         }
@@ -206,7 +206,7 @@ export class PseudoParser {
         if (next.type != TokenType.Separator && next.type != TokenType.Comment &&
             next.type != TokenType.EOL && next.type != TokenType.EOF
         ) {
-            throw Parser.mkTokError("Stray token after macro body", next);
+            throw Tokens.mkTokError("Stray token after macro body", next);
         }
         this.lexer.unget(next);
 
@@ -268,7 +268,7 @@ export class PseudoParser {
                 if (next.char == "+" || next.char == "-") {
                     const nextInt = this.lexer.next();
                     if (nextInt.type != TokenType.Integer) {
-                        throw Parser.mkTokError("Unexpected unary operand", nextInt);
+                        throw Tokens.mkTokError("Unexpected unary operand", nextInt);
                     }
                     return { type: NodeType.DoubleInt, unaryOp: this.commonParser.toUnaryOp(next), token: nextInt };
                 } else {

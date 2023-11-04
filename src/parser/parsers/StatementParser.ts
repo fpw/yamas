@@ -66,7 +66,7 @@ export class StatementParser {
             case TokenType.EOF:
                 return undefined;
         }
-        throw Parser.mkTokError(`Statement expected, got ${Tokens.tokenToString(tok)}`, tok);
+        throw Tokens.mkTokError(`Statement expected, got ${Tokens.tokenToString(tok)}`, tok);
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
@@ -140,7 +140,7 @@ export class StatementParser {
         const nameSym = this.commonParser.parseSymbol();
         const macro = this.macros.get(nameSym.token.symbol);
         if (!macro) {
-            throw Parser.mkNodeError("Not a macro", nameSym);
+            throw Nodes.mkNodeError("Not a macro", nameSym);
         }
 
         const args: Tokens.MacroBodyToken[] = [];
@@ -151,7 +151,7 @@ export class StatementParser {
 
         const next = this.lexer.nextNonBlank();
         if (![TokenType.Comment, TokenType.Separator, TokenType.EOF, TokenType.EOL].includes(next.type)) {
-            throw Parser.mkTokError("Excessive argument for macro", next);
+            throw Tokens.mkTokError("Excessive argument for macro", next);
         }
         this.lexer.unget(next);
 
@@ -184,7 +184,7 @@ export class StatementParser {
             const line = e.line;
             const col = e.col;
             const msg = e.message;
-            throw Parser.mkTokError(`Error invoking ${name}: "${msg}", in invocation line ${line}:${col}`, nameSym);
+            throw Tokens.mkTokError(`Error invoking ${name}: "${msg}", in invocation line ${line}:${col}`, nameSym);
         }
     }
 }

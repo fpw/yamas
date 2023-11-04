@@ -16,21 +16,10 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { CodeError } from "../utils/CodeError.js";
 import { replaceBlanks } from "../utils/Strings.js";
-import { TokenType } from "./Token.js";
+import { Cursor, mkCursorError } from "./Cursor.js";
 import * as Tokens from "./Token.js";
-
-export interface Cursor {
-    inputName: string;
-    dataIdx: number;
-    colIdx: number;
-    lineIdx: number;
-
-    // set if we are inside a text substitution, i.e. a macro argument appearing inside the body
-    // will be set to the actual text of the substitution to avoid repeated lookups
-    activeSubst?: string;
-}
+import { TokenType } from "./Token.js";
 
 export class Lexer {
     private static FloatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([eE][-+]?\d+)?/; // +-ddd.dddE+-ddd
@@ -127,7 +116,7 @@ export class Lexer {
         const data = this.getData();
         const match = data.substring(this.cursor.dataIdx).match(Lexer.FloatRegex);
         if (!match) {
-            throw Lexer.mkError("Invalid float format", startCursor);
+            throw mkCursorError("Invalid float format", startCursor);
         }
 
         this.advanceCursor(match[0].length);
@@ -157,7 +146,7 @@ export class Lexer {
 
         const arg = rawArg.trim();
         if (arg.length == 0) {
-            throw Lexer.mkError("Expected macro argument", startCursor);
+            throw mkCursorError("Expected macro argument", startCursor);
         }
 
         this.advanceCursor(rawArg.length + (hadComma ? 1 : 0));
@@ -177,7 +166,7 @@ export class Lexer {
         const toSubst = (tok.cursor.activeSubst !== undefined);
 
         if (fromSubst != toSubst) {
-            throw Lexer.mkError("Can't unget across substitution boundaries", this.cursor);
+            throw mkCursorError("Can't unget across substitution boundaries", this.cursor);
         }
 
         this.cursor = tok.cursor;
@@ -233,7 +222,7 @@ export class Lexer {
     private activateSubstitution(symbol: string) {
         const subst = this.substitutions.get(symbol);
         if (!subst || this.savedCursor || this.cursor.activeSubst) {
-            throw Lexer.mkError("Logic error in substitution", this.cursor);
+            throw mkCursorError("Logic error in substitution", this.cursor);
         }
 
         this.savedCursor = this.cursor;
@@ -352,7 +341,7 @@ export class Lexer {
         }
 
         if (level != 0) {
-            throw Lexer.mkError("Unterminated macro body", startCursor);
+            throw mkCursorError("Unterminated macro body", startCursor);
         }
         return { type: TokenType.MacroBody, body, ...this.getTokenMeasurement(startCursor) };
     }
@@ -408,7 +397,7 @@ export class Lexer {
                 };
         }
 
-        throw Lexer.mkError(`Unexpected character '${replaceBlanks(chr)}'`, startCursor);
+        throw mkCursorError(`Unexpected character '${replaceBlanks(chr)}'`, startCursor);
     }
 
     private advanceCursor(step: number) {
@@ -449,9 +438,5 @@ export class Lexer {
             cursor: start,
             width: end.dataIdx - start.dataIdx,
         };
-    }
-
-    public static mkError(msg: string, cursor: Cursor): CodeError {
-        return new CodeError(msg, cursor.inputName, cursor.lineIdx + 1, cursor.colIdx + 1);
     }
 }

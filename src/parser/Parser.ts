@@ -17,7 +17,6 @@
  */
 
 import { Lexer } from "../lexer/Lexer.js";
-import * as Tokens from "../lexer/Token.js";
 import { CodeError } from "../utils/CodeError.js";
 import * as Nodes from "./Node.js";
 import { NodeType } from "./Node.js";
@@ -72,23 +71,5 @@ export class Parser {
         };
 
         return prog;
-    }
-
-    public static mkNodeError(msg: string, lastNode: Nodes.Node): CodeError {
-        if ("token" in lastNode) {
-            return Parser.mkTokError(msg, lastNode.token);
-        }
-
-        switch (lastNode.type) {
-            case NodeType.Program:          return new CodeError(msg, lastNode.inputName, 0, 0);
-            case NodeType.ExpressionStmt:   return Parser.mkNodeError(msg, lastNode.expr);
-            case NodeType.Invocation:       return Parser.mkTokError(msg, lastNode.name.token);
-            case NodeType.SymbolGroup:      return Parser.mkNodeError(msg, lastNode.first);
-            case Nodes.NodeType.Element:    return Parser.mkNodeError(msg, lastNode.node);
-        }
-    }
-
-    public static mkTokError(msg: string, curToken: Tokens.Token): CodeError {
-        return Lexer.mkError(msg, curToken.cursor);
     }
 }

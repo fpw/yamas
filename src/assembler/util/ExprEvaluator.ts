@@ -21,7 +21,7 @@ import { NodeType } from "../../parser/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
 import * as PDP8 from "../../utils/PDP8.js";
 import { parseIntSafe } from "../../utils/Strings.js";
-import { Assembler, AssemblerOptions } from "../Assembler.js";
+import { AssemblerOptions } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { LinkTable } from "../LinkTable.js";
 import { SymbolTable, SymbolType } from "../SymbolTable.js";
@@ -43,7 +43,7 @@ export class ExprEvaluator {
     public safeEval(ctx: Context, expr: Nodes.Expression): number {
         const val = this.tryEval(ctx, expr);
         if (val === null) {
-            throw Assembler.mkError("Undefined expression", expr);
+            throw Nodes.mkNodeError("Undefined expression", expr);
         }
         return val;
     }
@@ -81,7 +81,7 @@ export class ExprEvaluator {
             return null;
         }
         if (sym.type == SymbolType.Macro || sym.type == SymbolType.Pseudo) {
-            throw Assembler.mkError("Macro and pseudo symbols not allowed here", node);
+            throw Nodes.mkNodeError("Macro and pseudo symbols not allowed here", node);
         }
         return sym.value;
     }
@@ -113,7 +113,7 @@ export class ExprEvaluator {
 
     private evalMRI(ctx: Context, group: Nodes.SymbolGroup): number | null {
         if (group.first.node.type != NodeType.Symbol) {
-            throw Assembler.mkError("Tried to evaluate MRI-group with non-MRI", group);
+            throw Nodes.mkNodeError("Tried to evaluate MRI-group with non-MRI", group);
         }
         const mri = this.syms.lookup(group.first.node.token.symbol);
 
@@ -124,7 +124,7 @@ export class ExprEvaluator {
         // But it's also not a real MRI because we never encode any real destination.
         if (group.first.unaryOp !== undefined) {
             if (group.exprs.length > 0) {
-                throw Assembler.mkError("MRI expression with parameters is illegal with parameters", group);
+                throw Nodes.mkNodeError("MRI expression with parameters is illegal with parameters", group);
             }
             return (group.first.unaryOp.operator == "-" ?  -mri.value : mri.value) & 0o7777;
         }
@@ -196,7 +196,7 @@ export class ExprEvaluator {
         } else if (expr.paren == "[") {
             return this.linkTable.enter(ctx, 0, val);
         } else {
-            throw Assembler.mkError(`Invalid parentheses: "${expr.paren}"`, expr);
+            throw Nodes.mkNodeError(`Invalid parentheses: "${expr.paren}"`, expr);
         }
     }
 

@@ -28,7 +28,7 @@ export class BinTapeWriter {
         this.writeLeader(2 * 12 * 10); // 2 feet = 12 inch of 10 byte each
     }
 
-    public writeDataWord(word: number, checked: boolean): void {
+    public writeDataWord(word: number, checked = true): void {
         this.writeByte(((word >> 6) & 0o077), checked);
         this.writeByte(word & 0o077, checked);
     }

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { dumpNode } from "../../src/parser/Node.js";
+import { dumpNode } from "../../../src/parser/Node.js";
 import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a full example listing", () => {

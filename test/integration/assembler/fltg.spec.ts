@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { fromDecFloat } from "../../src/utils/Floats.js";
+import { fromDecFloat } from "../../../src/utils/Floats.js";
 import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a program with FLTG statements", () => {

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { decStringToAscii, os8NameToASCII } from "../../src/utils/CharSets.js";
+import { decStringToAscii, os8NameToASCII } from "../../../src/utils/CharSets.js";
 import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a program containing pseudo statements", () => {

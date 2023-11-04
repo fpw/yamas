@@ -16,10 +16,10 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { replaceBlanks } from "../utils/Strings.js";
 import * as Tokens from "../lexer/Token.js";
-import { CodeError } from "../utils/CodeError.js";
 import { mkTokError } from "../lexer/Token.js";
+import { CodeError } from "../utils/CodeError.js";
+import { replaceBlanks } from "../utils/Strings.js";
 
 export enum NodeType {
     // Program

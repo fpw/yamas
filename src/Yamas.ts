@@ -50,7 +50,7 @@ export class Yamas {
         this.asm.setOutputHandler({
             changeField: field => this.binTape.writeField(field),
             changeOrigin: org => this.binTape.writeOrigin(org),
-            writeValue: (_clc, val) => this.binTape.writeDataWord(val, true),
+            writeValue: (_clc, val) => this.binTape.writeDataWord(val),
         });
 
         if (this.opts.loadPrelude) {

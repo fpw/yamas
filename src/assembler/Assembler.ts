@@ -19,13 +19,17 @@
 import * as Nodes from "../parser/Node.js";
 import { NodeType } from "../parser/Node.js";
 import { Parser, ParserOptions } from "../parser/Parser.js";
-import * as CharSets from "../utils/CharSets.js";
 import { CodeError } from "../utils/CodeError.js";
 import * as PDP8 from "../utils/PDP8.js";
 import { Context } from "./Context.js";
 import { LinkTable } from "./LinkTable.js";
+import { StatementEffect, StatementHandler } from "./util/StatementEffect.js";
 import { SymbolData, SymbolTable } from "./SymbolTable.js";
-import { Evaluator } from "./util/Evaluator.js";
+import { DataAssembler } from "./assemblers/DataAssembler.js";
+import { MacroAssembler } from "./assemblers/MacroAssembler.js";
+import { OriginAssembler } from "./assemblers/OriginAssembler.js";
+import { SymbolAssembler } from "./assemblers/SymbolAssembler.js";
+import { ExprEvaluator } from "./util/ExprEvaluator.js";
 import { OutputGenerator } from "./util/OutputGenerator.js";
 
 export interface OutputHandler {
@@ -36,21 +40,43 @@ export interface OutputHandler {
 
 export interface AssemblerOptions extends ParserOptions {
     orDoesShift?: boolean;  // like /B in PAL8: A!B becomes A * 100 + B
-    noNullTermination?: boolean; // like /F in PAL8: do not null-terminat even-length TEXTs
+    noNullTermination?: boolean; // like /F in PAL8: do not null-terminate even-length TEXTs
+    forgetLiterals?: boolean; // like /W in PAL8: punch and clear literals on PAGE
 }
 
 export class Assembler {
     private opts: AssemblerOptions;
     private syms = new SymbolTable();
     private output: OutputGenerator;
+    private evaluator: ExprEvaluator;
     private programs: Nodes.Program[] = [];
     private linkTable = new LinkTable();
-    private evaluator: Evaluator;
+
+    private stmtHandlers: StatementHandler[] = [];
+    private dataAssembler: DataAssembler;
+    private macroAssembler: MacroAssembler;
+    private symAssembler: SymbolAssembler;
+    private originAssembler: OriginAssembler;
 
     public constructor(options: AssemblerOptions) {
         this.opts = options;
         this.output = new OutputGenerator(this.opts);
-        this.evaluator = new Evaluator(this.opts, this.syms, this.linkTable);
+        this.evaluator = new ExprEvaluator(this.opts, this.syms, this.linkTable);
+
+        this.dataAssembler = new DataAssembler(this.opts, this.output, this.evaluator);
+        this.registerHandlers(this.dataAssembler.handlers);
+
+        this.macroAssembler = new MacroAssembler(this.opts, this.syms, this.output, this.evaluator);
+        this.registerHandlers(this.macroAssembler.handlers);
+
+        this.symAssembler = new SymbolAssembler(this.opts, this.syms, this.evaluator);
+        this.registerHandlers(this.symAssembler.handlers);
+
+        this.originAssembler = new OriginAssembler(this.opts, this.evaluator);
+        this.registerHandlers(this.originAssembler.handlers);
+
+        this.registerHandlers(this.handlers);
+
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
 
@@ -58,6 +84,24 @@ export class Assembler {
         Parser.SupportedPseudos
             .filter(k => !this.opts.disabledPseudos?.includes(k))
             .forEach(k => this.syms.definePseudo(k));
+    }
+
+    private get handlers(): [NodeType, StatementHandler][] {
+        const nullEffect = (ctx: Context, stmt: Nodes.Statement): StatementEffect => ({
+        });
+
+        return [
+            [NodeType.Separator, nullEffect],
+            [NodeType.Comment, nullEffect],
+            [NodeType.Eject, nullEffect],
+            [NodeType.XList, nullEffect],
+        ];
+    }
+
+    private registerHandlers(hs: [NodeType, StatementHandler][]) {
+        hs.forEach(([type, handler]) => {
+            this.stmtHandlers[type] = handler;
+        });
     }
 
     public setOutputHandler(out: OutputHandler) {
@@ -81,7 +125,7 @@ export class Assembler {
         // pass 1: assign all symbols and links that can be evaluated in a single pass
         const symCtx = new Context(false);
         for (const prog of this.programs) {
-            const symErrors = this.assignSymbols(symCtx, prog);
+            const symErrors = this.assembleProgram(symCtx, prog);
             errors.push(...symErrors);
         }
         if (errors.length > 0) {
@@ -105,28 +149,12 @@ export class Assembler {
         return errors;
     }
 
-    private assignSymbols(ctx: Context, prog: Nodes.Program): CodeError[] {
-        const errors: CodeError[] = [];
-        for (const stmt of prog.stmts) {
-            try {
-                this.updateSymbols(ctx, stmt);
-                this.updateCLC(ctx, stmt);
-            } catch (e) {
-                if (e instanceof CodeError) {
-                    errors.push(e);
-                } else if (e instanceof Error) {
-                    errors.push(new CodeError(e.message, prog.inputName, 0, 0));
-                }
-            }
-        }
-        return errors;
-    }
-
     private assembleProgram(ctx: Context, prog: Nodes.Program): CodeError[] {
         const errors: CodeError[] = [];
         for (const stmt of prog.stmts) {
             try {
-                this.assembleStatement(ctx, stmt);
+                const subErrors = this.handleStatement(ctx, stmt);
+                errors.push(...subErrors);
             } catch (e) {
                 if (e instanceof CodeError) {
                     errors.push(e);
@@ -138,251 +166,62 @@ export class Assembler {
         return errors;
     }
 
-    private assembleStatement(ctx: Context, stmt: Nodes.Statement) {
-        const out = this.output;
-        let gen = false;
-        switch (stmt.type) {
-            case NodeType.ZeroBlock:        gen = this.handleZBlock(ctx, stmt); break;
-            case NodeType.Text:             gen = out.outputText(ctx, stmt.str.str); break;
-            case NodeType.DoubleIntList:    gen = out.outputDubl(ctx, stmt); break;
-            case NodeType.FloatList:        gen = out.outputFltg(ctx, stmt); break;
-            case NodeType.DeviceName:       gen = out.outputDeviceName(ctx, stmt.name.token.symbol); break;
-            case NodeType.FileName:         gen = out.outputFileName(ctx, stmt.name.str); break;
-            case NodeType.ExpressionStmt:   gen = this.handleExprStmt(ctx, stmt); break;
+    private handleStatement(ctx: Context, stmt: Nodes.Statement): CodeError[] {
+        const handler = this.stmtHandlers[stmt.type];
+        if (!handler) {
+            throw Error(`No handler for ${NodeType[stmt.type]}`);
+        }
+        const effect = handler(ctx, stmt);
+
+        if (effect.incClc !== undefined) {
+            this.incClc(ctx, effect.incClc);
         }
 
-        if (gen) {
-            // we just put something at CLC - check if it overlapped with a link
-            this.linkTable.checkOverlap(ctx.getClc(false));
+        if (effect.changeField !== undefined) {
+            this.changeField(ctx, effect.changeField);
         }
 
-        // symbols need to be updated here as well because it's possible to use
-        // undefined symbols on the right hand side of A=B in pass 1
-        this.updateSymbols(ctx, stmt);
-        this.updateCLC(ctx, stmt);
+        if (effect.relocClc !== undefined) {
+            this.relocClc(ctx, effect.relocClc);
+        }
+
+        if (effect.executeProgram) {
+            const subErrors = this.assembleProgram(ctx, effect.executeProgram);
+            return subErrors;
+        }
+        return [];
     }
 
-    private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): boolean {
-        const val = this.evaluator.tryEval(ctx, stmt.expr);
-        if (ctx.generateCode) {
-            if (val === null) {
-                throw Assembler.mkError("Undefined expression", stmt);
-            }
-            this.output.punchData(ctx, ctx.getClc(false), val);
+    private relocClc(ctx: Context, newClc: number) {
+        const oldPage = PDP8.calcPageNum(ctx.getClc(true));
+        ctx.setClc(newClc, true);
+        const newPage = PDP8.calcPageNum(ctx.getClc(true));
+
+        if (this.opts.forgetLiterals && oldPage != newPage) {
+            this.outputLinks(ctx);
+            this.linkTable.clear();
         }
-        return true;
+
+        this.output.punchOrigin(ctx);
     }
 
-    private handleZBlock(ctx: Context, stmt: Nodes.ZBlockStatement): boolean {
-        const amount = this.evaluator.safeEval(ctx, stmt.expr);
-        this.output.outputZBlock(ctx, amount);
-        return true;
-    }
-
-    // eslint-disable-next-line max-lines-per-function
-    private updateSymbols(ctx: Context, stmt: Nodes.Statement) {
-        switch (stmt.type) {
-            case NodeType.Assignment:
-                const paramVal = this.evaluator.tryEval(ctx, stmt.val);
-                // undefined expressions lead to undefined symbols
-                if (paramVal !== null) {
-                    this.syms.defineParameter(stmt.sym.token.symbol, paramVal);
-                }
-                break;
-            case NodeType.FixMri:
-                const val = this.evaluator.safeEval(ctx, stmt.assignment.val);
-                this.syms.defineForcedMri(stmt.assignment.sym.token.symbol, val);
-                break;
-            case NodeType.Label:
-                this.syms.defineLabel(stmt.sym.token.symbol, ctx.getClc(true));
-                break;
-            case NodeType.Define:
-                if (!ctx.generateCode) {
-                    // define macros only once so we don't get duplicates in next pass
-                    this.syms.defineMacro(stmt.name.token.symbol);
-                }
-                break;
-            case NodeType.IfDef:
-            case NodeType.IfNotDef:
-                this.handleIfDef(ctx, stmt);
-                break;
-            case NodeType.IfZero:
-            case NodeType.IfNotZero:
-                this.handleIfZero(ctx, stmt);
-                break;
-            case NodeType.Invocation:
-                this.handleSubProgram(ctx, stmt.program);
-                break;
-            case NodeType.Radix:
-                ctx.radix = stmt.radix;
-                break;
-            case NodeType.PunchControl:
-                ctx.punchEnabled = stmt.enable;
-                break;
-            case NodeType.FixTab:
-                this.handleFixTab(ctx);
-                break;
-            case NodeType.Expunge:
-                this.handleExpunge(ctx);
-                break;
-            case NodeType.ChangePage:
-                this.handlePage(ctx, stmt);
-                break;
-            case NodeType.ChangeField:
-                this.handleField(ctx, stmt);
-                break;
-            case NodeType.Reloc:
-                this.handleReloc(ctx, stmt);
-                break;
-            case NodeType.ExpressionStmt:
-                // must also handle them here to assign links
-                if (!ctx.generateCode) {
-                    this.handleExprStmt(ctx, stmt);
-                }
-                break;
-        }
-    }
-
-    private updateCLC(ctx: Context, stmt: Nodes.Statement) {
-        let newClc = ctx.getClc(false);
-
-        switch (stmt.type) {
-            case NodeType.Origin:
-                newClc = this.evaluator.safeEval(ctx, stmt.val);
-                ctx.setClc(newClc, true);
-                this.output.punchOrigin(ctx);
-                return;
-            case NodeType.ZeroBlock:
-                newClc += this.evaluator.safeEval(ctx, stmt.expr);
-                break;
-            case NodeType.Text:
-                newClc += CharSets.asciiStringToDec(stmt.str.str, !this.opts.noNullTermination).length;
-                break;
-            case NodeType.DeviceName:
-                newClc += 2;
-                break;
-            case NodeType.FileName:
-                newClc += 4;
-                break;
-            case NodeType.DoubleIntList:
-                newClc += stmt.list.filter(x => x.type == NodeType.DoubleInt).length * 2;
-                break;
-            case NodeType.FloatList:
-                newClc += stmt.list.filter(x => x.type == NodeType.Float).length * 3;
-                break;
-            case NodeType.ExpressionStmt:
-                newClc++;
-                break;
-        }
+    private incClc(ctx: Context, incClc: number) {
+        // we just put something in interval [current CLC, current CLC + incClc)
+        // -> check if it overlapped with a link by checking the last written address
+        const oldClc = ctx.getClc(false);
+        const newClc = oldClc + incClc;
+        const lastWrite = newClc - 1;
+        this.linkTable.checkOverlap(lastWrite);
         ctx.setClc(newClc, false);
     }
 
-    private handlePage(ctx: Context, stmt: Nodes.ChangePageStatement) {
-        let newPage: number;
-        if (!stmt.expr) {
-            // subtracting 1 because the cursor is already at the next statement
-            const curPage = PDP8.calcPageNum(ctx.getClc(true) - 1);
-            newPage = curPage + 1;
-        } else {
-            newPage = this.evaluator.safeEval(ctx, stmt.expr);
-            if (newPage < 0 || newPage >= PDP8.NumPages) {
-                throw Assembler.mkError(`Invalid page ${newPage}`, stmt);
-            }
-        }
-        ctx.setClc(PDP8.firstAddrInPage(newPage), true);
-        if (ctx.generateCode) {
-            this.output.punchOrigin(ctx);
-        }
-    }
-
-    private handleField(ctx: Context, stmt: Nodes.ChangeFieldStatement) {
-        const field = this.evaluator.safeEval(ctx, stmt.expr);
-        if (field < 0 || field >= PDP8.NumFields) {
-            throw Assembler.mkError(`Invalid field ${field}`, stmt);
-        }
-        if (ctx.reloc) {
-            throw Assembler.mkError("Changing FIELD with active reloc not supported", stmt);
-        }
-
+    private changeField(ctx: Context, field: number) {
         ctx.field = field;
+        this.outputLinks(ctx);
         ctx.setClc(PDP8.firstAddrInPage(1), false);
-        if (ctx.generateCode) {
-            this.outputLinks(ctx);
-            this.output.punchField(ctx, field);
-            this.output.punchOrigin(ctx);
-        }
+        this.output.punchField(ctx, field);
+        this.output.punchOrigin(ctx);
         this.linkTable.clear();
-    }
-
-    private handleReloc(ctx: Context, stmt: Nodes.RelocStatement) {
-        if (!stmt.expr) {
-            ctx.reloc = 0;
-        } else {
-            const reloc = this.evaluator.safeEval(ctx, stmt.expr);
-            ctx.reloc = reloc - ctx.getClc(false);
-        }
-    }
-
-    private handleIfDef(ctx: Context, stmt: Nodes.IfDefStatement | Nodes.IfNotDefStatement) {
-        const sym = this.syms.tryLookup(stmt.symbol.token.symbol);
-        if ((sym && stmt.type == NodeType.IfDef) || (!sym && stmt.type == NodeType.IfNotDef)) {
-            this.handleConditionBody(ctx, stmt.body);
-        }
-    }
-
-    private handleIfZero(ctx: Context, stmt: Nodes.IfZeroStatement | Nodes.IfNotZeroStatement) {
-        // It's allowed to use IFZERO with undefined expressions if they are later defined
-        // However, that only makes sense if the bodies don't generate code.
-        // Otherwise, we would get different CLCs after the body in pass 1 vs 2.
-        // We will notice that later because parsing happens in pass 1 and execution in pass 2 where the body
-        // will be unparsed if this happens.
-        const exVal = this.evaluator.tryEval(ctx, stmt.expr);
-        const val = (exVal === null ? 0 : exVal);
-
-        if ((val == 0 && stmt.type == NodeType.IfZero) || (val != 0 && stmt.type == NodeType.IfNotZero)) {
-            this.handleConditionBody(ctx, stmt.body);
-        } else {
-            if (stmt.body.parsed) {
-                throw Assembler.mkError("Condition was true in pass 1, now false -> Illegal", stmt.body);
-            }
-        }
-    }
-
-    private handleConditionBody(ctx: Context, body: Nodes.MacroBody) {
-        if (!ctx.generateCode) {
-            const name = body.token.cursor.inputName + `:ConditionOnLine${body.token.cursor.lineIdx + 1}`;
-            const parser = new Parser(this.opts, name, body.token.body);
-            body.parsed = parser.parseProgram();
-        } else {
-            if (!body.parsed) {
-                throw Assembler.mkError("Condition was false in pass 1, now true -> Illegal", body);
-            }
-        }
-        const errors = this.handleSubProgram(ctx, body.parsed);
-        if (errors.length > 0) {
-            // TODO: We can't pass errors upwards yet, so just rethrow the first one
-            throw errors[0];
-        }
-    }
-
-    private handleSubProgram(ctx: Context, program: Nodes.Program): CodeError[] {
-        if (!ctx.generateCode) {
-            return this.assignSymbols(ctx, program);
-        } else {
-            return this.assembleProgram(ctx, program);
-        }
-    }
-
-    private handleFixTab(ctx: Context) {
-        if (!ctx.generateCode) {
-            this.syms.fix();
-        }
-    }
-
-    private handleExpunge(ctx: Context) {
-        if (!ctx.generateCode) {
-            this.syms.expunge();
-        }
     }
 
     private outputLinks(ctx: Context) {

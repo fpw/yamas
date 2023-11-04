@@ -16,11 +16,6 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as Nodes from "../../parser/Node.js";
-import { NodeType } from "../../parser/Node.js";
-import * as CharSets from "../../utils/CharSets.js";
-import { toDECFloat } from "../../utils/Floats.js";
-import { parseIntSafe } from "../../utils/Strings.js";
 import { AssemblerOptions, OutputHandler } from "../Assembler.js";
 import { Context } from "../Context.js";
 
@@ -34,91 +29,21 @@ export class OutputGenerator {
         this.outputHandler = out;
     }
 
-    public outputZBlock(ctx: Context, num: number): boolean {
-        let loc = ctx.getClc(false);
-        for (let i = 0; i < num; i++) {
-            this.punchData(ctx, loc, 0);
-            loc++;
-        }
-        return true;
-    }
-
-    public outputText(ctx: Context, text: string): boolean {
-        const outStr = CharSets.asciiStringToDec(text, !this.options.noNullTermination);
-        const addr = ctx.getClc(false);
-        outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
-        return true;
-    }
-
-    public outputFileName(ctx: Context, text: string): boolean {
-        const outStr = CharSets.asciiStringToOS8Name(text);
-        const addr = ctx.getClc(false);
-        outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
-        return true;
-    }
-
-    public outputDeviceName(ctx: Context, name: string): boolean {
-        const dev = name.padEnd(4, "\0");
-        const outStr = CharSets.asciiStringToDec(dev, false);
-        const addr = ctx.getClc(false);
-        outStr.forEach((w, i) => this.punchData(ctx, addr + i, w));
-        return true;
-    }
-
-    public outputDubl(ctx: Context, stmt: Nodes.DoubleIntList): boolean {
-        if (stmt.list.length == 0) {
-            return false;
-        }
-
-        let loc = ctx.getClc(false);
-        for (const dubl of stmt.list) {
-            if (dubl.type != NodeType.DoubleInt) {
-                continue;
-            }
-            let num = parseIntSafe(dubl.token.value, 10);
-            if (dubl.unaryOp?.operator === "-") {
-                num = -num;
-            }
-            this.punchData(ctx, loc++, (num >> 12) & 0o7777);
-            this.punchData(ctx, loc++, num & 0o7777);
-        }
-        return true;
-    }
-
-    public outputFltg(ctx: Context, stmt: Nodes.FloatList): boolean {
-        if (stmt.list.length == 0) {
-            return false;
-        }
-
-        let loc = ctx.getClc(false);
-        for (const fltg of stmt.list) {
-            if (fltg.type != NodeType.Float) {
-                continue;
-            }
-
-            const [e, m1, m2] = toDECFloat(fltg.token.float);
-            this.punchData(ctx, loc++, e);
-            this.punchData(ctx, loc++, m1);
-            this.punchData(ctx, loc++, m2);
-        }
-        return true;
-    }
-
     public punchData(ctx: Context, addr: number, val: number) {
-        if (ctx.punchEnabled && this.outputHandler) {
+        if (ctx.doOutput && this.outputHandler) {
             this.outputHandler.writeValue(addr, val);
         }
     }
 
     public punchOrigin(ctx: Context, origin?: number) {
-        if (ctx.punchEnabled && this.outputHandler) {
+        if (ctx.doOutput && this.outputHandler) {
             const to = origin ?? ctx.getClc(false);
             this.outputHandler.changeOrigin(to);
         }
     }
 
     public punchField(ctx: Context, field: number) {
-        if (ctx.punchEnabled && this.outputHandler) {
+        if (ctx.doOutput && this.outputHandler) {
             this.outputHandler.changeField(field);
         }
     }

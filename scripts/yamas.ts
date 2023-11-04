@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable max-lines-per-function */
 /*
  *   Yamas - Yet Another Macro Assembler (for the PDP-8)
  *   Copyright (C) 2023 Folke Will <folko@solhost.org>
@@ -17,7 +18,7 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { command, flag, option, optional, positional, run, string } from "cmd-ts";
+import { array, command, flag, option, optional, positional, run, string } from "cmd-ts";
 import { closeSync, openSync, readFileSync, writeFileSync } from "fs";
 import { basename } from "path";
 import { Yamas, YamasOptions } from "../src/Yamas.js";
@@ -54,10 +55,21 @@ const cmd = command({
             short: "a",
             description: "Write abstract syntax tree",
         }),
+        forgetLiterals: flag({
+            long: "forget-literals",
+            short: "w",
+            description: "Forget literals on page change, like /W in PAL8",
+        }),
         compareWith: option({
             long: "compare",
             short: "c",
             description: "Compare output with given bin file",
+            type: optional(string),
+        }),
+        disabledPseudos: option({
+            long: "disable-pseudos",
+            short: "d",
+            description: "Disable pseudo symbols",
             type: optional(string),
         }),
         filesStr: positional({
@@ -66,7 +78,7 @@ const cmd = command({
             type: optional(string),
         }),
     },
-    // eslint-disable-next-line max-lines-per-function
+
     handler: (args) => {
         if (args.version) {
             console.log(`Yamas ${process.env.npm_package_version}`);
@@ -82,6 +94,8 @@ const cmd = command({
         opts.loadPrelude = !args.noPrelude;
         opts.orDoesShift = args.orShifts;
         opts.noNullTermination = args.noNullTermination;
+        opts.disabledPseudos = args.disabledPseudos?.split(",");
+        opts.forgetLiterals = args.forgetLiterals;
 
         const files = args.filesStr.split(" ");
 
@@ -97,7 +111,11 @@ const cmd = command({
         }
 
         const output = yamas.run();
-        output.errors.forEach(e => console.error(formatCodeError(e)));
+        if (output.errors.length > 0) {
+            output.errors.forEach(e => console.error(formatCodeError(e)));
+            process.exit(-1);
+        }
+
         if (output.errors.length == 0) {
             const lastName = files[files.length - 1];
             writeFileSync(basename(lastName) + ".bin", output.binary);

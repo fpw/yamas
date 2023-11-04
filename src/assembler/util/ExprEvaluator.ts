@@ -26,7 +26,7 @@ import { Context } from "../Context.js";
 import { LinkTable } from "../LinkTable.js";
 import { SymbolTable, SymbolType } from "../SymbolTable.js";
 
-export class Evaluator {
+export class ExprEvaluator {
     public constructor(private opts: AssemblerOptions, private syms: SymbolTable, private linkTable: LinkTable) {
     }
 

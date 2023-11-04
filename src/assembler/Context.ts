@@ -66,6 +66,10 @@ export class Context {
         return this.generateCode_;
     }
 
+    public get doOutput() {
+        return this.generateCode && this.punchEnabled;
+    }
+
     public getClc(doReloc: boolean) {
         return (this.clc + (doReloc ? this.reloc : 0)) & 0o7777;
     }

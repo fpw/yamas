@@ -68,6 +68,10 @@ function createOptions(json?: object): YamasOptions {
         opts.disabledPseudos = json.disabledPseudos as string[];
     }
 
+    if ("forgetLiterals" in json) {
+        opts.forgetLiterals = json.forgetLiterals as boolean;
+    }
+
     return opts;
 }
 

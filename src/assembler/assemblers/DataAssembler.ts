@@ -16,12 +16,12 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as Nodes from "../../parser/Node.js";
-import { NodeType } from "../../parser/Node.js";
+import * as Nodes from "../../parser/nodes/Node.js";
+import { NodeType } from "../../parser/nodes/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
 import { toDECFloat } from "../../utils/Floats.js";
 import { parseIntSafe } from "../../utils/Strings.js";
-import { Assembler, AssemblerOptions } from "../Assembler.js";
+import { AssemblerOptions } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
 import { OutputFilter } from "../util/OutputFilter.js";

@@ -16,8 +16,8 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as Nodes from "../../parser/Node.js";
-import { NodeType } from "../../parser/Node.js";
+import * as Nodes from "../../parser/nodes/Node.js";
+import { NodeType } from "../../parser/nodes/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
 import * as PDP8 from "../../utils/PDP8.js";
 import { parseIntSafe } from "../../utils/Strings.js";

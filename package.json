@@ -3,7 +3,10 @@
   "description": "Yet Another Macro Assembler: A PDP-8 assembler.",
   "version": "0.0.5",
   "author": "Folke Will <folko@solhost.org>",
-  "keywords": ["PDP-8", "assembler"],
+  "keywords": [
+    "PDP-8",
+    "assembler"
+  ],
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",

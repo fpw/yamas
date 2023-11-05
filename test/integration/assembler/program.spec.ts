@@ -1,5 +1,4 @@
 /* eslint-disable max-lines-per-function */
-import { dumpNode } from "../../../src/parser/Node.js";
 import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a full example listing", () => {
@@ -64,11 +63,6 @@ describe("GIVEN a full example listing", () => {
             expect(data.memory[0o577]).toEqual(0o0003);
             expect(data.memory[0o10177]).toEqual(0o0002);
             expect(data.memory[0o20177]).toEqual(0o0003);
-
-            // Dumping a complex AST should not crash
-            let ast = "";
-            dumpNode(data.ast, line => ast += line + "\n");
-            expect(ast.length).toBeGreaterThan(0);
         });
     });
 });

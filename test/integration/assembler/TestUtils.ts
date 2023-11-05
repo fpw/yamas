@@ -1,6 +1,6 @@
 /* eslint-disable max-lines-per-function */
 import { Assembler } from "../../../src/assembler/Assembler.js";
-import { Program, dumpNode } from "../../../src/parser/Node.js";
+import { Program } from "../../../src/parser/nodes/Node.js";
 import { PreludeFamily8 } from "../../../src/prelude/Family8.js";
 import { PreludeIO } from "../../../src/prelude/IO.js";
 import { Prelude8E } from "../../../src/prelude/PDP8E.js";
@@ -50,9 +50,6 @@ export function assembleWithErrors(input: string): TestData {
 
     const symbols: Record<string, number> = {};
     asm.getSymbols().forEach(sym => symbols[sym.name] = sym.value);
-
-    // indirectly test that dumpNode doesn't throw
-    dumpNode(ast, () => null);
 
     return { asm, errors, ast, symbols, orgs, memory };
 }

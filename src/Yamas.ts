@@ -18,7 +18,7 @@
 
 import { Assembler, AssemblerOptions } from "./assembler/Assembler.js";
 import { SymbolData } from "./assembler/SymbolData.js";
-import { Program } from "./parser/Node.js";
+import { Program } from "./parser/nodes/Node.js";
 import { PreludeFamily8 } from "./prelude/Family8.js";
 import { PreludeIO } from "./prelude/IO.js";
 import { Prelude8E } from "./prelude/PDP8E.js";

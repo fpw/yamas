@@ -18,13 +18,14 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { array, command, flag, option, optional, positional, run, string } from "cmd-ts";
+import { command, flag, option, optional, restPositionals, run, string } from "cmd-ts";
 import { closeSync, openSync, readFileSync, writeFileSync } from "fs";
 import { basename } from "path";
+import { version } from "../package.json";
 import { Yamas, YamasOptions } from "../src/Yamas.js";
-import { dumpNode } from "../src/parser/Node.js";
-import { formatCodeError } from "../src/utils/CodeError.js";
+import { dumpAst } from "../src/parser/nodes/dumpAst.js";
 import { compareBin } from "../src/tapeformats/compareBin.js";
+import { formatCodeError } from "../src/utils/CodeError.js";
 
 // eslint-disable-next-line max-lines-per-function
 const cmd = command({
@@ -72,23 +73,25 @@ const cmd = command({
             description: "Disable pseudo symbols",
             type: optional(string),
         }),
-        filesStr: positional({
+        files: restPositionals({
             description: "Input source files",
             displayName: "sources",
-            type: optional(string),
+            type: string,
         }),
     },
 
     handler: (args) => {
         if (args.version) {
-            console.log(`Yamas ${process.env.npm_package_version}`);
+            console.log(`Yamas ${version}`);
             process.exit(0);
         }
 
-        if (!args.filesStr) {
+        if (args.files.length == 0) {
             console.error("No sources given");
             process.exit(-1);
         }
+
+        const files = args.files;
 
         const opts: YamasOptions = {};
         opts.loadPrelude = !args.noPrelude;
@@ -97,15 +100,13 @@ const cmd = command({
         opts.disabledPseudos = args.disabledPseudos?.split(",");
         opts.forgetLiterals = args.forgetLiterals;
 
-        const files = args.filesStr.split(" ");
-
         const yamas = new Yamas(opts);
         for (const file of files) {
             const src = readFileSync(file, "utf-8");
             const ast = yamas.addInput(file, src);
             if (args.outputAst) {
                 const astFile = openSync(basename(file) + ".ast.txt", "w");
-                dumpNode(ast, line => writeFileSync(astFile, line + "\n"));
+                dumpAst(ast, line => writeFileSync(astFile, line + "\n"));
                 closeSync(astFile);
             }
         }

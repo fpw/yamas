@@ -16,9 +16,9 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { Parser } from "../../index.js";
-import * as Nodes from "../../parser/Node.js";
-import { NodeType } from "../../parser/Node.js";
+import { Parser } from "../../parser/Parser.js";
+import * as Nodes from "../../parser/nodes/Node.js";
+import { NodeType } from "../../parser/nodes/Node.js";
 import { AssemblerOptions } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { SymbolTable } from "../SymbolTable.js";

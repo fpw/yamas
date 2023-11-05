@@ -16,9 +16,9 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as Nodes from "../parser/Node.js";
-import { NodeType } from "../parser/Node.js";
 import { Parser, ParserOptions } from "../parser/Parser.js";
+import * as Nodes from "../parser/nodes/Node.js";
+import { NodeType } from "../parser/nodes/Node.js";
 import { CodeError } from "../utils/CodeError.js";
 import * as PDP8 from "../utils/PDP8.js";
 import { Context } from "./Context.js";
@@ -97,7 +97,7 @@ export class Assembler {
 
     private register<T extends Nodes.Statement>(type: T["type"], handler: StatementHandler<T>) {
         if (this.stmtHandlers[type]) {
-            throw Error(`Multiple handlers for ${Nodes.NodeType[type]}`);
+            throw Error(`Multiple handlers for ${NodeType[type]}`);
         }
 
         // storing as if it was a generic handler for any handler, so promise:

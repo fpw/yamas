@@ -19,8 +19,8 @@
 import { mkCursorError } from "../lexer/Cursor.js";
 import { Lexer } from "../lexer/Lexer.js";
 import { CodeError } from "../utils/CodeError.js";
-import * as Nodes from "./Node.js";
-import { NodeType } from "./Node.js";
+import * as Nodes from "./nodes/Node.js";
+import { NodeType } from "./nodes/Node.js";
 import { PseudoParser } from "./parsers/PseudoParser.js";
 import { StatementParser } from "./parsers/StatementParser.js";
 

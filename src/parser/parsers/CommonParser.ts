@@ -16,11 +16,12 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { tokenToString } from "../../lexer/formatToken.js";
 import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
-import * as Nodes from "../Node.js";
-import { NodeType } from "../Node.js";
+import * as Nodes from "../nodes/Node.js";
+import { NodeType } from "../nodes/Node.js";
 import { ParserOptions } from "../Parser.js";
 
 export class CommonParser {
@@ -52,7 +53,7 @@ export class CommonParser {
                 break;
         }
 
-        throw Tokens.mkTokError(`Element expected, got ${Tokens.tokenToString(tok)}`, tok);
+        throw Tokens.mkTokError(`Element expected, got ${tokenToString(tok)}`, tok);
     }
 
     public toUnaryOp(tok: Tokens.CharToken): Nodes.UnaryOp {

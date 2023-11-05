@@ -20,9 +20,9 @@ import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
 import { normalizeSymbolName } from "../../utils/Strings.js";
-import * as Nodes from "../Node.js";
-import { NodeType } from "../Node.js";
 import { ParserOptions } from "../Parser.js";
+import * as Nodes from "../nodes/Node.js";
+import { NodeType } from "../nodes/Node.js";
 import { CommonParser } from "./CommonParser.js";
 import { ExprParser } from "./ExprParser.js";
 
@@ -61,23 +61,24 @@ export class PseudoParser {
     }
 
     private registerPseudos(mkPseudo: (pseudo: string, action: PseudoHandler) => void) {
+        // Origin
         mkPseudo("PAGE", token => ({ type: NodeType.ChangePage, expr: this.parseOptionalParam(token), token }));
         mkPseudo("FIELD", token => ({ type: NodeType.ChangeField, expr: this.parseParam(token), token }));
         mkPseudo("RELOC", token => ({ type: NodeType.Reloc, expr: this.parseOptionalParam(token), token }));
 
+        // Symbols
         mkPseudo("FIXMRI", token => this.parseFixMri(token));
         mkPseudo("FIXTAB", token => ({ type: NodeType.FixTab, token }));
         mkPseudo("EXPUNGE", token => ({ type: NodeType.Expunge, token }));
 
+        // Macros
         mkPseudo("DEFINE", token => this.parseDefine(token));
-        mkPseudo("IFDEF", token => this.parseIfDef(token, false));
-        mkPseudo("IFNDEF", token => this.parseIfDef(token, true));
-        mkPseudo("IFZERO", token => this.parseIfZero(token, false));
-        mkPseudo("IFNZRO", token => this.parseIfZero(token, true));
+        mkPseudo("IFDEF", token => this.parseIfDef(token));
+        mkPseudo("IFNDEF", token => this.parseIfNotDef(token));
+        mkPseudo("IFZERO", token => this.parseIfZero(token));
+        mkPseudo("IFNZRO", token => this.parseIfNotZero(token));
 
-        mkPseudo("DECIMAL", token => ({ type: NodeType.Radix, radix: 10, token }));
-        mkPseudo("OCTAL", token => ({ type: NodeType.Radix, radix: 8, token }));
-
+        // Data
         mkPseudo("ZBLOCK", token => ({ type: NodeType.ZeroBlock, expr: this.parseParam(token), token }));
         mkPseudo("TEXT", token => this.parseText(token));
         mkPseudo("DUBL", token => this.parseDublList(token));
@@ -85,6 +86,8 @@ export class PseudoParser {
         mkPseudo("DEVICE", token => this.parseDeviceName(token));
         mkPseudo("FILENAME", token => this.parseFileName(token));
 
+        mkPseudo("DECIMAL", token => ({ type: NodeType.Radix, radix: 10, token }));
+        mkPseudo("OCTAL", token => ({ type: NodeType.Radix, radix: 8, token }));
         mkPseudo("EJECT", token => this.parseEject(token));
         mkPseudo("XLIST", token => ({ type: NodeType.XList, token }));
         mkPseudo("PAUSE", token => ({ type: NodeType.Pause, token }));
@@ -163,18 +166,36 @@ export class PseudoParser {
         return expr.exprs[0];
     }
 
-    private parseIfZero(token: Tokens.SymbolToken, invert: boolean): Nodes.IfZeroStatement | Nodes.IfNotZeroStatement {
+    private parseIfZero(token: Tokens.SymbolToken): Nodes.IfZeroStatement {
         return {
-            type: invert ? NodeType.IfNotZero : NodeType.IfZero,
+            type: NodeType.IfZero,
             expr: this.exprParser.parseExpr(),
             body: this.parseMacroBody(),
             token,
         };
     }
 
-    private parseIfDef(token: Tokens.SymbolToken, invert: boolean): Nodes.IfDefStatement | Nodes.IfNotDefStatement {
+    private parseIfNotZero(token: Tokens.SymbolToken): Nodes.IfNotZeroStatement {
         return {
-            type: invert ? NodeType.IfNotDef : NodeType.IfDef,
+            type: NodeType.IfNotZero,
+            expr: this.exprParser.parseExpr(),
+            body: this.parseMacroBody(),
+            token,
+        };
+    }
+
+    private parseIfDef(token: Tokens.SymbolToken): Nodes.IfDefStatement {
+        return {
+            type: NodeType.IfDef,
+            symbol: this.commonParser.parseSymbol(),
+            body: this.parseMacroBody(),
+            token,
+        };
+    }
+
+    private parseIfNotDef(token: Tokens.SymbolToken): Nodes.IfNotDefStatement {
+        return {
+            type: NodeType.IfNotDef,
             symbol: this.commonParser.parseSymbol(),
             body: this.parseMacroBody(),
             token,

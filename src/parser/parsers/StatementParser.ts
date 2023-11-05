@@ -19,10 +19,11 @@
 import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
+import { tokenToString } from "../../lexer/formatToken.js";
 import { CodeError } from "../../utils/CodeError.js";
-import * as Nodes from "../Node.js";
-import { NodeType } from "../Node.js";
 import { Parser, ParserOptions } from "../Parser.js";
+import * as Nodes from "../nodes/Node.js";
+import { NodeType } from "../nodes/Node.js";
 import { CommonParser } from "./CommonParser.js";
 import { ExprParser } from "./ExprParser.js";
 import { PseudoParser } from "./PseudoParser.js";
@@ -66,7 +67,7 @@ export class StatementParser {
             case TokenType.EOF:
                 return undefined;
         }
-        throw Tokens.mkTokError(`Statement expected, got ${Tokens.tokenToString(tok)}`, tok);
+        throw Tokens.mkTokError(`Statement expected, got ${tokenToString(tok)}`, tok);
     }
 
     private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {

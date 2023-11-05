@@ -21,7 +21,7 @@
 import { command, flag, option, optional, restPositionals, run, string } from "cmd-ts";
 import { closeSync, openSync, readFileSync, writeFileSync } from "fs";
 import { basename } from "path";
-import { version } from "../package.json";
+import { version } from "../package.json" assert {type: "json"};
 import { Yamas, YamasOptions } from "../src/Yamas.js";
 import { dumpAst } from "../src/parser/nodes/dumpAst.js";
 import { compareBin } from "../src/tapeformats/compareBin.js";
@@ -31,12 +31,8 @@ import { formatCodeError } from "../src/utils/CodeError.js";
 const cmd = command({
     name: "yamas",
     description: "Yet Another Macro Assembler (for PDP-8)",
+    version: version,
     args: {
-        version: flag({
-            long: "version",
-            short: "v",
-            description: "Show version",
-        }),
         noPrelude: flag({
             long: "no-prelude",
             description: "Do not set default symbols",
@@ -81,11 +77,6 @@ const cmd = command({
     },
 
     handler: (args) => {
-        if (args.version) {
-            console.log(`Yamas ${version}`);
-            process.exit(0);
-        }
-
         if (args.files.length == 0) {
             console.error("No sources given");
             process.exit(-1);

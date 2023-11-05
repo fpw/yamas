@@ -210,4 +210,14 @@ describe("GIVEN a program containing statements", () => {
             expect(data.memory[0o0377]).toEqual(7);
         });
     });
+
+    describe("WHEN a statement expressions is a paren expr", () => {
+        const data = assemble(`
+            (1234)
+        `);
+        test("THEN the statement should generate a link", () => {
+            expect(data.memory[0o200]).equals(0o0377);
+            expect(data.memory[0o377]).equals(0o1234);
+        });
+    });
 });

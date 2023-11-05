@@ -335,8 +335,7 @@ export class PseudoParser {
                         token: nextInt,
                     };
                 } else {
-                    this.lexer.unget(next);
-                    return undefined;
+                    throw Tokens.mkTokError("Unexpected character in DUBL", next);
                 }
             default:
                 this.lexer.unget(next);

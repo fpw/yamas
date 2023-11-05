@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { assemble } from "./TestUtils.js";
+import { assemble, assembleWithErrors } from "./TestUtils.js";
 
 describe("GIVEN a program with macros", () => {
     describe("WHEN evaluating macros with strange arguments", () => {
@@ -44,4 +44,29 @@ describe("GIVEN a program with macros", () => {
             expect(data.memory[0o201]).toEqual(0o5635);
         });
     });
+
+    describe("WHEN the invocation causes parser errors", () => {
+        const data = assembleWithErrors(`
+            DEFINE FAIL X <
+                TAD X
+            >
+            FAIL !          / Invocation has operand in element position
+        `);
+        test("THEN assembling should fail", () => {
+            expect(data.errors.length).toBeGreaterThan(0);
+        });
+    });
+
+    describe("WHEN the invocation causes assembler errors", () => {
+        const data = assembleWithErrors(`
+            DEFINE FAIL X <
+                TAD X
+            >
+            FAIL I 1234     / Invocation causes double indirection
+        `);
+        test("THEN assembling should fail", () => {
+            expect(data.errors.length).toBeGreaterThan(0);
+        });
+    });
+
 });

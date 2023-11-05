@@ -50,6 +50,8 @@ export class StatementParser {
                         return this.parseOriginStatement(tok);
                     case "+":
                     case "-":
+                    case "(":
+                    case "[":
                     case ".":
                         return this.parseExprStatement(tok);
                 }
@@ -177,17 +179,11 @@ export class StatementParser {
             macroParser.addSubstitution(macro.params[i].name, args[i].body);
         }
 
-        try {
-            return macroParser.parseProgram();
-        } catch (e) {
-            if (!(e instanceof CodeError)) {
-                throw e;
-            }
+        const prog = macroParser.parseProgram();
+        if (prog.errors.length > 0) {
             const name = macro.name.name;
-            const line = e.line;
-            const col = e.col;
-            const msg = e.message;
-            throw Tokens.mkTokError(`Error invoking ${name}: "${msg}", in invocation line ${line}:${col}`, nameSym);
+            throw Tokens.mkTokError(`Error invoking ${name}: "${prog.errors[0].message}"`, nameSym);
         }
+        return prog;
     }
 }

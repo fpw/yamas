@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a program with DUBL statements", () => {

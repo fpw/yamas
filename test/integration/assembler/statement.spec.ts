@@ -119,10 +119,25 @@ describe("GIVEN a program containing statements", () => {
             });
         });
 
-        describe("WHEN a multi-word data instruction is used", () => {
+        describe("WHEN a multi-word data instruction spanning two pages is used", () => {
             const data = assembleWithErrors(`
                 TAD (1234)      / 0201: Generates link in 0377
-                ZBLOCK 177      / Overlaps with 0377
+                ZBLOCK 200      / Overlaps with 0377
+            `);
+
+            test("THEN assembling should fail", () => {
+                expect(data.errors.length).toBeGreaterThan(0);
+            });
+        });
+
+        describe("WHEN a multi-word data instruction spanning multiple pages is used", () => {
+            const data = assembleWithErrors(`
+                PAGE 3
+                TAD (123)
+
+                PAGE 1
+                ZBLOCK 600      / Fills pages 1, 2, 3
+
             `);
 
             test("THEN assembling should fail", () => {

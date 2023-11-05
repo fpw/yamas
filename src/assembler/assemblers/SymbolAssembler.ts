@@ -28,9 +28,9 @@ import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
  * Assembler for statements related to symbol table manipulation.
  */
 export class SymbolAssembler {
-    public opts: AssemblerOptions;
+    private opts: AssemblerOptions;
     private syms: SymbolTable;
-    public evaluator: ExprEvaluator;
+    private evaluator: ExprEvaluator;
 
     public constructor(opts: AssemblerOptions, syms: SymbolTable, evaluator: ExprEvaluator) {
         this.opts = opts;

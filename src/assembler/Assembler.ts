@@ -40,9 +40,9 @@ export interface OutputHandler {
 }
 
 export interface AssemblerOptions extends ParserOptions {
-    orDoesShift?: boolean;  // like /B in PAL8: A!B becomes A * 100 + B
-    noNullTermination?: boolean; // like /F in PAL8: do not null-terminate even-length TEXTs
-    forgetLiterals?: boolean; // like /W in PAL8: punch and clear literals on PAGE
+    orDoesShift?: boolean;          // like /B in PAL8: A!B becomes A * 100 + B
+    noNullTermination?: boolean;    // like /F in PAL8: do not null-terminate even-length TEXTs
+    forgetLiterals?: boolean;       // like /W in PAL8: punch and clear literals on PAGE
 }
 
 export class Assembler {
@@ -223,10 +223,11 @@ export class Assembler {
         const firstWrite = ctx.getClc(false);
         const newClc = firstWrite + incClc;
         const lastWrite = newClc - 1;
-        // TODO: This could be optimized
-        for (let addr = firstWrite; addr <= lastWrite; addr++) {
-            this.linkTable.checkOverlap(addr);
+
+        if (this.linkTable.checkOverlap(firstWrite, lastWrite)) {
+            throw Error("Link table overflow");
         }
+
         ctx.setClc(newClc, false);
     }
 

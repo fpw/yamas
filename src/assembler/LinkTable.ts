@@ -53,17 +53,49 @@ export class LinkTable {
         return this.indexToAddr(page, this.entries[page].length - 1) + delta;
     }
 
-    public checkOverlap(clc: number) {
-        const page = PDP8.calcPageNum(clc);
-        const linkCount = this.entries[page].length;
-        if (linkCount == 0) {
-            return;
+    // Check if there's an overlap of link tables with the interval [first, last]
+    public checkOverlap(firstAddr: number, lastAddr: number): boolean {
+        const firstPage = PDP8.calcPageNum(firstAddr);
+        const lastPage = PDP8.calcPageNum(lastAddr);
+
+        // If the write is only inside a single page, we only need to check the higher address
+        if (firstPage == lastPage) {
+            return this.hasOverlapWithAddr(lastAddr);
         }
 
-        const lowAddr = this.indexToAddr(page, linkCount - 1);
-        if (clc >= lowAddr) {
-            throw Error(`Link table for page ${page} overlap`);
+        // check all in between -> any links means interval overlaps with a link
+        // we need to include the first page because we already know that everything from
+        // firstAddr to the end of the first page is overwritten, i.e. all of the linktable is always overwritten
+        for (let page = firstPage; page < lastPage; page++) {
+            const linkCount = this.entries[page].length;
+            if (linkCount > 0) {
+                return true;
+            }
         }
+
+        // check last page
+        if (this.hasOverlapWithAddr(lastAddr)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private hasOverlapWithAddr(addr: number): boolean {
+        const page = PDP8.calcPageNum(addr);
+
+        const linkCount = this.entries[page].length;
+        if (linkCount == 0) {
+            return false;
+        }
+
+        // Address of the latest link -> lowest address in use by link table
+        const lowAddr = this.indexToAddr(page, linkCount - 1);
+        if (addr >= lowAddr) {
+            return true;
+        }
+
+        return false;
     }
 
     public clear() {

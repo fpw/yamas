@@ -31,9 +31,9 @@ import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
  * Assembler for statements related to data output.
  */
 export class DataAssembler {
-    public opts: AssemblerOptions;
-    public evaluator: ExprEvaluator;
-    public output: OutputFilter;
+    private opts: AssemblerOptions;
+    private evaluator: ExprEvaluator;
+    private output: OutputFilter;
 
     public constructor(opts: AssemblerOptions, output: OutputFilter, evaluator: ExprEvaluator) {
         this.opts = opts;

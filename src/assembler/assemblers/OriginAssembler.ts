@@ -28,8 +28,8 @@ import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
  * Assembler for statements to origin changes.
  */
 export class OriginAssembler {
-    public opts: AssemblerOptions;
-    public evaluator: ExprEvaluator;
+    private opts: AssemblerOptions;
+    private evaluator: ExprEvaluator;
 
     public constructor(opts: AssemblerOptions, evaluator: ExprEvaluator) {
         this.opts = opts;

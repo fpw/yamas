@@ -30,10 +30,10 @@ import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
  * Assembler for conditional and macro statements.
  */
 export class MacroAssembler {
-    public opts: AssemblerOptions;
+    private opts: AssemblerOptions;
     private syms: SymbolTable;
-    public output: OutputFilter;
-    public evaluator: ExprEvaluator;
+    private output: OutputFilter;
+    private evaluator: ExprEvaluator;
 
     public constructor(opts: AssemblerOptions, syms: SymbolTable, output: OutputFilter, evaluator: ExprEvaluator) {
         this.opts = opts;

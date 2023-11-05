@@ -108,15 +108,26 @@ describe("GIVEN a program containing statements", () => {
     });
 
     describe("WHEN overlapping data and links", () => {
-        const data = assembleWithErrors(`
-            / We have no prelude in this test
-            TAD=1000
-            FIXTAB
-            *177
-            TAD (1234)
-        `);
-        test("THEN assembling should fail", () => {
-            expect(data.errors.length).toBeGreaterThan(0);
+        describe("WHEN a single instruction is used", () => {
+            const data = assembleWithErrors(`
+                *177
+                TAD (1234)
+            `);
+
+            test("THEN assembling should fail", () => {
+                expect(data.errors.length).toBeGreaterThan(0);
+            });
+        });
+
+        describe("WHEN a multi-word data instruction is used", () => {
+            const data = assembleWithErrors(`
+                TAD (1234)      / 0201: Generates link in 0377
+                ZBLOCK 177      / Overlaps with 0377
+            `);
+
+            test("THEN assembling should fail", () => {
+                expect(data.errors.length).toBeGreaterThan(0);
+            });
         });
     });
 

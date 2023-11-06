@@ -209,7 +209,7 @@ export class PseudoParser {
         let body: Nodes.MacroBody;
 
         while (true) {
-            const next = this.lexer.nextNonBlank(undefined, true);
+            const next = this.lexer.nextNonBlank(true);
             if (next.type == TokenType.Symbol) {
                 params.push(this.commonParser.parseSymbol(next));
             } else if (next.type == TokenType.MacroBody) {
@@ -224,7 +224,7 @@ export class PseudoParser {
     }
 
     private parseFixMri(startSym: Tokens.SymbolToken): Nodes.FixMriStatement {
-        const dstSym = this.lexer.nextNonBlank();
+        const dstSym = this.lexer.nextNonBlank(false);
         if (dstSym.type == TokenType.Symbol) {
             const op = this.lexer.next();
             if (op.type == TokenType.Char && op.char == "=") {
@@ -252,14 +252,14 @@ export class PseudoParser {
 
     private parseMacroBody(gotTok?: Tokens.MacroBodyToken): Nodes.MacroBody {
         if (!gotTok) {
-            const next = this.lexer.nextNonBlank(undefined, true);
+            const next = this.lexer.nextNonBlank(true);
             if (next.type != TokenType.MacroBody) {
                 throw Tokens.mkTokError("Macro body expected", next);
             }
             gotTok = next;
         }
 
-        const next = this.lexer.nextNonBlank();
+        const next = this.lexer.nextNonBlank(false);
         if (next.type != TokenType.Separator && next.type != TokenType.Comment &&
             next.type != TokenType.EOL && next.type != TokenType.EOF
         ) {
@@ -313,7 +313,7 @@ export class PseudoParser {
     }
 
     private parseDubl(): Nodes.DublListMember | undefined {
-        const next = this.lexer.nextNonBlank();
+        const next = this.lexer.nextNonBlank(false);
         switch (next.type) {
             case TokenType.Comment:
                 return this.commonParser.parseComment(next);
@@ -344,7 +344,7 @@ export class PseudoParser {
     }
 
     private parseFloat(): Nodes.FloatListMember | undefined {
-        const next = this.lexer.nextNonBlank();
+        const next = this.lexer.nextNonBlank(false);
         switch (next.type) {
             case TokenType.Comment:
                 return this.commonParser.parseComment(next);

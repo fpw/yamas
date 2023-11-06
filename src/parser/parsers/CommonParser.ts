@@ -29,7 +29,7 @@ export class CommonParser {
     }
 
     public parseElement(gotTok?: Tokens.Token): Nodes.Element {
-        let tok = gotTok ?? this.lexer.nextNonBlank(gotTok);
+        let tok = gotTok ?? this.lexer.nextNonBlank(false, gotTok);
         let unary: Nodes.UnaryOp | undefined;
 
         if (tok.type == TokenType.Char && (tok.char == "+" || tok.char == "-")) {
@@ -73,7 +73,7 @@ export class CommonParser {
 
     public parseSymbol(gotTok?: Tokens.SymbolToken): Nodes.SymbolNode {
         if (!gotTok) {
-            const next = this.lexer.nextNonBlank();
+            const next = this.lexer.nextNonBlank(false);
             if (next.type != TokenType.Symbol) {
                 throw Tokens.mkTokError("Symbol expected", next);
             }

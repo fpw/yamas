@@ -86,11 +86,14 @@ export class Lexer {
         this.skipToLineBreak(data);
     }
 
-    public nextNonBlank(gotTok?: Tokens.Token, skipLinebreaks = false): Tokens.Token {
+    public nextNonBlank(skipLineBreaks: boolean, gotTok?: Tokens.Token): Tokens.Token {
+        if (gotTok && gotTok.type != TokenType.Blank && (gotTok.type != TokenType.EOL || !skipLineBreaks)) {
+            return gotTok;
+        }
+
         while (true) {
-            const next = gotTok ?? this.next();
-            gotTok = undefined;
-            if (next.type == TokenType.EOL && skipLinebreaks) {
+            const next = this.next();
+            if (next.type == TokenType.EOL && skipLineBreaks) {
                 continue;
             } else if (next.type != TokenType.Blank) {
                 return next;
@@ -299,7 +302,7 @@ export class Lexer {
             throw mkCursorError("Expected symbol", startCursor);
         }
         const symbol = match[1];
-        this.advanceCursor(symbol.length);
+        this.advanceCursor(symbol.length, true);
 
         return {
             type: TokenType.Symbol,
@@ -315,7 +318,7 @@ export class Lexer {
             throw mkCursorError("Expected integer", startCursor);
         }
         const int = match[1];
-        this.advanceCursor(int.length);
+        this.advanceCursor(int.length, true);
         return {
             type: TokenType.Integer,
             value: int,
@@ -330,7 +333,7 @@ export class Lexer {
             throw mkCursorError("Expected comment", startCursor);
         }
         const comment = match[1];
-        this.advanceCursor(1 + comment.length);
+        this.advanceCursor(1 + comment.length, true);
 
         return {
             type: TokenType.Comment,
@@ -428,20 +431,25 @@ export class Lexer {
         throw mkCursorError(`Unexpected character '${replaceBlanks(chr)}'`, startCursor);
     }
 
-    private advanceCursor(step: number) {
+    private advanceCursor(step: number, noNewline?: boolean) {
         const data = this.getData();
         // make sure to create a new object so that the references in next() keep their state
         const newCursor = { ...this.cursor };
 
-        for (let i = 0; i < step; i++) {
-            if (newCursor.dataIdx < data.length) {
-                if (data[newCursor.dataIdx] == "\n") {
-                    newCursor.lineIdx++;
-                    newCursor.colIdx = 0;
+        if (noNewline) {
+            newCursor.dataIdx += step;
+            newCursor.colIdx += step;
+        } else {
+            for (let i = 0; i < step; i++) {
+                if (newCursor.dataIdx < data.length) {
+                    if (data[newCursor.dataIdx] == "\n") {
+                        newCursor.lineIdx++;
+                        newCursor.colIdx = 0;
+                    }
                 }
+                newCursor.dataIdx++;
+                newCursor.colIdx++;
             }
-            newCursor.dataIdx++;
-            newCursor.colIdx++;
         }
 
         this.cursor = newCursor;

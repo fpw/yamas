@@ -87,7 +87,7 @@ export class ExprParser {
     private parseExprParts(gotTok?: Tokens.Token): Nodes.Expression[] {
         const exprs: Nodes.Expression[] = [];
         while (true) {
-            const tok = this.lexer.nextNonBlank(gotTok);
+            const tok = this.lexer.nextNonBlank(false, gotTok);
             gotTok = undefined;
             if (!this.couldBeInExpr(tok) || (tok.type == TokenType.Char && [")", "]"].includes(tok.char))) {
                 this.lexer.unget(tok);
@@ -112,11 +112,11 @@ export class ExprParser {
      */
     private parseExpressionPart(gotTok?: Tokens.Token): Nodes.Expression {
         // check for special cases that are not linked with operators
-        const first = this.lexer.nextNonBlank(gotTok);
+        const first = this.lexer.nextNonBlank(false, gotTok);
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 const expr = this.parseExpr();
-                const closingParen = this.lexer.nextNonBlank();
+                const closingParen = this.lexer.nextNonBlank(false);
                 const closingMatch = (first.char == "(" ? ")" : "]");
                 if (closingParen.type != TokenType.Char || closingParen.char != closingMatch) {
                     this.lexer.unget(closingParen); // ignore non-closed parentheses

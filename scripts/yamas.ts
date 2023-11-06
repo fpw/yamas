@@ -21,7 +21,6 @@
 import { command, flag, option, optional, restPositionals, run, string } from "cmd-ts";
 import { closeSync, openSync, readFileSync, writeFileSync } from "fs";
 import { basename } from "path";
-import { version } from "../package.json" assert {type: "json"};
 import { Yamas, YamasOptions } from "../src/Yamas.js";
 import { dumpAst } from "../src/parser/nodes/dumpAst.js";
 import { compareBin } from "../src/tapeformats/compareBin.js";
@@ -31,7 +30,6 @@ import { formatCodeError } from "../src/utils/CodeError.js";
 const cmd = command({
     name: "yamas",
     description: "Yet Another Macro Assembler (for PDP-8)",
-    version: version,
     args: {
         noPrelude: flag({
             long: "no-prelude",

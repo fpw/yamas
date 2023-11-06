@@ -40,7 +40,7 @@ export class StatementParser {
     }
 
     public parseStatement(): Nodes.Statement | undefined {
-        const tok = this.lexer.nextNonBlank();
+        const tok = this.lexer.nextNonBlank(false);
 
         switch (tok.type) {
             case TokenType.Char:
@@ -149,7 +149,7 @@ export class StatementParser {
             args.push(arg);
         }
 
-        const next = this.lexer.nextNonBlank();
+        const next = this.lexer.nextNonBlank(false);
         if (![TokenType.Comment, TokenType.Separator, TokenType.EOF, TokenType.EOL].includes(next.type)) {
             throw Tokens.mkTokError("Excessive argument for macro", next);
         }

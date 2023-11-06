@@ -20,7 +20,6 @@ import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
 import { tokenToString } from "../../lexer/formatToken.js";
-import { CodeError } from "../../utils/CodeError.js";
 import { Parser, ParserOptions } from "../Parser.js";
 import * as Nodes from "../nodes/Node.js";
 import { NodeType } from "../nodes/Node.js";
@@ -60,7 +59,7 @@ export class StatementParser {
             case TokenType.Integer:
                 return this.parseExprStatement(tok);
             case TokenType.Symbol:
-                return this.finishStatement(tok);
+                return this.parseStatementWithSymbol(tok);
             case TokenType.Comment:
                 return this.commonParser.parseComment(tok);
             case TokenType.EOL:
@@ -72,7 +71,7 @@ export class StatementParser {
         throw Tokens.mkTokError(`Statement expected, got ${tokenToString(tok)}`, tok);
     }
 
-    private finishStatement(startSym: Tokens.SymbolToken): Nodes.Statement {
+    private parseStatementWithSymbol(startSym: Tokens.SymbolToken): Nodes.Statement {
         const pseudo = this.pseudoParser.tryHandlePseudo(startSym);
         if (pseudo) {
             if (pseudo.type == NodeType.Define) {
@@ -98,13 +97,9 @@ export class StatementParser {
     }
 
     private parseExprStatement(gotTok?: Tokens.Token): Nodes.ExpressionStatement {
-        if (gotTok) {
-            this.lexer.unget(gotTok);
-        }
-
         return {
             type: NodeType.ExpressionStmt,
-            expr: this.exprParser.parseExpr(),
+            expr: this.exprParser.parseExpr(gotTok),
         } as Nodes.ExpressionStatement;
     };
 

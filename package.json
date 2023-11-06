@@ -16,6 +16,7 @@
     "start": "tsx scripts/yamas.ts",
     "testbench": "tsx scripts/testbench.ts",
     "grammar-testbench": "tsx scripts/grammar-testbench.ts",
+    "benchmark": "tsx scripts/benchmark.ts",
     "generate-diagrams": "tsx scripts/generate-diagrams.ts",
     "build": "tsc",
     "prepack": "tsc",

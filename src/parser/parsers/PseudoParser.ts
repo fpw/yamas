@@ -202,14 +202,14 @@ export class PseudoParser {
         };
     }
 
-    private parseDefine(token: Tokens.SymbolToken): Nodes.DefineStatement {
+    private parseDefine(defineTok: Tokens.SymbolToken): Nodes.DefineStatement {
         const nameElem = this.commonParser.parseSymbol();
         const name = nameElem;
         const params: Nodes.SymbolNode[] = [];
         let body: Nodes.MacroBody;
 
         while (true) {
-            const next = this.lexer.nextNonBlank(true);
+            const next = this.lexer.nextNonBlank(undefined, true);
             if (next.type == TokenType.Symbol) {
                 params.push(this.commonParser.parseSymbol(next));
             } else if (next.type == TokenType.MacroBody) {
@@ -220,7 +220,7 @@ export class PseudoParser {
             }
         }
 
-        return { type: NodeType.Define, name, body, params, token };
+        return { type: NodeType.Define, name, body, params, token: defineTok };
     }
 
     private parseFixMri(startSym: Tokens.SymbolToken): Nodes.FixMriStatement {
@@ -252,7 +252,7 @@ export class PseudoParser {
 
     private parseMacroBody(gotTok?: Tokens.MacroBodyToken): Nodes.MacroBody {
         if (!gotTok) {
-            const next = this.lexer.nextNonBlank(true);
+            const next = this.lexer.nextNonBlank(undefined, true);
             if (next.type != TokenType.MacroBody) {
                 throw Tokens.mkTokError("Macro body expected", next);
             }

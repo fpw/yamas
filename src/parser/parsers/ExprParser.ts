@@ -40,8 +40,8 @@ export class ExprParser {
      * because all of them will be in an expression group instead of a Symbol, a BinOp or something else.
      * @returns a symbol group or an expression that's not a single symbol
      */
-    public parseExpr(): Nodes.Expression {
-        const exprs: Nodes.Expression[] = this.parseExprParts();
+    public parseExpr(gotTok?: Tokens.Token): Nodes.Expression {
+        const exprs: Nodes.Expression[] = this.parseExprParts(gotTok);
 
         const firstElem = exprs[0];
         if (firstElem.type == NodeType.Element) {
@@ -84,10 +84,11 @@ export class ExprParser {
         }
     }
 
-    private parseExprParts(): Nodes.Expression[] {
+    private parseExprParts(gotTok?: Tokens.Token): Nodes.Expression[] {
         const exprs: Nodes.Expression[] = [];
         while (true) {
-            const tok = this.lexer.nextNonBlank();
+            const tok = this.lexer.nextNonBlank(gotTok);
+            gotTok = undefined;
             if (!this.couldBeInExpr(tok) || (tok.type == TokenType.Char && [")", "]"].includes(tok.char))) {
                 this.lexer.unget(tok);
                 if (exprs.length == 0) {
@@ -95,8 +96,7 @@ export class ExprParser {
                 }
                 break;
             }
-            this.lexer.unget(tok);
-            const expr = this.parseExpressionPart();
+            const expr = this.parseExpressionPart(tok);
             exprs.push(expr);
         }
 
@@ -110,9 +110,9 @@ export class ExprParser {
      * for the next symbol.
      * @returns The next part of an expression
      */
-    private parseExpressionPart(): Nodes.Expression {
+    private parseExpressionPart(gotTok?: Tokens.Token): Nodes.Expression {
         // check for special cases that are not linked with operators
-        const first = this.lexer.nextNonBlank();
+        const first = this.lexer.nextNonBlank(gotTok);
         if (first.type == TokenType.Char) {
             if (first.char == "(" || first.char == "[") {
                 const expr = this.parseExpr();
@@ -132,15 +132,15 @@ export class ExprParser {
         }
 
         // no special case - must be single element or element with operators
-        this.lexer.unget(first);
-        return this.parseBinOpOrElement();
+        return this.parseBinOpOrElement(first);
     }
 
-    private parseBinOpOrElement(): Nodes.BinaryOp | Nodes.Element {
+    private parseBinOpOrElement(gotTok?: Tokens.Token): Nodes.BinaryOp | Nodes.Element {
         // all expressions are left-associative, so collect parts and fold
         const parts: BinOpFragment[] = [];
         while (true) {
-            const part = this.parseElementAndOperator();
+            const part = this.parseElementAndOperator(gotTok);
+            gotTok = undefined;
             parts.push(part);
             if (!part.op) {
                 break;
@@ -158,8 +158,8 @@ export class ExprParser {
      * Parse the next element of an expression and the next operator.
      * @returns The next element of an expression and the operator behind it, if any.
      */
-    private parseElementAndOperator(): BinOpFragment {
-        const firstElem = this.commonParser.parseElement();
+    private parseElementAndOperator(gotTok?: Tokens.Token): BinOpFragment {
+        const firstElem = this.commonParser.parseElement(gotTok);
 
         const nextTok = this.lexer.next();
         if (!this.couldBeInExpr(nextTok)) {

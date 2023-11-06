@@ -22,12 +22,19 @@ import * as Tokens from "./Token.js";
 import { TokenType } from "./Token.js";
 
 export class Lexer {
-    private static FloatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([eE][-+]?\d+)?/; // +-ddd.dddE+-ddd
+    private static SymbolRegex = /([A-Z][A-Z0-9]*)/i;
+    private static IntRegex = /([0-9]*)/;
+    private static CommentRegEx = /\/([^\r\n]*)/;
+    private static FloatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([E][-+]?\d+)?/i; // +-ddd.dddE+-ddd
     private inputName: string;
     private inputData: string;
     private substitutions = new Map<string, string>();
     private cursor: Cursor;
     private savedCursor?: Cursor;
+    private scanTable: { [id: number]: ((data: string) => Tokens.Token) } = [];
+
+    private ungetCache?: Tokens.Token;
+    private ungetCursor?: Cursor;
 
     public constructor(inputName: string, input: string) {
         this.inputName = inputName;
@@ -39,6 +46,8 @@ export class Lexer {
             colIdx: 0,
             lineIdx: 0,
         };
+
+        this.fillScanTable();
     }
 
     public addSubstitution(symbol: string, sub: string) {
@@ -54,6 +63,13 @@ export class Lexer {
     }
 
     public next(): Tokens.Token {
+        if (this.ungetCache?.cursor.dataIdx == this.cursor.dataIdx) {
+            const res = this.ungetCache;
+            this.ungetCache = undefined;
+            this.cursor = this.ungetCursor!;
+            return res;
+        }
+
         const data = this.getData();
         if (this.cursor.dataIdx >= data.length) {
             return {
@@ -70,9 +86,10 @@ export class Lexer {
         this.skipToLineBreak(data);
     }
 
-    public nextNonBlank(skipLinebreaks = false): Tokens.Token {
+    public nextNonBlank(gotTok?: Tokens.Token, skipLinebreaks = false): Tokens.Token {
         while (true) {
-            const next = this.next();
+            const next = gotTok ?? this.next();
+            gotTok = undefined;
             if (next.type == TokenType.EOL && skipLinebreaks) {
                 continue;
             } else if (next.type != TokenType.Blank) {
@@ -153,7 +170,7 @@ export class Lexer {
             throw mkCursorError("Expected macro argument", startCursor);
         }
 
-        this.advanceCursor(rawArg.length + (hadComma ? 1 : 0));
+        this.advanceCursor(rawArg.length);
         if (hadComma) {
             this.advanceCursor(1);
         }
@@ -173,6 +190,8 @@ export class Lexer {
             throw mkCursorError("Can't unget across substitution boundaries", this.cursor);
         }
 
+        this.ungetCache = tok;
+        this.ungetCursor = { ...this.cursor };
         this.cursor = tok.cursor;
     }
 
@@ -195,31 +214,45 @@ export class Lexer {
         }
     }
 
+    private fillScanTable() {
+        for (let c = 0; c < 256; c++) {
+            const chr = String.fromCharCode(c);
+            if (this.isLineBreak(chr)) {
+                this.scanTable[c] = () => this.toNewLine(chr);
+            } else if (this.isBlank(chr)) {
+                this.scanTable[c] = () => this.toBlank(chr);
+            } else if ((chr >= "A" && chr <= "Z") || (chr >= "a" && chr <= "z")) {
+                this.scanTable[c] = this.scanAndCheckSymbol.bind(this);
+            } else if (chr >= "0" && chr <= "9") {
+                this.scanTable[c] = this.scanInt.bind(this);
+            } else if (chr == "/") {
+                this.scanTable[c] = this.scanComment.bind(this);
+            } else if (chr == "<") {
+                this.scanTable[c] = this.scanMacroBody.bind(this);
+            } else if (chr == '"') {
+                this.scanTable[c] = this.scanASCII.bind(this);
+            }
+        }
+    }
+
     private scanFromData(data: string): Tokens.Token {
         const first = data[this.cursor.dataIdx];
+        const handler = this.scanTable[first.charCodeAt(0)];
 
-        if (this.isLineBreak(first)) {
-            return this.toNewLine(first);
-        } else if (this.isBlank(first)) {
-            return this.toBlank(first);
-        } else if ((first >= "A" && first <= "Z") || (first >= "a" && first <= "z")) {
-            const sym = this.scanSymbol(data);
-            if (sym.type == TokenType.Symbol && this.substitutions.has(sym.name)) {
-                this.activateSubstitution(sym.name);
-                return this.next();
-            } else {
-                return sym;
-            }
-        } else if (first >= "0" && first <= "9") {
-            return this.scanInt(data);
-        } else if (first == "/") {
-            return this.scanComment(data);
-        } else if (first == "<") {
-            return this.scanMacroBody(data);
-        } else if (first == '"') {
-            return this.scanASCII(data);
+        if (handler) {
+            return handler(data);
         } else {
             return this.scanChar(data);
+        }
+    }
+
+    private scanAndCheckSymbol(data: string) {
+        const sym = this.scanSymbol(data);
+        if (this.substitutions.has(sym.name)) {
+            this.activateSubstitution(sym.name);
+            return this.next();
+        } else {
+            return sym;
         }
     }
 
@@ -261,15 +294,11 @@ export class Lexer {
 
     private scanSymbol(data: string): Tokens.SymbolToken {
         const startCursor = this.cursor;
-        let symbol = "";
-        for (let i = this.cursor.dataIdx; i < data.length; i++) {
-            const c = data[i].toUpperCase();
-            if ((c >= "A" && c <= "Z") || (c >= "0" && c <= "9")) {
-                symbol += c;
-            } else {
-                break;
-            }
+        const match = data.substring(startCursor.dataIdx).match(Lexer.SymbolRegex);
+        if (!match) {
+            throw mkCursorError("Expected symbol", startCursor);
         }
+        const symbol = match[1];
         this.advanceCursor(symbol.length);
 
         return {
@@ -281,14 +310,11 @@ export class Lexer {
 
     private scanInt(data: string): Tokens.IntegerToken {
         const startCursor = this.cursor;
-        let int = "";
-        for (let i = this.cursor.dataIdx; i < data.length; i++) {
-            if (data[i] >= "0" && data[i] <= "9") {
-                int += data[i];
-            } else {
-                break;
-            }
+        const match = data.substring(startCursor.dataIdx).match(Lexer.IntRegex);
+        if (!match) {
+            throw mkCursorError("Expected integer", startCursor);
         }
+        const int = match[1];
         this.advanceCursor(int.length);
         return {
             type: TokenType.Integer,
@@ -299,15 +325,13 @@ export class Lexer {
 
     private scanComment(data: string): Tokens.CommentToken {
         const startCursor = this.cursor;
-        let comment = "";
-        this.advanceCursor(1); // skip over '/'
-        for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
-            const c = data[this.cursor.dataIdx];
-            if (this.isLineBreak(c)) {
-                break;
-            }
-            comment += c;
+        const match = data.substring(startCursor.dataIdx).match(Lexer.CommentRegEx);
+        if (!match) {
+            throw mkCursorError("Expected comment", startCursor);
         }
+        const comment = match[1];
+        this.advanceCursor(1 + comment.length);
+
         return {
             type: TokenType.Comment,
             comment: comment,
@@ -410,8 +434,8 @@ export class Lexer {
         const newCursor = { ...this.cursor };
 
         for (let i = 0; i < step; i++) {
-            if (this.cursor.dataIdx < data.length) {
-                if (data[this.cursor.dataIdx] == "\n") {
+            if (newCursor.dataIdx < data.length) {
+                if (data[newCursor.dataIdx] == "\n") {
                     newCursor.lineIdx++;
                     newCursor.colIdx = 0;
                 }

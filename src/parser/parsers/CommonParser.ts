@@ -28,8 +28,8 @@ export class CommonParser {
     public constructor(private opts: ParserOptions, private lexer: Lexer) {
     }
 
-    public parseElement(): Nodes.Element {
-        let tok = this.lexer.nextNonBlank();
+    public parseElement(gotTok?: Tokens.Token): Nodes.Element {
+        let tok = gotTok ?? this.lexer.nextNonBlank(gotTok);
         let unary: Nodes.UnaryOp | undefined;
 
         if (tok.type == TokenType.Char && (tok.char == "+" || tok.char == "-")) {

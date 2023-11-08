@@ -1,4 +1,21 @@
-import { tokenToString } from "../../lexer/formatToken.js";
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { replaceBlanks } from "../../utils/Strings.js";
 import * as Nodes from "./Node.js";
 
@@ -12,7 +29,7 @@ export function dumpAst(prog: Nodes.Program, write: (line: string) => void, inde
     for (const node of prog.stmts) {
         switch (node.type) {
             case Nodes.NodeType.Invocation:
-                const args = node.args.map(a => tokenToString(a)).join(", ");
+                const args = node.args.join(", ");
                 w(`Invoke(${formatNode(node.macro)}, [${args}], program=`, indent);
                 dumpAst(node.program, write, indent + 1);
                 w(")", indent);
@@ -60,7 +77,7 @@ export function formatNode(node: Nodes.Node): string {
             return `Paren('${node.paren}', ${formatNode(node.expr)})`;
         case Nodes.NodeType.Define:
             const params = node.params.map(a => formatNode(a)).join(", ");
-            return `Define(${formatNode(node.name)}, [${params}], ${formatNode(node.body)})`;
+            return `Define(${formatNode(node.macro)}, [${params}], ${formatNode(node.body)})`;
         case Nodes.NodeType.IfDef:
             return `IfDef(${formatNode(node.symbol)}, ${formatNode(node.body)})`;
         case Nodes.NodeType.IfNotDef:

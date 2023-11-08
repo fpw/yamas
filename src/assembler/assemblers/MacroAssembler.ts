@@ -20,6 +20,7 @@ import { Parser } from "../../parser/Parser.js";
 import * as Nodes from "../../parser/nodes/Node.js";
 import { NodeType } from "../../parser/nodes/Node.js";
 import { AssemblerOptions } from "../Assembler.js";
+import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
 import { SymbolTable } from "../SymbolTable.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
@@ -54,7 +55,7 @@ export class MacroAssembler {
     private handleDefine(ctx: Context, stmt: Nodes.DefineStatement): StatementEffect {
         if (!ctx.generateCode) {
             // define macros only once so we don't get duplicates in next pass
-            this.syms.defineMacro(stmt.name.name);
+            this.syms.defineMacro(stmt.macro.name);
         }
         return {};
     }
@@ -80,7 +81,7 @@ export class MacroAssembler {
             return this.handleConditionBody(ctx, stmt.body);
         } else {
             if (stmt.body.parsed) {
-                throw Nodes.mkNodeError("Condition was true in pass 1, now false -> Illegal", stmt.body);
+                throw new AssemblerError("Condition was true in pass 1, now false -> Illegal", stmt.body);
             }
             return {};
         }
@@ -88,12 +89,13 @@ export class MacroAssembler {
 
     private handleConditionBody(ctx: Context, body: Nodes.MacroBody): StatementEffect {
         if (!ctx.generateCode) {
-            const name = body.token.cursor.inputName + `:ConditionOnLine${body.token.cursor.lineIdx + 1}`;
+            const cursor = body.extent.cursor;
+            const name = cursor.inputName + `:ConditionOnLine${cursor.lineIdx + 1}`;
             const parser = new Parser(this.opts, name, body.code);
             body.parsed = parser.parseProgram();
         } else {
             if (!body.parsed) {
-                throw Nodes.mkNodeError("Condition was false in pass 1, now true -> Illegal", body);
+                throw new AssemblerError("Condition was false in pass 1, now true -> Illegal", body);
             }
         }
 

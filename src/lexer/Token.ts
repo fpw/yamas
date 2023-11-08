@@ -16,8 +16,7 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { CodeError } from "../utils/CodeError.js";
-import { Cursor, mkCursorError } from "./Cursor.js";
+import { CursorExtent } from "./Cursor.js";
 
 export type OperatorChr = BinaryOpChr | UnaryOpChr | ParenChr | "." | "," | "=" | "*";
 export type ParenChr =  "(" | ")" | "[" | "]";
@@ -38,7 +37,7 @@ export type Token =
     SymbolToken | IntegerToken | CharToken | FloatToken |
     CommentToken | ASCIIToken | StringToken | MacroBodyToken;
 
-export enum TokenType {
+export const enum TokenType {
     Blank, EOL, EOF, Separator, Comment,
     Symbol, Integer, Float, Char, ASCII, String,
     MacroBody,
@@ -46,8 +45,7 @@ export enum TokenType {
 
 export interface BaseToken {
     type: TokenType;
-    cursor: Cursor;
-    width: number;
+    extent: CursorExtent;
 }
 
 export interface BlankToken extends BaseToken {
@@ -109,8 +107,4 @@ export interface SeparatorToken extends BaseToken {
 export interface EOFToken extends BaseToken {
     type: TokenType.EOF;
     char?: "$"; // if enforced
-}
-
-export function mkTokError(msg: string, curToken: Token): CodeError {
-    return mkCursorError(msg, curToken.cursor);
 }

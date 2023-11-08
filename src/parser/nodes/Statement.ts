@@ -1,4 +1,21 @@
-import { CharToken, CommentToken, EOLToken, MacroBodyToken, SeparatorToken } from "../../lexer/Token.js";
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { SymbolNode } from "./Element.js";
 import { Expression } from "./Expression.js";
 import { BaseNode, NodeType, Program } from "./Node.js";
@@ -14,14 +31,12 @@ export type Statement =
 export interface OriginStatement extends BaseNode {
     type: NodeType.Origin;
     val: Expression;
-    token: CharToken; // on *
 }
 
 // BEGIN, ...
-export interface LabelDef {
+export interface LabelDef extends BaseNode {
     type: NodeType.Label;
     sym: SymbolNode;
-    token: CharToken; // on ,
 }
 
 // A=B
@@ -29,14 +44,13 @@ export interface AssignStatement extends BaseNode {
     type: NodeType.Assignment;
     sym: SymbolNode;
     val: Expression;
-    token: CharToken; // on =
 }
 
 // M A1, A2 where M is macro
 export interface Invocation extends BaseNode {
     type: NodeType.Invocation;
     macro: SymbolNode;
-    args: MacroBodyToken[];
+    args: string[];
     program: Program;
 }
 
@@ -44,14 +58,12 @@ export interface Invocation extends BaseNode {
 export interface StatementSeparator extends BaseNode {
     type: NodeType.Separator;
     separator: ";" | "\n";
-    token: EOLToken | SeparatorToken;
 }
 
 // /Comment
 export interface Comment extends BaseNode {
     type: NodeType.Comment;
     comment: string;
-    token: CommentToken;
 }
 
 // an expression as a data-generating statement

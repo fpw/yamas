@@ -16,12 +16,14 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { HasExtent, calcExtent } from "../../lexer/Cursor.js";
 import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
+import { ParserOptions } from "../Parser.js";
+import { ParserError } from "../ParserError.js";
 import * as Nodes from "../nodes/Node.js";
 import { NodeType } from "../nodes/Node.js";
-import { ParserOptions } from "../Parser.js";
 import { CommonParser } from "./CommonParser.js";
 
 type BinOpFragment = { elem: Nodes.Element, op?: Tokens.CharToken };
@@ -49,13 +51,14 @@ export class ExprParser {
                 type: NodeType.SymbolGroup,
                 first: firstElem,
                 exprs: exprs.splice(1),
+                extent: firstElem.extent,
             };
             return group;
         } else {
             if (exprs.length == 1) {
                 return exprs[0];
             } else {
-                throw Nodes.mkNodeError("Logic error: Group not started by symbol", firstElem);
+                throw new ParserError("Logic error: Group not started by symbol", firstElem);
             }
         }
     }
@@ -92,7 +95,7 @@ export class ExprParser {
             if (!this.couldBeInExpr(tok) || (tok.type == TokenType.Char && [")", "]"].includes(tok.char))) {
                 this.lexer.unget(tok);
                 if (exprs.length == 0) {
-                    throw Tokens.mkTokError("Expression expected", tok);
+                    throw new ParserError("Expression expected", tok);
                 }
                 break;
             }
@@ -117,16 +120,18 @@ export class ExprParser {
             if (first.char == "(" || first.char == "[") {
                 const expr = this.parseExpr();
                 const closingParen = this.lexer.nextNonBlank(false);
+                let last: HasExtent = closingParen;
                 const closingMatch = (first.char == "(" ? ")" : "]");
                 if (closingParen.type != TokenType.Char || closingParen.char != closingMatch) {
                     this.lexer.unget(closingParen); // ignore non-closed parentheses
+                    last = expr;
                 }
 
                 return {
                     type: NodeType.ParenExpr,
                     paren: first.char,
                     expr: expr,
-                    token: first,
+                    extent: calcExtent(first, last),
                 };
             }
         }
@@ -182,7 +187,7 @@ export class ExprParser {
                         this.lexer.unget(nextTok);
                         return { elem: firstElem };
                     default:
-                        throw Tokens.mkTokError(`Unexpected operator in expression: '${nextTok.char}'`, nextTok);
+                        throw new ParserError(`Unexpected operator in expression: '${nextTok.char}'`, nextTok);
                 }
             default:
                 this.lexer.unget(nextTok);
@@ -193,11 +198,11 @@ export class ExprParser {
     // convert a list of (element, operator) tuples to left-associative expression tree
     private foldExpressionParts(parts: BinOpFragment[]): Nodes.BinaryOp {
         if (parts.length < 2) {
-            throw Nodes.mkNodeError("Unexpected end of expression", parts[0].elem);
+            throw new ParserError("Unexpected end of expression", parts[0].elem);
         }
 
         if (!parts[0].op) {
-            throw Nodes.mkNodeError("No operator in first expression part", parts[0].elem);
+            throw new ParserError("No operator in first expression part", parts[0].elem);
         }
 
         let binOp: Nodes.BinaryOp = {
@@ -205,24 +210,23 @@ export class ExprParser {
             lhs: parts[0].elem,
             operator: parts[0].op.char as Tokens.BinaryOpChr,
             rhs: parts[1].elem,
-            token: parts[0].op,
+            extent: calcExtent(parts[0].elem, parts[1].elem),
         };
 
         for (let i = 1; i < parts.length - 1; i++) {
             const next = parts[i];
             if (!next.op) {
-                throw Nodes.mkNodeError("No operator in expression part", next.elem);
+                throw new ParserError("No operator in expression part", next.elem);
             }
             binOp = {
                 type: NodeType.BinaryOp,
                 lhs: binOp,
                 operator: next.op.char as Tokens.BinaryOpChr,
                 rhs: parts[i + 1].elem,
-                token: next.op,
+                extent: binOp.extent,
             };
         }
 
         return binOp;
     }
-
 }

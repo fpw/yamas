@@ -22,6 +22,7 @@ import * as CharSets from "../../utils/CharSets.js";
 import { toDECFloat } from "../../utils/Floats.js";
 import { parseIntSafe } from "../../utils/Strings.js";
 import { AssemblerOptions } from "../Assembler.js";
+import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
 import { OutputFilter } from "../util/OutputFilter.js";
@@ -60,7 +61,7 @@ export class DataAssembler {
         // but in pass 2, we really need to access the value
         if (ctx.generateCode) {
             if (val === null) {
-                throw Nodes.mkNodeError("Undefined expression", stmt);
+                throw new AssemblerError("Undefined expression", stmt);
             }
             this.output.punchData(ctx, ctx.getClc(false), val);
         }

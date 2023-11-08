@@ -1,4 +1,5 @@
-import { BinTapeReader, BinTapeWriter } from "../../../src/index.js";
+import { BinTapeReader } from "../../../src/tapeformats/BinTapeReader.js";
+import { BinTapeWriter } from "../../../src/tapeformats/BinTapeWriter.js";
 
 describe("GIVEN a binary tape", () => {
     const writer = new BinTapeWriter();

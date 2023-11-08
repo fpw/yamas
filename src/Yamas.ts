@@ -36,8 +36,8 @@ export interface YamasOptions extends AssemblerOptions {
 
 export interface YamasOutput {
     binary: Uint8Array;
-    errors: CodeError[];
-    symbols: SymbolData[];
+    errors: ReadonlyArray<CodeError>;
+    symbols: ReadonlyArray<SymbolData>;
 }
 
 export class Yamas {

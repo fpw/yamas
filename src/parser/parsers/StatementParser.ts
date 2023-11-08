@@ -16,11 +16,13 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { calcExtent } from "../../lexer/Cursor.js";
 import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
 import { tokenToString } from "../../lexer/formatToken.js";
 import { Parser, ParserOptions } from "../Parser.js";
+import { ParserError } from "../ParserError.js";
 import * as Nodes from "../nodes/Node.js";
 import { NodeType } from "../nodes/Node.js";
 import { CommonParser } from "./CommonParser.js";
@@ -68,7 +70,7 @@ export class StatementParser {
             case TokenType.EOF:
                 return undefined;
         }
-        throw Tokens.mkTokError(`Statement expected, got ${tokenToString(tok)}`, tok);
+        throw new ParserError(`Statement expected, got ${tokenToString(tok)}`, tok);
     }
 
     private parseStatementWithSymbol(startSym: Tokens.SymbolToken): Nodes.Statement {
@@ -76,7 +78,7 @@ export class StatementParser {
         if (pseudo) {
             if (pseudo.type == NodeType.Define) {
                 // need to remember macro names so that we can distinguish invocations from symbol groups
-                this.macros.set(pseudo.name.name, pseudo);
+                this.macros.set(pseudo.macro.name, pseudo);
             }
             return pseudo;
         } else if (this.macros.has(startSym.name)) {
@@ -97,17 +99,21 @@ export class StatementParser {
     }
 
     private parseExprStatement(gotTok?: Tokens.Token): Nodes.ExpressionStatement {
+        const expr = this.exprParser.parseExpr(gotTok);
         return {
             type: NodeType.ExpressionStmt,
-            expr: this.exprParser.parseExpr(gotTok),
-        } as Nodes.ExpressionStatement;
+            expr: expr,
+            extent: expr.extent,
+        };
     };
 
     private parseOriginStatement(sym: Tokens.CharToken): Nodes.OriginStatement {
+        const expr = this.exprParser.parseExpr();
+
         return {
             type: NodeType.Origin,
-            token: sym,
-            val: this.exprParser.parseExpr(),
+            val: expr,
+            extent: calcExtent(sym, expr),
         };
     }
 
@@ -117,22 +123,24 @@ export class StatementParser {
             sym: {
                 type: NodeType.Symbol,
                 name: sym.name,
-                token: sym,
+                extent: sym.extent,
             },
-            token: chr,
+            extent: calcExtent(sym, chr),
         };
     }
 
     private parseAssignment(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.AssignStatement {
+        const expr = this.exprParser.parseExpr();
+
         return {
             type: NodeType.Assignment,
             sym: {
                 type: NodeType.Symbol,
                 name: sym.name,
-                token: sym,
+                extent: sym.extent,
             },
-            val: this.exprParser.parseExpr(),
-            token: chr,
+            val: expr,
+            extent: calcExtent(sym, expr),
         };
     }
 
@@ -140,7 +148,7 @@ export class StatementParser {
         const macroSym = this.commonParser.parseSymbol();
         const macro = this.macros.get(macroSym.name);
         if (!macro) {
-            throw Nodes.mkNodeError("Not a macro", macroSym);
+            throw new ParserError("Not a macro", macroSym);
         }
 
         const args: Tokens.MacroBodyToken[] = [];
@@ -151,33 +159,34 @@ export class StatementParser {
 
         const next = this.lexer.nextNonBlank(false);
         if (![TokenType.Comment, TokenType.Separator, TokenType.EOF, TokenType.EOL].includes(next.type)) {
-            throw Tokens.mkTokError("Excessive argument for macro", next);
+            throw new ParserError("Excessive argument for macro", next);
         }
         this.lexer.unget(next);
 
         return {
             type: NodeType.Invocation,
             macro: macroSym,
-            args: args,
-            program: this.createInvocationProgram(macroSym.token, macro, args),
+            args: args.map(a => a.body),
+            program: this.createInvocationProgram(macroSym, macro, args),
+            extent: calcExtent(macroSym, args[args.length - 1]),
         };
     }
 
     private createInvocationProgram(
-        nameSym: Tokens.SymbolToken,
-        macro: Nodes.DefineStatement,
+        nameNode: Nodes.SymbolNode,
+        define: Nodes.DefineStatement,
         args: Tokens.MacroBodyToken[]
     ): Nodes.Program {
-        const name = `${this.lexer.getInputName()}:${macro.name.name}`;
-        const macroParser = new Parser(this.opts, name, macro.body.code);
+        const name = `${this.lexer.getInputName()}:${define.macro.name}`;
+        const macroParser = new Parser(this.opts, name, define.body.code);
         for (let i = 0; i < args.length; i++) {
-            macroParser.addSubstitution(macro.params[i].name, args[i].body);
+            macroParser.addSubstitution(define.params[i].name, args[i].body);
         }
 
         const prog = macroParser.parseProgram();
         if (prog.errors.length > 0) {
-            const name = macro.name.name;
-            throw Tokens.mkTokError(`Error invoking ${name}: "${prog.errors[0].message}"`, nameSym);
+            const name = define.macro.name;
+            throw new ParserError(`Error invoking ${name}: "${prog.errors[0].message}"`, nameNode);
         }
         return prog;
     }

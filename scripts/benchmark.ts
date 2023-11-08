@@ -21,7 +21,7 @@ import { performance } from "perf_hooks";
 import { command, number, option, positional, run } from "cmd-ts";
 import { readFileSync } from "fs";
 import peggy from "peggy";
-import { Parser } from "../src/index.js";
+import { Parser } from "../src/parser/Parser.js";
 
 const cmd = command({
     name: "benchmark",

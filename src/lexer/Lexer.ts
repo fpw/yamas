@@ -16,8 +16,9 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { LexerError } from "./LexerError.js";
 import { replaceBlanks } from "../utils/Strings.js";
-import { Cursor, mkCursorError } from "./Cursor.js";
+import { Cursor, CursorExtent } from "./Cursor.js";
 import * as Tokens from "./Token.js";
 import { TokenType } from "./Token.js";
 
@@ -28,10 +29,14 @@ export class Lexer {
     private static FloatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([E][-+]?\d+)?/i; // +-ddd.dddE+-ddd
     private inputName: string;
     private inputData: string;
-    private substitutions = new Map<string, string>();
     private cursor: Cursor;
     private savedCursor?: Cursor;
     private scanTable: { [id: number]: ((data: string) => Tokens.Token) } = [];
+    private substitutions = new Map<string, string>();
+
+    // set if we are inside a text substitution, i.e. a macro argument appearing inside the body
+    // will be set to the actual text of the substitution to avoid repeated lookups
+    private activeSubst?: string;
 
     private ungetCache?: Tokens.Token;
     private ungetCursor?: Cursor;
@@ -63,7 +68,7 @@ export class Lexer {
     }
 
     public next(): Tokens.Token {
-        if (this.ungetCache?.cursor.dataIdx == this.cursor.dataIdx) {
+        if (this.ungetCache?.extent.cursor.dataIdx == this.cursor.dataIdx) {
             const res = this.ungetCache;
             this.ungetCache = undefined;
             this.cursor = this.ungetCursor!;
@@ -74,8 +79,10 @@ export class Lexer {
         if (this.cursor.dataIdx >= data.length) {
             return {
                 type: TokenType.EOF,
-                cursor: this.cursor,
-                width: 0,
+                extent: {
+                    cursor: this.cursor,
+                    width: 0,
+                }
             };
         }
         return this.scanFromData(data);
@@ -131,7 +138,7 @@ export class Lexer {
             type: TokenType.String,
             str: str,
             delims: delims,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -140,7 +147,7 @@ export class Lexer {
         const data = this.getData();
         const match = data.substring(this.cursor.dataIdx).match(Lexer.FloatRegex);
         if (!match) {
-            throw mkCursorError("Invalid float format", startCursor);
+            throw new LexerError("Invalid float format", startCursor);
         }
 
         this.advanceCursor(match[0].length);
@@ -148,7 +155,7 @@ export class Lexer {
         return {
             type: TokenType.Float,
             value: match[0],
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -170,7 +177,7 @@ export class Lexer {
 
         const arg = rawArg.trim();
         if (arg.length == 0) {
-            throw mkCursorError("Expected macro argument", startCursor);
+            throw new LexerError("Expected macro argument", startCursor);
         }
 
         this.advanceCursor(rawArg.length);
@@ -181,30 +188,28 @@ export class Lexer {
         return {
             type: TokenType.MacroBody,
             body: arg,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
     public unget(tok: Tokens.Token) {
-        const fromSubst = (this.cursor.activeSubst !== undefined);
-        const toSubst = (tok.cursor.activeSubst !== undefined);
-
-        if (fromSubst != toSubst) {
-            throw mkCursorError("Can't unget across substitution boundaries", this.cursor);
+        if (this.cursor.inputName != tok.extent.cursor.inputName) {
+            throw new LexerError("Can't unget across substitution boundaries", this.cursor);
         }
 
         this.ungetCache = tok;
         this.ungetCursor = { ...this.cursor };
-        this.cursor = tok.cursor;
+        this.cursor = tok.extent.cursor;
     }
 
     private getData(): string {
         // are we inside a text substitution?
-        if (this.cursor.activeSubst) {
-            if (this.cursor.dataIdx < this.cursor.activeSubst.length) {
-                return this.cursor.activeSubst;
+        if (this.activeSubst) {
+            if (this.cursor.dataIdx < this.activeSubst.length) {
+                return this.activeSubst;
             } else {
                 this.cursor = this.savedCursor!;
+                this.activeSubst = undefined;
                 this.savedCursor = undefined;
             }
         }
@@ -261,14 +266,14 @@ export class Lexer {
 
     private activateSubstitution(symbol: string) {
         const subst = this.substitutions.get(symbol);
-        if (!subst || this.savedCursor || this.cursor.activeSubst) {
-            throw mkCursorError("Logic error in substitution", this.cursor);
+        if (!subst || this.savedCursor || this.activeSubst) {
+            throw new LexerError("Logic error in substitution", this.cursor);
         }
 
         this.savedCursor = this.cursor;
+        this.activeSubst = subst;
         this.cursor = {
             inputName: `${this.inputName}:APPLY_${symbol}`,
-            activeSubst: subst,
             dataIdx: 0,
             lineIdx: 0,
             colIdx: 0,
@@ -281,7 +286,7 @@ export class Lexer {
         return {
             type: TokenType.EOL,
             char: first,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -291,7 +296,7 @@ export class Lexer {
         return {
             type: TokenType.Blank,
             char: first,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -299,7 +304,7 @@ export class Lexer {
         const startCursor = this.cursor;
         const match = data.substring(startCursor.dataIdx).match(Lexer.SymbolRegex);
         if (!match) {
-            throw mkCursorError("Expected symbol", startCursor);
+            throw new LexerError("Expected symbol", startCursor);
         }
         const symbol = match[1];
         this.advanceCursor(symbol.length, true);
@@ -307,7 +312,7 @@ export class Lexer {
         return {
             type: TokenType.Symbol,
             name: symbol,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -315,14 +320,14 @@ export class Lexer {
         const startCursor = this.cursor;
         const match = data.substring(startCursor.dataIdx).match(Lexer.IntRegex);
         if (!match) {
-            throw mkCursorError("Expected integer", startCursor);
+            throw new LexerError("Expected integer", startCursor);
         }
         const int = match[1];
         this.advanceCursor(int.length, true);
         return {
             type: TokenType.Integer,
             value: int,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -330,7 +335,7 @@ export class Lexer {
         const startCursor = this.cursor;
         const match = data.substring(startCursor.dataIdx).match(Lexer.CommentRegEx);
         if (!match) {
-            throw mkCursorError("Expected comment", startCursor);
+            throw new LexerError("Expected comment", startCursor);
         }
         const comment = match[1];
         this.advanceCursor(1 + comment.length, true);
@@ -338,7 +343,7 @@ export class Lexer {
         return {
             type: TokenType.Comment,
             comment: comment,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -372,9 +377,9 @@ export class Lexer {
         }
 
         if (level != 0) {
-            throw mkCursorError("Unterminated macro body", startCursor);
+            throw new LexerError("Unterminated macro body", startCursor);
         }
-        return { type: TokenType.MacroBody, body, ...this.getTokenMeasurement(startCursor) };
+        return { type: TokenType.MacroBody, body, extent: this.getTokenMeasurement(startCursor) };
     }
 
     private skipToLineBreak(data: string): string {
@@ -396,7 +401,7 @@ export class Lexer {
         return {
             type: TokenType.ASCII,
             char: chr,
-            ...this.getTokenMeasurement(startCursor),
+            extent: this.getTokenMeasurement(startCursor),
         };
     }
 
@@ -408,7 +413,7 @@ export class Lexer {
             return {
                 type: TokenType.Char,
                 char: chr,
-                ...this.getTokenMeasurement(startCursor),
+                extent: this.getTokenMeasurement(startCursor),
             };
         }
 
@@ -418,17 +423,17 @@ export class Lexer {
                 return {
                     type: TokenType.EOF,
                     char: chr,
-                    ...this.getTokenMeasurement(startCursor),
+                    extent: this.getTokenMeasurement(startCursor),
                 };
             case ";":
                 return {
                     type: TokenType.Separator,
                     char: chr,
-                    ...this.getTokenMeasurement(startCursor),
+                    extent: this.getTokenMeasurement(startCursor),
                 };
         }
 
-        throw mkCursorError(`Unexpected character '${replaceBlanks(chr)}'`, startCursor);
+        throw new LexerError(`Unexpected character '${replaceBlanks(chr)}'`, startCursor);
     }
 
     private advanceCursor(step: number, noNewline?: boolean) {
@@ -467,7 +472,7 @@ export class Lexer {
         return chr == " " || chr == "\t" || chr == "\f";
     }
 
-    private getTokenMeasurement(start: Cursor): { cursor: Cursor, width: number } {
+    private getTokenMeasurement(start: Cursor): CursorExtent {
         const end = this.cursor;
 
         return {

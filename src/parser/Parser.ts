@@ -16,13 +16,14 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { mkCursorError } from "../lexer/Cursor.js";
 import { Lexer } from "../lexer/Lexer.js";
 import { CodeError } from "../utils/CodeError.js";
+import { LexerError } from "../lexer/LexerError.js";
 import * as Nodes from "./nodes/Node.js";
 import { NodeType } from "./nodes/Node.js";
 import { PseudoParser } from "./parsers/PseudoParser.js";
 import { StatementParser } from "./parsers/StatementParser.js";
+import { calcExtent } from "../lexer/Cursor.js";
 
 export interface ParserOptions {
     // disable given pseudos to use them as custom symbol names
@@ -51,6 +52,10 @@ export class Parser {
             inputName: this.lexer.getInputName(),
             stmts: [],
             errors: [],
+            extent: {
+                cursor: this.lexer.getCursor(),
+                width: 0, // will be corrected below
+            },
         };
 
         while (true) {
@@ -65,11 +70,13 @@ export class Parser {
                 if (e instanceof CodeError) {
                     prog.errors.push(e);
                 } else if (e instanceof Error) {
-                    prog.errors.push(mkCursorError(e.message, this.lexer.getCursor()));
+                    prog.errors.push(new LexerError(e.message, this.lexer.getCursor()));
                 }
                 this.lexer.ignoreCurrentLine();
             }
         };
+
+        prog.extent.width = calcExtent(prog, prog.stmts[prog.stmts.length - 1]).width;
 
         return prog;
     }

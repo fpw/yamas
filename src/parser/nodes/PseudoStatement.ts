@@ -1,9 +1,26 @@
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { DataStatement } from "./DataStatement.js";
-import { MacroStatement } from "./MacroStatement.js";
 import { Expression } from "./Expression.js";
-import { AssignStatement } from "./Statement.js";
+import { MacroStatement } from "./MacroStatement.js";
 import { BaseNode, NodeType } from "./Node.js";
-import { StringToken, SymbolToken } from "../../lexer/Token.js";
+import { AssignStatement } from "./Statement.js";
 
 export type PseudoStatement =
     DataStatement | MacroStatement |
@@ -15,73 +32,60 @@ export type PseudoStatement =
 export interface RadixStatement extends BaseNode {
     type: NodeType.Radix;
     radix: 8 | 10;
-    token: SymbolToken; // on OCTAL / DECIMAL
 }
 
 // FIELD
 export interface ChangeFieldStatement extends BaseNode {
     type: NodeType.ChangeField;
     expr: Expression;
-    token: SymbolToken; // on FIELD
 }
 
 // PAGE
 export interface ChangePageStatement extends BaseNode {
     type: NodeType.ChangePage;
     expr?: Expression;
-    token: SymbolToken; // on PAGE
 }
 
 // RELOC
 export interface RelocStatement extends BaseNode {
     type: NodeType.Reloc;
     expr?: Expression;
-    token: SymbolToken; // on RELOC
 }
 
 // FIXMRI
 export interface FixMriStatement extends BaseNode {
     type: NodeType.FixMri;
     assignment: AssignStatement;
-    token: SymbolToken; // on FIXMRI
 }
 
 // FIXTAB
 export interface FixTabStatement extends BaseNode {
     type: NodeType.FixTab;
-    token: SymbolToken;
 }
 
 // EXPUNGE
 export interface ExpungeStatement extends BaseNode {
     type: NodeType.Expunge;
-    token: SymbolToken;
 }
 
 // EJECT
 export interface EjectStatement extends BaseNode {
     type: NodeType.Eject;
     text?: string;
-
-    str?: StringToken;
-    token: SymbolToken;
 }
 
 // ENPUNCH, NOPUNCH
 export interface PunchCtrlStatement extends BaseNode {
     type: NodeType.PunchControl;
     enable: boolean;
-    token: SymbolToken; // on ENPUNCH / NOPUNCH
 }
 
 // XLIST
 export interface XListStatement extends BaseNode {
     type: NodeType.XList;
-    token: SymbolToken; // on XLIST
 }
 
 // PAUSE
 export interface PauseStatement extends BaseNode {
     type: NodeType.Pause;
-    token: SymbolToken; // on PAUSE
 }

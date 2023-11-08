@@ -18,6 +18,7 @@
 
 import { tokenToString } from "../../lexer/formatToken.js";
 import { Lexer } from "../../lexer/Lexer.js";
+import { ParserError } from "../ParserError.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
 import * as Nodes from "../nodes/Node.js";
@@ -29,72 +30,73 @@ export class CommonParser {
     }
 
     public parseElement(gotTok?: Tokens.Token): Nodes.Element {
-        let tok = gotTok ?? this.lexer.nextNonBlank(false, gotTok);
-        let unary: Nodes.UnaryOp | undefined;
-
-        if (tok.type == TokenType.Char && (tok.char == "+" || tok.char == "-")) {
-            unary = this.toUnaryOp(tok);
-            tok = this.lexer.next();
-        }
+        let token = gotTok ?? this.lexer.nextNonBlank(false, gotTok);
 
         const base: Omit<Nodes.Element, "node"> = {
             type: NodeType.Element,
-            unaryOp: unary,
+            unaryOp: undefined,
+            extent: token.extent,
         };
 
-        switch (tok.type) {
-            case TokenType.ASCII:   return { ...base, node: this.toAscii(tok) };
-            case TokenType.Symbol:  return { ...base, node: this.parseSymbol(tok) };
-            case TokenType.Integer: return { ...base, node: this.parseInteger(tok) };
+        if (token.type == TokenType.Char && (token.char == "+" || token.char == "-")) {
+            base.unaryOp = this.toUnaryOp(token);
+            token = this.lexer.next();
+            base.extent.width += token.extent.width;
+        }
+
+        switch (token.type) {
+            case TokenType.ASCII:   return { ...base, node: this.toAscii(token) };
+            case TokenType.Symbol:  return { ...base, node: this.parseSymbol(token) };
+            case TokenType.Integer: return { ...base, node: this.parseInteger(token) };
             case TokenType.Char:
-                if (tok.char == ".") {
-                    return { ...base, node: this.toCLC(tok) };
+                if (token.char == ".") {
+                    return { ...base, node: this.toCLC(token) };
                 }
                 break;
         }
 
-        throw Tokens.mkTokError(`Element expected, got ${tokenToString(tok)}`, tok);
+        throw new ParserError(`Element expected, got ${tokenToString(token)}`, token);
     }
 
     public toUnaryOp(tok: Tokens.CharToken): Nodes.UnaryOp {
         if ((tok.char == "+" || tok.char == "-")) {
-            return { type: NodeType.UnaryOp, operator: tok.char, token: tok };
+            return { type: NodeType.UnaryOp, operator: tok.char, extent: tok.extent };
         }
         throw Error(`Invalid unary operator: ${tok.char}`);
     }
 
     private toCLC(tok: Tokens.CharToken): Nodes.CLCValue {
-        return { type: NodeType.CLCValue, token: tok };
+        return { type: NodeType.CLCValue, extent: tok.extent };
     }
 
     private toAscii(tok: Tokens.ASCIIToken): Nodes.ASCIIChar {
-        return { type: NodeType.ASCIIChar, char: tok.char, token: tok };
+        return { type: NodeType.ASCIIChar, char: tok.char, extent: tok.extent };
     }
 
     public parseSymbol(gotTok?: Tokens.SymbolToken): Nodes.SymbolNode {
         if (!gotTok) {
             const next = this.lexer.nextNonBlank(false);
             if (next.type != TokenType.Symbol) {
-                throw Tokens.mkTokError("Symbol expected", next);
+                throw new ParserError("Symbol expected", next);
             }
             gotTok = next;
         }
-        return { type: NodeType.Symbol, name: gotTok.name, token: gotTok };
+        return { type: NodeType.Symbol, name: gotTok.name, extent: gotTok.extent };
     }
 
     public parseInteger(tok: Tokens.IntegerToken): Nodes.Integer {
-        return { type: NodeType.Integer, value: tok.value, token: tok };
+        return { type: NodeType.Integer, value: tok.value, extent: tok.extent };
     }
 
     public parseSeparator(tok: Tokens.EOLToken | Tokens.SeparatorToken): Nodes.StatementSeparator {
         if (tok.type == TokenType.EOL) {
-            return { type: NodeType.Separator, separator: "\n", token: tok };
+            return { type: NodeType.Separator, separator: "\n", extent: tok.extent };
         } else {
-            return { type: NodeType.Separator, separator: tok.char, token: tok };
+            return { type: NodeType.Separator, separator: tok.char, extent: tok.extent };
         }
     }
 
     public parseComment(tok: Tokens.CommentToken): Nodes.Comment {
-        return { type: NodeType.Comment, comment: tok.comment, token: tok };
+        return { type: NodeType.Comment, comment: tok.comment, extent: tok.extent };
     }
 }

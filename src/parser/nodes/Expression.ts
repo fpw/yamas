@@ -1,6 +1,24 @@
-import { BaseNode, NodeType } from "./Node.js";
-import { BinaryOpChr, CharToken } from "../../lexer/Token.js";
+/*
+ *   Yamas - Yet Another Macro Assembler (for the PDP-8)
+ *   Copyright (C) 2023 Folke Will <folko@solhost.org>
+ *
+ *   This program is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Affero General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Affero General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Affero General Public License
+ *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import { BinaryOpChr } from "../../lexer/Token.js";
 import { Element } from "./Element.js";
+import { BaseNode, NodeType } from "./Node.js";
 
 export type Expression =
     SymbolGroup | ParenExpr | BinaryOp | Element;
@@ -17,7 +35,6 @@ export interface ParenExpr extends BaseNode {
     type: NodeType.ParenExpr;
     paren: "(" | "[";
     expr: Expression;
-    token: CharToken;
 }
 
 // A+B!C...
@@ -26,5 +43,4 @@ export interface BinaryOp extends BaseNode {
     lhs: BinaryOp | Element;
     operator: BinaryOpChr;
     rhs: Element;
-    token: CharToken; // on op
 }

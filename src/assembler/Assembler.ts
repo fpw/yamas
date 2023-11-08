@@ -21,6 +21,7 @@ import * as Nodes from "../parser/nodes/Node.js";
 import { NodeType } from "../parser/nodes/Node.js";
 import { CodeError } from "../utils/CodeError.js";
 import * as PDP8 from "../utils/PDP8.js";
+import { AssemblerError } from "./AssemblerError.js";
 import { Context } from "./Context.js";
 import { LinkTable } from "./LinkTable.js";
 import { SymbolData } from "./SymbolData.js";
@@ -116,11 +117,11 @@ export class Assembler {
         return prog;
     }
 
-    public getSymbols(): SymbolData[] {
+    public getSymbols(): ReadonlyArray<SymbolData> {
         return this.syms.getSymbols();
     }
 
-    public assembleAll(): CodeError[] {
+    public assembleAll(): ReadonlyArray<CodeError> {
         // protect against being called with parse errors present
         const parseErrors = this.programs.map(p => p.errors).flat();
         if (parseErrors.length > 0) {
@@ -170,7 +171,7 @@ export class Assembler {
                 if (e instanceof CodeError) {
                     errors.push(e);
                 } else if (e instanceof Error) {
-                    errors.push(Nodes.mkNodeError(e.message, stmt));
+                    errors.push(new AssemblerError(e.message, stmt));
                 }
             }
         }
@@ -220,6 +221,7 @@ export class Assembler {
     private incClc(ctx: Context, incClc: number) {
         // we just put something in interval [current CLC, current CLC + incClc)
         // -> check if it overlapped with a link by checking the last written address
+        // TODO: Check the other direction, i.e. writing a link first and then an instruction
         const firstWrite = ctx.getClc(false);
         const newClc = firstWrite + incClc;
         const lastWrite = newClc - 1;

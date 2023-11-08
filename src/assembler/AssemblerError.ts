@@ -16,30 +16,12 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export interface Cursor {
-    inputName: string;
-    dataIdx: number;
-    colIdx: number;
-    lineIdx: number;
-}
+import { BaseNode } from "../parser/nodes/Node.js";
+import { CodeError } from "../utils/CodeError.js";
 
-export interface CursorExtent {
-    cursor: Cursor;
-    width: number;
-}
-
-export interface HasExtent {
-    extent: CursorExtent;
-}
-
-// given two things that have cursor extents, find the full extent from start to end + width
-export function calcExtent(start: HasExtent, end: HasExtent | undefined): CursorExtent {
-    let width: number;
-    if (end) {
-        width = end.extent.cursor.dataIdx - start.extent.cursor.dataIdx + end.extent.width;
-    } else {
-        width = start.extent.width;
+export class AssemblerError extends CodeError {
+    public constructor(msg: string, node: BaseNode) {
+        super(msg, node.extent.cursor);
+        this.name = AssemblerError.name;
     }
-
-    return { cursor: start.extent.cursor, width: width };
 }

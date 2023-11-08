@@ -20,6 +20,7 @@ import * as Nodes from "../../parser/nodes/Node.js";
 import { NodeType } from "../../parser/nodes/Node.js";
 import * as PDP8 from "../../utils/PDP8.js";
 import { AssemblerOptions } from "../Assembler.js";
+import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
 import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
@@ -57,7 +58,7 @@ export class OriginAssembler {
         } else {
             newPage = this.evaluator.safeEval(ctx, stmt.expr);
             if (newPage < 0 || newPage >= PDP8.NumPages) {
-                throw Nodes.mkNodeError(`Invalid page ${newPage}`, stmt);
+                throw new AssemblerError(`Invalid page ${newPage}`, stmt);
             }
         }
         const reloc = PDP8.firstAddrInPage(newPage);
@@ -67,10 +68,10 @@ export class OriginAssembler {
     private handleField(ctx: Context, stmt: Nodes.ChangeFieldStatement): StatementEffect {
         const field = this.evaluator.safeEval(ctx, stmt.expr);
         if (field < 0 || field >= PDP8.NumFields) {
-            throw Nodes.mkNodeError(`Invalid field ${field}`, stmt);
+            throw new AssemblerError(`Invalid field ${field}`, stmt);
         }
         if (ctx.reloc) {
-            throw Nodes.mkNodeError("Changing FIELD with active reloc not supported", stmt);
+            throw new AssemblerError("Changing FIELD with active reloc not supported", stmt);
         }
 
         return { changeField: field };

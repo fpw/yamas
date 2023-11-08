@@ -1,4 +1,5 @@
-import { BinTapeReader, Yamas } from "../../../src/index.js";
+import { Yamas } from "../../../src/Yamas.js";
+import { BinTapeReader } from "../../../src/tapeformats/BinTapeReader.js";
 
 describe("GIVEN an assembly listing", () => {
     const listing = "NOP";

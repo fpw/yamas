@@ -1,5 +1,5 @@
 import { asciiCharToDec, decCharToAscii } from "../../src/utils/CharSets.js";
-import { replaceBlanks } from "../../src/utils/Strings.js";
+import { replaceNonPrints } from "../../src/utils/Strings.js";
 
 describe("WHEN converting character sets", () => {
     const expectations: [string, number][] = [
@@ -12,7 +12,7 @@ describe("WHEN converting character sets", () => {
     ];
 
     for (const [ascii, dec] of expectations) {
-        describe(`GIVEN the ASCII character '${replaceBlanks(ascii)}'`, () => {
+        describe(`GIVEN the ASCII character '${replaceNonPrints(ascii)}'`, () => {
             test("THEN it should convert to 6-bit correctly", () => {
                 expect(asciiCharToDec(ascii)).toEqual(dec);
             });

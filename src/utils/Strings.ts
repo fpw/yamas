@@ -16,11 +16,15 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-export function replaceBlanks(s: string): string {
+export function replaceNonPrints(s: string): string {
     return s
         .replaceAll("\t", "<TAB>")
         .replaceAll("\r", "<CR>")
         .replaceAll("\n", "<LF>")
+        .replaceAll("\v", "<VT>")
+        .replaceAll("\b", "<BS>")
+        .replaceAll("\x00", "<NUL>")
+        .replaceAll("\x07", "<BEL>")
         .replaceAll("\f", "<FF>");
 }
 

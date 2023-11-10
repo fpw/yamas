@@ -23,8 +23,8 @@ export type ParenChr =  "(" | ")" | "[" | "]";
 export type BinaryOpChr =  "+" | "-" | "!" | "&" | "^" | "%";
 export type UnaryOpChr = "-" | "+";
 
-export type LineBreakChr = "\r" | "\n";
-export type BlankChr = " " | "\t" | "\f";
+export type LineBreakChr = "\n";
+export type BlankChr = " " | "\r" | "\t" | "\f";
 
 export const OperatorChars = [
     ".", ",", "=", "*",

@@ -17,7 +17,7 @@
  */
 
 import { LexerError } from "./LexerError.js";
-import { replaceBlanks } from "../utils/Strings.js";
+import { replaceNonPrints } from "../utils/Strings.js";
 import { Cursor, CursorExtent } from "./Cursor.js";
 import * as Tokens from "./Token.js";
 import { TokenType } from "./Token.js";
@@ -26,7 +26,7 @@ export class Lexer {
     private static SymbolRegex = /([A-Z][A-Z0-9]*)/i;
     private static IntRegex = /([0-9]*)/;
     private static CommentRegEx = /\/([^\r\n]*)/;
-    private static FloatRegex = /^[-+]?(\d+\.\d*|\d*\.\d+|\d+)([E][-+]?\d+)?/i; // +-ddd.dddE+-ddd
+    private static FloatRegex = /^(\d+\.\d*|\d*\.\d+|\d+)(e[-+]?\d+)?/i; // ddd.dddE+-ddd, unary +/- handled outside
     private inputName: string;
     private inputData: string;
     private cursor: Cursor;
@@ -138,7 +138,7 @@ export class Lexer {
             type: TokenType.String,
             str: str,
             delims: delims,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -155,7 +155,7 @@ export class Lexer {
         return {
             type: TokenType.Float,
             value: match[0],
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -188,7 +188,7 @@ export class Lexer {
         return {
             type: TokenType.MacroBody,
             body: arg,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -286,7 +286,7 @@ export class Lexer {
         return {
             type: TokenType.EOL,
             char: first,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -296,7 +296,7 @@ export class Lexer {
         return {
             type: TokenType.Blank,
             char: first,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -312,7 +312,7 @@ export class Lexer {
         return {
             type: TokenType.Symbol,
             name: symbol,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -327,7 +327,7 @@ export class Lexer {
         return {
             type: TokenType.Integer,
             value: int,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -343,7 +343,7 @@ export class Lexer {
         return {
             type: TokenType.Comment,
             comment: comment,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -379,7 +379,7 @@ export class Lexer {
         if (level != 0) {
             throw new LexerError("Unterminated macro body", startCursor);
         }
-        return { type: TokenType.MacroBody, body, extent: this.getTokenMeasurement(startCursor) };
+        return { type: TokenType.MacroBody, body, extent: this.calcExtentFrom(startCursor) };
     }
 
     private skipToLineBreak(data: string): string {
@@ -401,7 +401,7 @@ export class Lexer {
         return {
             type: TokenType.ASCII,
             char: chr,
-            extent: this.getTokenMeasurement(startCursor),
+            extent: this.calcExtentFrom(startCursor),
         };
     }
 
@@ -413,7 +413,7 @@ export class Lexer {
             return {
                 type: TokenType.Char,
                 char: chr,
-                extent: this.getTokenMeasurement(startCursor),
+                extent: this.calcExtentFrom(startCursor),
             };
         }
 
@@ -423,17 +423,17 @@ export class Lexer {
                 return {
                     type: TokenType.EOF,
                     char: chr,
-                    extent: this.getTokenMeasurement(startCursor),
+                    extent: this.calcExtentFrom(startCursor),
                 };
             case ";":
                 return {
                     type: TokenType.Separator,
                     char: chr,
-                    extent: this.getTokenMeasurement(startCursor),
+                    extent: this.calcExtentFrom(startCursor),
                 };
         }
 
-        throw new LexerError(`Unexpected character '${replaceBlanks(chr)}'`, startCursor);
+        throw new LexerError(`Unexpected character '${replaceNonPrints(chr)}'`, startCursor);
     }
 
     private advanceCursor(step: number, noNewline?: boolean) {
@@ -442,18 +442,17 @@ export class Lexer {
         const newCursor = { ...this.cursor };
 
         if (noNewline) {
-            newCursor.dataIdx += step;
             newCursor.colIdx += step;
+            newCursor.dataIdx += step;
         } else {
             for (let i = 0; i < step; i++) {
-                if (newCursor.dataIdx < data.length) {
-                    if (data[newCursor.dataIdx] == "\n") {
-                        newCursor.lineIdx++;
-                        newCursor.colIdx = 0;
-                    }
+                if (data[newCursor.dataIdx] == "\n") {
+                    newCursor.lineIdx++;
+                    newCursor.colIdx = 0;
+                } else {
+                    newCursor.colIdx++;
                 }
                 newCursor.dataIdx++;
-                newCursor.colIdx++;
             }
         }
 
@@ -465,14 +464,14 @@ export class Lexer {
     }
 
     private isLineBreak(chr: string): chr is Tokens.LineBreakChr {
-        return chr == "\r" || chr == "\n";
+        return chr == "\n";
     }
 
     private isBlank(chr: string): chr is Tokens.BlankChr {
-        return chr == " " || chr == "\t" || chr == "\f";
+        return chr == " " || chr == "\r" || chr == "\t" || chr == "\f";
     }
 
-    private getTokenMeasurement(start: Cursor): CursorExtent {
+    private calcExtentFrom(start: Cursor): CursorExtent {
         const end = this.cursor;
 
         return {

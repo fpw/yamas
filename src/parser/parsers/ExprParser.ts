@@ -50,8 +50,8 @@ export class ExprParser {
             const group: Nodes.SymbolGroup = {
                 type: NodeType.SymbolGroup,
                 first: firstElem,
-                exprs: exprs.splice(1),
-                extent: firstElem.extent,
+                exprs: exprs.slice(1),
+                extent: calcExtent(firstElem, exprs[exprs.length - 1]),
             };
             return group;
         } else {
@@ -223,7 +223,7 @@ export class ExprParser {
                 lhs: binOp,
                 operator: next.op.char as Tokens.BinaryOpChr,
                 rhs: parts[i + 1].elem,
-                extent: binOp.extent,
+                extent: calcExtent(binOp, parts[i + 1].elem),
             };
         }
 

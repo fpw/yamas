@@ -16,33 +16,37 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { replaceBlanks } from "../../utils/Strings.js";
+import { CursorExtent } from "../../lexer/Cursor.js";
+import { replaceNonPrints } from "../../utils/Strings.js";
 import * as Nodes from "./Node.js";
 
 export function dumpAst(prog: Nodes.Program, write: (line: string) => void, indent = 0) {
-    const w = (line: string, ind: number) => {
-        const indStr = "".padStart(2 * ind);
+    const writeIndented = (ex: CursorExtent | undefined, line: string, ind: number) => {
+        let indStr = "".padStart(2 * ind);
+        if (ex) {
+            indStr += `${ex.cursor.lineIdx + 1}:${ex.cursor.colIdx + 1}-${ex.cursor.colIdx + 1 + ex.width}: `;
+        }
         write(indStr + line);
     };
 
-    w(`Program("${prog.inputName}"`, indent);
+    writeIndented(prog.extent, `Program("${prog.inputName}"`, indent);
     for (const node of prog.stmts) {
         switch (node.type) {
             case Nodes.NodeType.Invocation:
                 const args = node.args.join(", ");
-                w(`Invoke(${formatNode(node.macro)}, [${args}], program=`, indent);
+                writeIndented(node.macro.extent, `Invoke(${formatNode(node.macro)}, [${args}], program=`, indent);
                 dumpAst(node.program, write, indent + 1);
-                w(")", indent);
+                writeIndented(undefined, ")", indent);
                 break;
             default:
-                w(formatNode(node), indent + 1);
+                writeIndented(node.extent, formatNode(node), indent + 1);
         }
     }
-    w(")", indent);
+    writeIndented(undefined, ")", indent);
 }
 
 // eslint-disable-next-line max-lines-per-function
-export function formatNode(node: Nodes.Node): string {
+function formatNode(node: Nodes.Node): string {
     let str;
     switch (node.type) {
         case Nodes.NodeType.Origin:
@@ -52,7 +56,7 @@ export function formatNode(node: Nodes.Node): string {
         case Nodes.NodeType.Assignment:
             return `Assign(${formatNode(node.sym)}, ${formatNode(node.val)})`;
         case Nodes.NodeType.Separator:
-            return `Separator('${replaceBlanks(node.separator)}')`;
+            return `Separator('${replaceNonPrints(node.separator)}')`;
         case Nodes.NodeType.ExpressionStmt:
             return `ExprStmt(${formatNode(node.expr)})`;
         case Nodes.NodeType.Text:
@@ -101,7 +105,7 @@ export function formatNode(node: Nodes.Node): string {
         case Nodes.NodeType.DeviceName:
             return `DeviceName("${node.name}")`;
         case Nodes.NodeType.MacroBody:
-            return `MacroBody("${replaceBlanks(node.code)}")`;
+            return `MacroBody("${replaceNonPrints(node.code)}")`;
         case Nodes.NodeType.FileName:
             return `Filename("${node.name}")`;
         case Nodes.NodeType.Eject:

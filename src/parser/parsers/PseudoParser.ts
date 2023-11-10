@@ -64,14 +64,14 @@ export class PseudoParser {
 
     private registerPseudos(mkPseudo: (pseudo: string, action: PseudoHandler) => void) {
         // Origin
-        mkPseudo("PAGE", token => this.parsePage(token));
-        mkPseudo("FIELD", token => this.parseField(token));
-        mkPseudo("RELOC", token => this.parseReloc(token));
+        mkPseudo("PAGE", token => this.parseWithOptParam<Nodes.ChangePageStatement>(NodeType.ChangePage, token));
+        mkPseudo("FIELD", token => this.parseWithParam<Nodes.ChangeFieldStatement>(NodeType.ChangeField, token));
+        mkPseudo("RELOC", token => this.parseWithOptParam<Nodes.RelocStatement>(NodeType.Reloc, token));
 
         // Symbols
         mkPseudo("FIXMRI", token => this.parseFixMri(token));
-        mkPseudo("FIXTAB", token => this.parseFixTab(token));
-        mkPseudo("EXPUNGE", token => this.parseExpunge(token));
+        mkPseudo("FIXTAB", token => this.parseWithoutParam<Nodes.FixTabStatement>(NodeType.FixTab, token));
+        mkPseudo("EXPUNGE", token => this.parseWithoutParam<Nodes.ExpungeStatement>(NodeType.Expunge, token));
 
         // Macros
         mkPseudo("DEFINE", token => this.parseDefine(token));
@@ -81,7 +81,7 @@ export class PseudoParser {
         mkPseudo("IFNZRO", token => this.parseIfNotZero(token));
 
         // Data
-        mkPseudo("ZBLOCK", token => this.parseZBlock(token));
+        mkPseudo("ZBLOCK", token => this.parseWithParam<Nodes.ZBlockStatement>(NodeType.ZeroBlock, token));
         mkPseudo("TEXT", token => this.parseText(token));
         mkPseudo("DUBL", token => this.parseDublList(token));
         mkPseudo("FLTG", token => this.parseFltgList(token));
@@ -91,8 +91,8 @@ export class PseudoParser {
         mkPseudo("DECIMAL", token => this.parseDecimal(token));
         mkPseudo("OCTAL", token => this.parseOctal(token));
         mkPseudo("EJECT", token => this.parseEject(token));
-        mkPseudo("XLIST", token => this.parseXList(token));
-        mkPseudo("PAUSE", token => this.parsePause(token));
+        mkPseudo("XLIST", token => this.parseWithoutParam<Nodes.XListStatement>(NodeType.XList, token));
+        mkPseudo("PAUSE", token => this.parseWithoutParam<Nodes.PauseStatement>(NodeType.Pause, token));
         mkPseudo("ENPUNCH", token => this.parsePunchEnable(token));
         mkPseudo("NOPUNCH", token => this.parsePunchDisable(token));
     }
@@ -109,15 +109,42 @@ export class PseudoParser {
         return handler(startSym);
     }
 
-    private parseParam(startSym: Tokens.SymbolToken): Nodes.Expression {
-        const expr = this.parseOptionalParam(startSym);
+    private parseWithoutParam<T extends Nodes.Statement>(type: T["type"], token: Tokens.SymbolToken) {
+        return {
+            type: type,
+            extent: token.extent,
+        };
+    }
+
+    private parseWithParam<T extends Nodes.Statement>(type: T["type"], token: Tokens.SymbolToken) {
+        const param = this.getParam(token);
+
+        return {
+            type: type,
+            expr: param,
+            extent: calcExtent(token, param),
+        };
+    }
+
+    private parseWithOptParam<T extends Nodes.Statement>(type: T["type"], token: Tokens.SymbolToken) {
+        const param = this.getOptionalParam(token);
+
+        return {
+            type: type,
+            expr: param,
+            extent: param ? calcExtent(token, param) : token.extent,
+        };
+    }
+
+    private getParam(startSym: Tokens.SymbolToken): Nodes.Expression {
+        const expr = this.getOptionalParam(startSym);
         if (!expr) {
             throw new ParserError("Parameter expected", startSym);
         }
         return expr;
     }
 
-    private parseOptionalParam(startSym: Tokens.SymbolToken): Nodes.Expression | undefined {
+    private getOptionalParam(startSym: Tokens.SymbolToken): Nodes.Expression | undefined {
         this.lexer.unget(startSym);
         const expr = this.exprParser.parseExpr();
         if (expr.type != NodeType.SymbolGroup) {
@@ -133,13 +160,6 @@ export class PseudoParser {
         }
 
         return expr.exprs[0];
-    }
-
-    private parseExpunge(token: Tokens.SymbolToken): Nodes.ExpungeStatement {
-        return {
-            type: NodeType.Expunge,
-            extent: token.extent,
-        };
     }
 
     private parsePunchDisable(token: Tokens.SymbolToken): Nodes.PunchCtrlStatement {
@@ -158,20 +178,6 @@ export class PseudoParser {
         };
     }
 
-    private parsePause(token: Tokens.SymbolToken): Nodes.PauseStatement {
-        return {
-            type: NodeType.Pause,
-            extent: token.extent,
-        };
-    }
-
-    private parseXList(token: Tokens.SymbolToken): Nodes.XListStatement {
-        return {
-            type: NodeType.XList,
-            extent: token.extent,
-        };
-    }
-
     private parseOctal(token: Tokens.SymbolToken): Nodes.RadixStatement {
         return {
             type: NodeType.Radix,
@@ -185,53 +191,6 @@ export class PseudoParser {
             type: NodeType.Radix,
             radix: 10,
             extent: token.extent,
-        };
-    }
-
-    private parseFixTab(token: Tokens.SymbolToken): Nodes.FixTabStatement {
-        return {
-            type: NodeType.FixTab,
-            extent: token.extent,
-        };
-    }
-
-    private parseZBlock(token: Tokens.SymbolToken): Nodes.ZBlockStatement {
-        const param = this.parseParam(token);
-
-        return {
-            type: NodeType.ZeroBlock,
-            expr: param,
-            extent: calcExtent(token, param),
-        };
-    }
-
-    private parseReloc(token: Tokens.SymbolToken): Nodes.RelocStatement {
-        const param = this.parseOptionalParam(token);
-
-        return {
-            type: NodeType.Reloc,
-            expr: param,
-            extent: token.extent,
-        };
-    }
-
-    private parseField(token: Tokens.SymbolToken): Nodes.ChangeFieldStatement {
-        const param = this.parseParam(token);
-
-        return {
-            type: NodeType.ChangeField,
-            expr: param,
-            extent: calcExtent(token, param),
-        };
-    }
-
-    private parsePage(token: Tokens.SymbolToken): Nodes.ChangePageStatement {
-        const param = this.parseOptionalParam(token);
-
-        return {
-            type: NodeType.ChangePage,
-            expr: param,
-            extent: calcExtent(token, param),
         };
     }
 

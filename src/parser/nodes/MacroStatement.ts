@@ -66,5 +66,8 @@ export interface MacroBody extends BaseNode {
     type: NodeType.MacroBody;
     code: string;
 
-    parsed?: Program; // cache for assembler, TODO: move somewhere else
+    // Since illegal syntax is allowed in a conditional body if it's never evaluated,
+    // we can't parse macro bodies as part of the parsing process.
+    // Instead, the assembler can call the parser again to fill the program if it was evaluated.
+    parsed?: Program;
 }

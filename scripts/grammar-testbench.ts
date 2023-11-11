@@ -34,7 +34,7 @@ const cmd = command({
     },
     handler: (args) => {
         console.log("Compiling grammar...");
-        const parser = peggy.generate(readFileSync("docs/grammar.peggy", "utf-8"), {
+        const parser = peggy.generate(readFileSync("docs/yamas.peggy", "utf-8"), {
             output: "parser",
         });
 

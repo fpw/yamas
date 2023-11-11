@@ -117,7 +117,7 @@ export class Assembler {
         return prog;
     }
 
-    public getSymbols(): ReadonlyArray<SymbolData> {
+    public getSymbols(): ReadonlyMap<string, SymbolData> {
         return this.syms.getSymbols();
     }
 

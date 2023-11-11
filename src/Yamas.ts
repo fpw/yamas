@@ -37,7 +37,7 @@ export interface YamasOptions extends AssemblerOptions {
 export interface YamasOutput {
     binary: Uint8Array;
     errors: ReadonlyArray<CodeError>;
-    symbols: ReadonlyArray<SymbolData>;
+    symbols: ReadonlyMap<string, SymbolData>;
 }
 
 export class Yamas {
@@ -70,6 +70,7 @@ export class Yamas {
         const errors = this.asm.assembleAll();
         const symbols = this.asm.getSymbols();
         const binary = this.binTape.finish();
+
         return { binary, symbols, errors };
     }
 }

@@ -32,7 +32,7 @@ const drawList = [
     "NeutralListElement", "StringContent", "IntWithUnary",
 ];
 
-const grammar = readFileSync("docs/grammar.peggy", "utf-8");
+const grammar = readFileSync("docs/yamas.peggy", "utf-8");
 
 for (const entry of drawList) {
     const diagram = tracks({

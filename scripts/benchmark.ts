@@ -50,7 +50,7 @@ const cmd = command({
         console.log("Preparing...");
         const src = readFileSync(args.file, "utf-8");
         const numLines = src.split("\n").length;
-        const peggyParser = peggy.generate(readFileSync("docs/grammar.peggy", "utf-8"), { output: "parser" });
+        const peggyParser = peggy.generate(readFileSync("docs/yamas.peggy", "utf-8"), { output: "parser" });
 
         const runPeggy = () => void peggyParser.parse(src);
         const runYamas = () => {

@@ -184,7 +184,7 @@ IfNZro                  = "IFNZRO" _ p:Expression _* body:MacroBody
 DataPseudo              = ZBlock / Text / Dubl / Fltg / Device / FileName
 ZBlock                  = "ZBLOCK" _ p:Param
                             { return {type: "ZBlock", amount: p}; }
-Text                    = "TEXT" _ l:. text:$(c:. &{return c != l;})* r:.
+Text                    = "TEXT" _ l:. text:$(c:[^\r\n] &{return c != l;})* (r:. &{return r == l;})?
                             { return {type: "Text", text: text}; }
 Dubl                    = "DUBL" _* list:(@(IntWithUnary  / NeutralListElement) _* )*
                             { return {type: "DoubleIntList", list: list}; }

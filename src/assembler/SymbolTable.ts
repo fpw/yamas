@@ -100,9 +100,8 @@ export class SymbolTable {
         }
     }
 
-    public getSymbols(): SymbolData[] {
-        const all = [...this.symbols.values()];
-        return all.sort((a, b) => a.name.localeCompare(b.name));
+    public getSymbols(): ReadonlyMap<string, SymbolData> {
+        return this.symbols;
     }
 
     private defineSymbol(data: SymbolData) {

@@ -27,11 +27,6 @@ import { CodeError } from "./utils/CodeError.js";
 
 export interface YamasOptions extends AssemblerOptions {
     loadPrelude?: boolean;
-
-    // Ideas:
-
-    // implementation idea: keep an array of LinKTables in Assembler
-    keepLinksInFieldSwitch?: boolean; // to not delete link table when switching fields
 };
 
 export interface YamasOutput {

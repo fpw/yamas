@@ -22,9 +22,9 @@ import * as Nodes from "./Node.js";
 
 export function dumpAst(prog: Nodes.Program, write: (line: string) => void, indent = 0) {
     const writeIndented = (ex: CursorExtent | undefined, line: string, ind: number) => {
-        let indStr = "".padStart(2 * ind);
+        const indStr = "".padStart(2 * ind);
         if (ex) {
-            indStr += `${ex.cursor.lineIdx + 1}:${ex.cursor.colIdx + 1}-${ex.cursor.colIdx + 1 + ex.width}: `;
+            // indStr += `${ex.cursor.lineIdx + 1}:${ex.cursor.colIdx + 1}-${ex.cursor.colIdx + 1 + ex.width}: `;
         }
         write(indStr + line);
     };

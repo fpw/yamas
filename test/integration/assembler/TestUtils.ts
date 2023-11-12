@@ -1,5 +1,5 @@
-/* eslint-disable max-lines-per-function */
 import { Assembler } from "../../../src/assembler/Assembler.js";
+import { SymbolType } from "../../../src/assembler/SymbolData.js";
 import { Program } from "../../../src/parser/nodes/Node.js";
 import { PreludeFamily8 } from "../../../src/prelude/Family8.js";
 import { PreludeIO } from "../../../src/prelude/IO.js";
@@ -49,7 +49,11 @@ export function assembleWithErrors(input: string): TestData {
     const errors = asm.assembleAll();
 
     const symbols: Record<string, number> = {};
-    asm.getSymbols().forEach(sym => symbols[sym.name] = sym.value);
+    for (const sym of asm.getSymbols().values()) {
+        if (sym.type == SymbolType.Param || sym.type == SymbolType.Label) {
+            symbols[sym.name] = sym.value;
+        }
+    }
 
     return { asm, errors, ast, symbols, orgs, memory };
 }

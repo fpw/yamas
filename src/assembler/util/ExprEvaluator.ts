@@ -82,8 +82,9 @@ export class ExprEvaluator {
         if (!sym) {
             return null;
         }
-        if (sym.type == SymbolType.Macro || sym.type == SymbolType.Pseudo) {
-            throw new AssemblerError("Macro and pseudo symbols not allowed here", node);
+
+        if (sym.type != SymbolType.Permanent && sym.type != SymbolType.Label && sym.type != SymbolType.Param) {
+            throw new AssemblerError("Expected a label or param symbol", node);
         }
         return sym.value;
     }
@@ -115,9 +116,13 @@ export class ExprEvaluator {
 
     private evalMRI(ctx: Context, group: Nodes.SymbolGroup): number | null {
         if (group.first.node.type != NodeType.Symbol) {
-            throw new AssemblerError("Tried to evaluate MRI-group with non-MRI", group);
+            throw new AssemblerError("Tried to evaluate MRI group with non-MRI", group);
         }
+
         const mri = this.syms.lookup(group.first.node.name);
+        if (mri.type != SymbolType.Param) {
+            throw new AssemblerError("MRI group symbol is not an param symbol", group);
+        }
 
         // It's allowed to have a negative MRI such as -TAD. Then the value is -TAD according
         // to PAL8. However, that's not allowed if any other operand is OR-ed after the space, e.g.
@@ -145,11 +150,18 @@ export class ExprEvaluator {
                 const sym = this.syms.tryLookup(ex.node.name);
                 if (!sym) {
                     return null;
-                } else if (sym.type == SymbolType.Permanent && i == 0) {
+                } else if (sym.type == SymbolType.Permanent) {
                     // permanent symbols are only allowed as first symbol after the MRI, otherwise they act on dst
-                    mriVal |= sym.value;
-                } else {
+                    if (i == 0) {
+                        mriVal |= sym.value;
+                    } else {
+                        // TODO: Warning
+                        dstVal |= sym.value;
+                    }
+                } else if (sym.type == SymbolType.Label || sym.type == SymbolType.Param) {
                     dstVal |= sym.value;
+                } else {
+                    throw new AssemblerError(`Unexpected symbol type ${sym.name} -> ${SymbolType[sym.type]}`, ex);
                 }
             } else {
                 const val = this.tryEval(ctx, ex);
@@ -160,6 +172,7 @@ export class ExprEvaluator {
             }
         }
 
+        // now build a single operation for the 12 bit destination
         return this.genMRI(ctx, mriVal, dstVal);
     }
 
@@ -237,7 +250,7 @@ export class ExprEvaluator {
             case "-":   return (lhs - rhs) & 0o7777;
             case "^":   return (lhs * rhs) & 0o7777;
             case "%":   return (lhs / rhs) & 0o7777;
-            case "!":   return !this.opts.orDoesShift ? (lhs | rhs) : (lhs * 0o100 + rhs);
+            case "!":   return !this.opts.orDoesShift ? (lhs | rhs) : ((lhs << 6) | rhs) & 0o7777;
             case "&":   return lhs & rhs;
         }
     }
@@ -249,11 +262,10 @@ export class ExprEvaluator {
         }
 
         const sym = this.syms.tryLookup(expr.first.node.name);
-        if (!sym || sym.type != SymbolType.Fixed) {
+        if (!sym || sym.type != SymbolType.Param || !sym.fixed) {
             return false;
         }
 
-        // check if FIXTAB with auto-MRI detection
-        return sym.forceMri || PDP8.isMRIOp(sym.value);
+        return sym.forcedMri || PDP8.isMRIOp(sym.value);
     }
 }

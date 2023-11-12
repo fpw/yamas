@@ -60,7 +60,7 @@ export class SymbolAssembler {
     private handleAssignment(ctx: Context, stmt: Nodes.AssignStatement): StatementEffect {
         const paramVal = this.evaluator.tryEval(ctx, stmt.val);
 
-        // undefined expressions lead to undefined symbols
+        // only assign non-null: undefined expressions lead to undefined symbols
         if (paramVal !== null) {
             this.syms.defineParameter(stmt.sym.name, paramVal);
         }

@@ -21,7 +21,7 @@ describe("GIVEN a program with macros", () => {
             expect(data.memory[0o377]).toEqual(0o1000);
             // and reference it in A
             expect(data.memory[0o201]).toEqual(0o1377);
-            // while B is a MRI
+            // while B is an MRI
             expect(data.memory[0o202]).toEqual(0o1721);
         });
     });

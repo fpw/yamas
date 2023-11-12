@@ -23,7 +23,7 @@ describe("GIVEN a program containing statements", () => {
         });
     });
 
-    describe("WHEN a MRI creates a link and the target is present on the zero page", () => {
+    describe("WHEN an MRI creates a link and the target is present on the zero page", () => {
         const data = assemble(`
             PAGE 0
             TAD (1234)

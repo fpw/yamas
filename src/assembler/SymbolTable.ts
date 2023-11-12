@@ -23,52 +23,104 @@ export class SymbolTable {
     private symbols = new Map<string, SymbolData>();
 
     public definePermanent(name: string, value: number) {
-        this.defineSymbol({
-            type: SymbolType.Permanent,
-            name: name,
-            value: value,
-        });
+        const normName = normalizeSymbolName(name);
+        if (this.symbols.has(normName)) {
+            throw Error(`Redefining permanent symbol ${normName}`);
+        }
+        this.symbols.set(normName, { type: SymbolType.Permanent, name: normName, value: value });
     }
 
     public definePseudo(name: string) {
-        this.defineSymbol({
-            type: SymbolType.Pseudo,
-            name: name,
-            value: 0,
-        });
+        const normName = normalizeSymbolName(name);
+        if (this.symbols.has(normName)) {
+            throw Error(`Redefining pseudo symbol ${normName}`);
+        }
+        this.symbols.set(normName, { type: SymbolType.Pseudo, name: normName });
+    }
+
+    public defineMacro(name: string) {
+        const normName = normalizeSymbolName(name);
+        if (this.symbols.has(normName)) {
+            throw Error(`Redefining macro symbol ${normName}`);
+        }
+        this.symbols.set(normName, { type: SymbolType.Macro, name: normName });
     }
 
     public defineParameter(name: string, value: number) {
-        this.defineSymbol({
+        const normName = normalizeSymbolName(name);
+        const existing = this.symbols.get(normName);
+        if (existing) {
+            if (existing.type != SymbolType.Param && existing.type != SymbolType.Label) {
+                throw Error(`Illegal redefine of ${existing.name}`);
+            }
+
+            const noChange = (existing.value == value);
+            if (noChange) {
+                // make sure we don't lose meta-information, e.g. FIXTAB only runs in pass 1,
+                // so pass 2 will re-assign parameters but not fix them again
+                return;
+            }
+
+            // redefining a symbol is completely okay, but not if the meta-data changed
+            if (!noChange && existing.type == SymbolType.Param && (existing.fixed || existing.forcedMri)) {
+                throw Error(`Redefining fixed symbol ${existing.name}`);
+            }
+        }
+
+        this.symbols.set(normName, {
             type: SymbolType.Param,
-            name: name,
+            name: normName,
             value: value,
+            fixed: false,
+            forcedMri: false,
         });
     }
 
     public defineForcedMri(name: string, value: number) {
-        this.defineSymbol({
-            type: SymbolType.Fixed,
-            name: name,
+        const normName = normalizeSymbolName(name);
+        const existing = this.symbols.get(normName);
+        if (existing) {
+            if (existing.type != SymbolType.Param) {
+                throw Error(`Illegal redefine of ${existing.name}`);
+            }
+
+            const noChange = (existing.value == value);
+            if (!noChange) {
+                throw Error(`Redefining MRI symbol ${normName}`);
+            }
+        }
+
+        this.symbols.set(normName, {
+            type: SymbolType.Param,
+            name: normName,
             value: value,
-            forceMri: true,
+            fixed: true,
+            forcedMri: true,
         });
     }
 
     public defineLabel(label: string, clc: number) {
-        this.defineSymbol({
-            type: SymbolType.Label,
-            name: label,
-            value: clc,
-        });
-    }
+        const normName = normalizeSymbolName(label);
+        const existing = this.symbols.get(normName);
 
-    public defineMacro(name: string) {
-        this.defineSymbol({
-            type: SymbolType.Macro,
-            name: name,
-            value: 0,
-        });
+        if (existing) {
+            if (existing.type != SymbolType.Label && existing.type != SymbolType.Param) {
+                throw Error(`Illegal redefine of label ${existing.name}`);
+            }
+
+            const noChange = (existing.value == clc);
+            if (noChange) {
+                // defining a parameter to export labels is okay if the label later gets the exported value
+                return;
+            }
+
+            if (existing.type == SymbolType.Param) {
+                // TODO: Warn on redefine
+            } else {
+                throw Error(`Redefining label ${normName}`);
+            }
+        }
+        this.symbols.set(normName, { type: SymbolType.Label, name: normName, value: clc });
     }
 
     public tryLookup(name: string): SymbolData | undefined {
@@ -87,7 +139,7 @@ export class SymbolTable {
     public fix() {
         for (const sym of this.symbols.values()) {
             if (sym.type == SymbolType.Param) {
-                sym.type = SymbolType.Fixed;
+                sym.fixed = true;
             }
         }
     }
@@ -102,37 +154,5 @@ export class SymbolTable {
 
     public getSymbols(): ReadonlyMap<string, SymbolData> {
         return this.symbols;
-    }
-
-    private defineSymbol(data: SymbolData) {
-        const normName = normalizeSymbolName(data.name);
-        const sym = this.tryLookup(normName);
-
-        if (sym) {
-            // redfining a param is okay
-            const isParamRedefine =
-                (sym.type == SymbolType.Param || sym.type == SymbolType.Fixed) &&
-                (data.type == SymbolType.Param || sym.forceMri);
-
-            // some programs set locations as a param and still use a label later
-            // this is only okay if they actually have the same value
-            const isLabelCheck =
-                (sym.type == SymbolType.Param || sym.type == SymbolType.Label) &&
-                (data.type == SymbolType.Label && sym.value == data.value);
-
-            // TODO: Generate warning
-            const isFixRedefine =
-                    (sym.type == SymbolType.Fixed &&
-                    (data.type == SymbolType.Param || data.type == SymbolType.Label));
-
-            if (isParamRedefine || isLabelCheck || isFixRedefine) {
-                sym.value = data.value;
-                return;
-            } else {
-                throw Error(`Duplicate symbol ${normName}, old: ${sym.value}, new: ${data.value}`);
-            }
-        }
-
-        this.symbols.set(normName, { ...data, name: normName });
     }
 }

@@ -17,17 +17,46 @@
  */
 
 export enum SymbolType {
-    Param,      // A=x
-    Label,      // A,
     Pseudo,     // PAGE, DECIMAL, ...
-    Fixed,      // Converted from param using FIXTAB. Means no output in symbol table.
     Permanent,  // I and Z
     Macro,      // DEFINE
+    Label,      // A,
+    Param,      // A=x
 }
 
-export interface SymbolData {
+export type SymbolData = PermanentSymbol | PseudoSymbol | MacroSymbol | LabelSymbol | ParamSymbol;
+
+export interface BaseSymbol {
+    readonly type: SymbolType;
     readonly name: string;
-    type: SymbolType;
+}
+
+export interface PseudoSymbol extends BaseSymbol {
+    type: SymbolType.Pseudo;
+}
+
+export interface PermanentSymbol extends BaseSymbol {
+    type: SymbolType.Permanent;
     value: number;
-    forceMri?: boolean;
+}
+
+export interface MacroSymbol extends BaseSymbol {
+    type: SymbolType.Macro;
+}
+
+export interface LabelSymbol extends BaseSymbol {
+    type: SymbolType.Label;
+    value: number;
+}
+
+export interface ParamSymbol extends BaseSymbol {
+    type: SymbolType.Param;
+    value: number;
+
+    // whether the symbol was fixed using FIXTAB or FIXMRI
+    // only effect: do not output in symbol listing
+    fixed: boolean;
+
+    // whether the symbol is a forced MRI (FIXMRI)
+    forcedMri: boolean;
 }

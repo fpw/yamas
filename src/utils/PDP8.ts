@@ -31,5 +31,5 @@ export function firstAddrInPage(pageNum: number): number {
 }
 
 export function isMRIOp(op: number): boolean {
-    return (op & 0o7000) <= 0o5000;
+    return ((op & 0o7000) == op) && (op <= 0o5000);
 }

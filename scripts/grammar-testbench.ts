@@ -25,7 +25,7 @@ import { YamasOptions } from "../src/Yamas.js";
 
 const cmd = command({
     name: "yamas-tb",
-    description: "Yamas Grammar Testbench",
+    description: "Yamas grammar doc testbench",
     args: {
         dir: positional({
             description: "Input directory with .pa(l) files",
@@ -34,7 +34,7 @@ const cmd = command({
     },
     handler: (args) => {
         console.log("Compiling grammar...");
-        const parser = peggy.generate(readFileSync("docs/yamas.peggy", "utf-8"), {
+        const peggyParser = peggy.generate(readFileSync("docs/yamas.peggy", "utf-8"), {
             output: "parser",
         });
 
@@ -49,7 +49,7 @@ const cmd = command({
                 rawOpts = JSON.parse(readFileSync(optsPath, "utf-8")) as object;
             }
             const opts = createOptions(rawOpts);
-            const res = testOne(parser, opts, filePath);
+            const res = testOne(peggyParser, opts, filePath);
             console.log(`Checked ${basename(filePath)}: ${res ? "good" : "bad"}`);
         }
     }

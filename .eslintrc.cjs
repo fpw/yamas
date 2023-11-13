@@ -25,7 +25,7 @@ module.exports = {
         "@stylistic/object-curly-spacing": ["error", "always"],
         "@stylistic/comma-spacing": "error",
         "@stylistic/keyword-spacing": "error",
-        "@stylistic/func-call-spacing": "error",
+        "@stylistic/function-call-spacing": "error",
         "@stylistic/space-before-blocks": "error",
         "@stylistic/space-before-function-paren": ["error", "never"],
         "@stylistic/space-infix-ops": "error",

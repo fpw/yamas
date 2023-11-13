@@ -1,17 +1,14 @@
 {
   "name": "yamas",
   "description": "Yet Another Macro Assembler: A PDP-8 assembler.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Folke Will <folko@solhost.org>",
   "keywords": [
     "PDP-8",
     "assembler"
   ],
   "license": "AGPL-3.0-or-later",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/fpw/yamas"
-  },
+  "repository": "github:fpw/yamas",
   "scripts": {
     "start": "tsx scripts/yamas.ts",
     "testbench": "tsx scripts/testbench.ts",
@@ -19,7 +16,7 @@
     "benchmark": "tsx scripts/benchmark.ts",
     "generate-diagrams": "tsx scripts/generate-diagrams.ts",
     "build": "tsc",
-    "prepack": "tsc",
+    "prepack": "rimraf dist && tsc",
     "lint": "tsc && eslint .",
     "test": "vitest run --dir test",
     "test:watch": "vitest --dir test",
@@ -35,14 +32,15 @@
     "cmd-ts": "^0.13.0"
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "^1.1.0",
+    "@stylistic/eslint-plugin": "^1.2.0",
     "@types/node": "^20.9.0",
-    "@typescript-eslint/eslint-plugin": "^6.10.0",
-    "@typescript-eslint/parser": "^6.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.11.0",
+    "@typescript-eslint/parser": "^6.11.0",
     "@vitest/coverage-v8": "^0.34.6",
     "eslint": "^8.53.0",
     "peggy": "^3.0.2",
     "peggy-tracks": "^2.0.1",
+    "rimraf": "^5.0.5",
     "tsx": "^4.1.1",
     "typescript": "^5.2.2",
     "vitest": "^0.34.6"

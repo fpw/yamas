@@ -18,7 +18,7 @@
 
 import * as Nodes from "../../parser/nodes/Node.js";
 import { NodeType } from "../../parser/nodes/Node.js";
-import { AssemblerOptions } from "../Assembler.js";
+import { SubComponents } from "../Assembler.js";
 import { Context } from "../Context.js";
 import { SymbolTable } from "../SymbolTable.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
@@ -28,17 +28,15 @@ import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
  * Assembler for statements related to symbol table manipulation.
  */
 export class SymbolAssembler {
-    private opts: AssemblerOptions;
     private syms: SymbolTable;
     private evaluator: ExprEvaluator;
 
-    public constructor(opts: AssemblerOptions, syms: SymbolTable, evaluator: ExprEvaluator) {
-        this.opts = opts;
-        this.syms = syms;
-        this.evaluator = evaluator;
+    public constructor(components: SubComponents) {
+        this.syms = components.symbols;
+        this.evaluator = components.evaluator;
     }
 
-    public registerHandlers(register: RegisterFunction) {
+    public registerStatements(register: RegisterFunction) {
         register(NodeType.Assignment, this.handleAssignment.bind(this));
         register(NodeType.FixMri, this.handleFixMri.bind(this));
         register(NodeType.Label, this.handleLabel.bind(this));

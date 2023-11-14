@@ -19,12 +19,11 @@
 import { Parser } from "../../parser/Parser.js";
 import * as Nodes from "../../parser/nodes/Node.js";
 import { NodeType } from "../../parser/nodes/Node.js";
-import { AssemblerOptions } from "../Assembler.js";
+import { AssemblerOptions, SubComponents } from "../Assembler.js";
 import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
 import { SymbolTable } from "../SymbolTable.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
-import { OutputFilter } from "../util/OutputFilter.js";
 import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 
 /**
@@ -33,17 +32,15 @@ import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 export class MacroAssembler {
     private opts: AssemblerOptions;
     private syms: SymbolTable;
-    private output: OutputFilter;
     private evaluator: ExprEvaluator;
 
-    public constructor(opts: AssemblerOptions, syms: SymbolTable, output: OutputFilter, evaluator: ExprEvaluator) {
-        this.opts = opts;
-        this.syms = syms;
-        this.evaluator = evaluator;
-        this.output = output;
+    public constructor(components: SubComponents) {
+        this.opts = components.options;
+        this.syms = components.symbols;
+        this.evaluator = components.evaluator;
     }
 
-    public registerHandlers(register: RegisterFunction) {
+    public registerStatements(register: RegisterFunction) {
         register(NodeType.Define, this.handleDefine.bind(this));
         register(NodeType.Invocation, this.handleInvocation.bind(this));
         register(NodeType.IfDef, this.handleIfDef.bind(this));

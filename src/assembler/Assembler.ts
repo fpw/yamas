@@ -32,7 +32,7 @@ import { OriginAssembler } from "./assemblers/OriginAssembler.js";
 import { SymbolAssembler } from "./assemblers/SymbolAssembler.js";
 import { ExprEvaluator } from "./util/ExprEvaluator.js";
 import { OutputFilter } from "./util/OutputFilter.js";
-import { RegisterFunction, StatementEffect, StatementHandler } from "./util/StatementEffect.js";
+import { RegisterFunction, StatementHandler } from "./util/StatementEffect.js";
 
 export interface OutputHandler {
     changeOrigin(clc: number): void;
@@ -46,57 +46,61 @@ export interface AssemblerOptions extends ParserOptions {
     forgetLiterals?: boolean;       // like /W in PAL8: punch and clear literals on PAGE
 }
 
+export interface SubComponents {
+    options: AssemblerOptions;
+    symbols: SymbolTable;
+    links: LinkTable;
+    output: OutputFilter;
+    evaluator: ExprEvaluator;
+}
+
 export class Assembler {
     private opts: AssemblerOptions;
-    private syms = new SymbolTable();
-    private output: OutputFilter;
     private evaluator: ExprEvaluator;
-    private programs: Nodes.Program[] = [];
-    private linkTable = new LinkTable();
+    private output: OutputFilter;
+    private syms = new SymbolTable();
+    private links = new LinkTable();
 
+    private programs: Nodes.Program[] = [];
     private stmtHandlers: StatementHandler<Nodes.Statement>[] = [];
-    private dataAssembler: DataAssembler;
-    private macroAssembler: MacroAssembler;
-    private symAssembler: SymbolAssembler;
-    private originAssembler: OriginAssembler;
 
     public constructor(options: AssemblerOptions) {
         this.opts = options;
-        this.output = new OutputFilter(this.opts);
-        this.evaluator = new ExprEvaluator(this.opts, this.syms, this.linkTable);
+        this.output = new OutputFilter(options);
+        this.evaluator = new ExprEvaluator(options, this.syms, this.links);
 
-        this.dataAssembler = new DataAssembler(this.opts, this.output, this.evaluator);
-        this.dataAssembler.registerHandlers(this.register.bind(this));
-
-        this.macroAssembler = new MacroAssembler(this.opts, this.syms, this.output, this.evaluator);
-        this.macroAssembler.registerHandlers(this.register.bind(this));
-
-        this.symAssembler = new SymbolAssembler(this.opts, this.syms, this.evaluator);
-        this.symAssembler.registerHandlers(this.register.bind(this));
-
-        this.originAssembler = new OriginAssembler(this.opts, this.evaluator);
-        this.originAssembler.registerHandlers(this.register.bind(this));
-
-        this.registerHandlers(this.register.bind(this));
+        // register pseudos as such so that we get errors if code redefines them
+        Parser.SupportedPseudos
+            .filter(k => !options.disabledPseudos?.includes(k))
+            .forEach(k => this.syms.definePseudo(k));
 
         this.syms.definePermanent("I", 0o400);
         this.syms.definePermanent("Z", 0);
 
-        // register pseudos as such so that we get errors if code redefines them
-        Parser.SupportedPseudos
-            .filter(k => !this.opts.disabledPseudos?.includes(k))
-            .forEach(k => this.syms.definePseudo(k));
+        this.registerStatements(this.registerStatement.bind(this));
     }
 
-    private registerHandlers(register: RegisterFunction) {
-        const nullEffect = (ctx: Context, stmt: Nodes.Statement): StatementEffect => ({});
+    private registerStatements(register: RegisterFunction) {
+        const components: SubComponents = {
+            options: this.opts,
+            output: this.output,
+            symbols: this.syms,
+            links: this.links,
+            evaluator: this.evaluator,
+        };
 
+        for (const cons of [DataAssembler, MacroAssembler, SymbolAssembler, OriginAssembler]) {
+            const sub = new cons(components);
+            sub.registerStatements(register);
+        }
+
+        const nullEffect = () => ({});
         register(NodeType.Eject, nullEffect);
         register(NodeType.XList, nullEffect);
         register(NodeType.Pause, nullEffect);
     }
 
-    private register<T extends Nodes.Statement>(type: T["type"], handler: StatementHandler<T>) {
+    private registerStatement<T extends Nodes.Statement>(type: T["type"], handler: StatementHandler<T>) {
         if (this.stmtHandlers[type]) {
             throw Error(`Multiple handlers for ${NodeType[type]}`);
         }
@@ -137,7 +141,7 @@ export class Assembler {
         // pass 2: generate code and assign missing symbols and links on the go
         // we must clear the link table because it's possible that the previous pass left it
         // in another field, so we'll just fill it again in pass 2
-        this.linkTable.clear();
+        this.links.clear();
         const pass2Errors = this.doPass(true);
         if (pass2Errors.length > 0) {
             return pass2Errors;
@@ -212,7 +216,7 @@ export class Assembler {
 
         if (this.opts.forgetLiterals && oldPage != newPage) {
             this.outputLinks(ctx);
-            this.linkTable.clear();
+            this.links.clear();
         }
 
         this.output.punchOrigin(ctx);
@@ -226,7 +230,7 @@ export class Assembler {
         const newClc = firstWrite + incClc;
         const lastWrite = newClc - 1;
 
-        if (this.linkTable.checkOverlap(firstWrite, lastWrite)) {
+        if (this.links.checkOverlap(firstWrite, lastWrite)) {
             throw Error("Link table overflow");
         }
 
@@ -239,12 +243,12 @@ export class Assembler {
         ctx.setClc(PDP8.firstAddrInPage(1), false);
         this.output.punchField(ctx, field);
         this.output.punchOrigin(ctx);
-        this.linkTable.clear();
+        this.links.clear();
     }
 
     private outputLinks(ctx: Context) {
         let curAddr = ctx.getClc(false);
-        this.linkTable.visit((addr, val) => {
+        this.links.visit((addr, val) => {
             if (curAddr != addr) {
                 curAddr = addr;
                 this.output.punchOrigin(ctx, curAddr);

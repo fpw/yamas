@@ -21,7 +21,7 @@ import { NodeType } from "../../parser/nodes/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
 import { toDECFloat } from "../../utils/Floats.js";
 import { parseIntSafe } from "../../utils/Strings.js";
-import { AssemblerOptions } from "../Assembler.js";
+import { AssemblerOptions, SubComponents } from "../Assembler.js";
 import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
@@ -36,13 +36,13 @@ export class DataAssembler {
     private evaluator: ExprEvaluator;
     private output: OutputFilter;
 
-    public constructor(opts: AssemblerOptions, output: OutputFilter, evaluator: ExprEvaluator) {
-        this.opts = opts;
-        this.evaluator = evaluator;
-        this.output = output;
+    public constructor(components: SubComponents) {
+        this.opts = components.options;
+        this.evaluator = components.evaluator;
+        this.output = components.output;
     }
 
-    public registerHandlers(register: RegisterFunction) {
+    public registerStatements(register: RegisterFunction) {
         register(NodeType.ExpressionStmt, this.handleExprStmt.bind(this));
         register(NodeType.Radix, this.handleRadix.bind(this));
         register(NodeType.PunchControl, this.handlePunchControl.bind(this));

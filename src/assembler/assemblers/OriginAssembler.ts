@@ -19,7 +19,7 @@
 import * as Nodes from "../../parser/nodes/Node.js";
 import { NodeType } from "../../parser/nodes/Node.js";
 import * as PDP8 from "../../utils/PDP8.js";
-import { AssemblerOptions } from "../Assembler.js";
+import { AssemblerOptions, SubComponents } from "../Assembler.js";
 import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
@@ -32,12 +32,12 @@ export class OriginAssembler {
     private opts: AssemblerOptions;
     private evaluator: ExprEvaluator;
 
-    public constructor(opts: AssemblerOptions, evaluator: ExprEvaluator) {
-        this.opts = opts;
-        this.evaluator = evaluator;
+    public constructor(components: SubComponents) {
+        this.opts = components.options;
+        this.evaluator = components.evaluator;
     }
 
-    public registerHandlers(register: RegisterFunction) {
+    public registerStatements(register: RegisterFunction) {
         register(NodeType.ChangePage, this.handlePage.bind(this));
         register(NodeType.ChangeField, this.handleField.bind(this));
         register(NodeType.Reloc, this.handleReloc.bind(this));

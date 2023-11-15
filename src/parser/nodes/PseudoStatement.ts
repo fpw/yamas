@@ -37,7 +37,7 @@ export interface RadixStatement extends BaseNode {
 // FIELD
 export interface ChangeFieldStatement extends BaseNode {
     type: NodeType.ChangeField;
-    expr: Expression;
+    expr?: Expression;
 }
 
 // PAGE

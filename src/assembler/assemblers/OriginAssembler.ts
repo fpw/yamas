@@ -66,7 +66,13 @@ export class OriginAssembler {
     }
 
     private handleField(ctx: Context, stmt: Nodes.ChangeFieldStatement): StatementEffect {
-        const field = this.evaluator.safeEval(ctx, stmt.expr);
+        let field;
+        if (!stmt.expr) {
+            // TODO: Generate warning, this is unsupported in PAL8
+            field = ctx.field + 1;
+        } else {
+            field = this.evaluator.safeEval(ctx, stmt.expr);
+        }
         if (field < 0 || field >= PDP8.NumFields) {
             throw new AssemblerError(`Invalid field ${field}`, stmt);
         }

@@ -26,7 +26,7 @@ import * as Nodes from "../nodes/Node.js";
 import { NodeType } from "../nodes/Node.js";
 import { CommonParser } from "./CommonParser.js";
 
-type BinOpFragment = { elem: Nodes.Element, op?: Tokens.CharToken };
+type BinOpFragment = { elem: Nodes.Element | Nodes.ParenExpr, op?: Tokens.CharToken };
 
 export class ExprParser {
     public constructor(private opts: ParserOptions, private lexer: Lexer, private commonParser: CommonParser) {
@@ -45,22 +45,17 @@ export class ExprParser {
     public parseExpr(gotTok?: Tokens.Token): Nodes.Expression {
         const exprs: Nodes.Expression[] = this.parseExprParts(gotTok);
 
-        const firstElem = exprs[0];
-        if (firstElem.type == NodeType.Element) {
-            const group: Nodes.SymbolGroup = {
-                type: NodeType.SymbolGroup,
-                first: firstElem,
-                exprs: exprs.slice(1),
-                extent: calcExtent(firstElem, exprs[exprs.length - 1]),
-            };
-            return group;
-        } else {
-            if (exprs.length == 1) {
-                return exprs[0];
-            } else {
-                throw new ParserError("Logic error: Group not started by symbol", firstElem);
-            }
+        if (exprs.length == 1 && exprs[0].type != NodeType.Element) {
+            return exprs[0];
         }
+
+        const firstElem = exprs[0];
+        const group: Nodes.ExprGroup = {
+            type: NodeType.SymbolGroup,
+            exprs: exprs,
+            extent: calcExtent(firstElem, exprs[exprs.length - 1]),
+        };
+        return group;
     }
 
     /**
@@ -140,30 +135,37 @@ export class ExprParser {
         return this.parseBinOpOrElement(first);
     }
 
-    private parseBinOpOrElement(gotTok?: Tokens.Token): Nodes.BinaryOp | Nodes.Element {
+    private parseBinOpOrElement(gotTok?: Tokens.Token): Nodes.BinaryOp | Nodes.Expression {
         // all expressions are left-associative, so collect parts and fold
-        const parts: BinOpFragment[] = [];
+        const fragments: BinOpFragment[] = [];
         while (true) {
-            const part = this.parseElementAndOperator(gotTok);
+            const first = this.lexer.nextNonBlank(false, gotTok);
             gotTok = undefined;
-            parts.push(part);
-            if (!part.op) {
+            if (first.type == TokenType.Char && (first.char == "(" || first.char == "[")) {
+                const expr = this.parseExpressionPart(first) as Nodes.ParenExpr;
+                fragments.push({ elem: expr });
                 break;
+            } else {
+                const frag = this.parseElemAndOp(first);
+                fragments.push(frag);
+                if (!frag.op) {
+                    break;
+                }
             }
         }
 
-        if (parts.length == 1) {
-            return parts[0].elem;
+        if (fragments.length == 1) {
+            return fragments[0].elem;
         }
 
-        return this.foldExpressionParts(parts);
+        return this.foldExpressionParts(fragments);
     }
 
     /**
      * Parse the next element of an expression and the next operator.
      * @returns The next element of an expression and the operator behind it, if any.
      */
-    private parseElementAndOperator(gotTok?: Tokens.Token): BinOpFragment {
+    private parseElemAndOp(gotTok?: Tokens.Token): BinOpFragment {
         const firstElem = this.commonParser.parseElement(gotTok);
 
         const nextTok = this.lexer.next();

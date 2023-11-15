@@ -84,7 +84,7 @@ function testOne(opts: YamasOptions, srcPath: string, bnPath: string): boolean {
         yamas.addInput(`${basename(srcPath)}`, src);
         const output = yamas.run();
         if (output.errors.length > 0) {
-            output.errors.forEach(e => console.error(e));
+            console.error(output.errors[0]);
             return false;
         }
         return compareBin(`${basename(bnPath)}`, output.binary, shouldBin);

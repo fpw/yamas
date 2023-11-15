@@ -65,7 +65,7 @@ export class PseudoParser {
     private registerPseudos(mkPseudo: (pseudo: string, action: PseudoHandler) => void) {
         // Origin
         mkPseudo("PAGE", token => this.parseWithOptParam<Nodes.ChangePageStatement>(NodeType.ChangePage, token));
-        mkPseudo("FIELD", token => this.parseWithParam<Nodes.ChangeFieldStatement>(NodeType.ChangeField, token));
+        mkPseudo("FIELD", token => this.parseWithOptParam<Nodes.ChangeFieldStatement>(NodeType.ChangeField, token));
         mkPseudo("RELOC", token => this.parseWithOptParam<Nodes.RelocStatement>(NodeType.Reloc, token));
 
         // Symbols
@@ -151,15 +151,17 @@ export class PseudoParser {
             throw new ParserError("Symbol group expected", startSym);
         }
 
-        if (expr.exprs.length == 0) {
+        if (expr.exprs.length == 1) {
+            // no additional parameter
             return undefined;
         }
 
-        if (expr.exprs.length != 1) {
+        if (expr.exprs.length != 2) {
+            // more than one parameter
             throw new ParserError("Too many arguments", startSym);
         }
 
-        return expr.exprs[0];
+        return expr.exprs[1];
     }
 
     private parsePunchDisable(token: Tokens.SymbolToken): Nodes.PunchCtrlStatement {

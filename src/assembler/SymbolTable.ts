@@ -61,9 +61,11 @@ export class SymbolTable {
                 return;
             }
 
-            // redefining a symbol is completely okay, but not if the meta-data changed
-            if (!noChange && existing.type == SymbolType.Param && (existing.fixed || existing.forcedMri)) {
-                throw Error(`Redefining fixed symbol ${existing.name}`);
+            // redefining a symbol is completely okay, but warn if it changed despite being fixed
+            if (existing.type == SymbolType.Param && existing.fixed) {
+                // TODO: Generate warning
+                existing.value = value;
+                return;
             }
         }
 
@@ -115,7 +117,7 @@ export class SymbolTable {
             }
 
             if (existing.type == SymbolType.Param) {
-                // TODO: Warn on redefine
+                // TODO: Generate warning
             } else {
                 throw Error(`Redefining label ${normName}`);
             }

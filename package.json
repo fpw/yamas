@@ -1,7 +1,7 @@
 {
   "name": "yamas",
   "description": "Yet Another Macro Assembler: A PDP-8 assembler.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Folke Will <folko@solhost.org>",
   "keywords": [
     "PDP-8",
@@ -41,7 +41,7 @@
     "peggy": "^3.0.2",
     "peggy-tracks": "^2.0.1",
     "rimraf": "^5.0.5",
-    "tsx": "^4.1.1",
+    "tsx": "^4.1.2",
     "typescript": "^5.2.2",
     "vitest": "^0.34.6"
   },

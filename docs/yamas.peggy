@@ -105,7 +105,7 @@ SymbolGroup             = sym:Element exprs:(_ @Expression)*
 
 BinaryOp                = head:Element tail:BinOpFragment+
                             { return {type: "BinOp", ...leftAssoc(head, tail)}; }
-BinOpFragment           = op:BinaryOperator rhs:Element
+BinOpFragment           = op:BinaryOperator rhs:(Element / ParenExpr)
                             { return {type: "BinOp", op: op, rhs: rhs}; }
 BinaryOperator          = op:$("+" / "-" / "!" / "&" / "^" / "%")
 
@@ -127,7 +127,7 @@ Symbol "Symbol"         = name:SymbolName &{return !pseudos.has(name) && !macros
 
 Macro "Macro Name"      = @name:SymbolName &{return macros.has(name);}
 
-SymbolName              = $([A-Z][A-Z0-9]*)
+SymbolName              = $([a-zA-Z][a-zA-Z0-9]*)
 
 CLC                     = "."
                             { return {type: "CLC"}; }
@@ -148,7 +148,7 @@ EOF "EOF"               = "$"
 OriginPseudo            = Page / Field / Reloc
 Page                    = "PAGE" p:(_+ @Param)?
                             { return {type: "Page", page: p}; }
-Field                   = "FIELD" _+ p:Param
+Field                   = "FIELD" p:(_+ @Param)?
                             { return {type: "Field", field: p}; }
 Reloc                   = "RELOC" p:(_+ @Param)?
                             { return {type: "Reloc", reloc: p}; }

@@ -240,10 +240,10 @@ export class Assembler {
     private changeField(ctx: Context, field: number) {
         ctx.field = field;
         this.outputLinks(ctx);
+        this.links.clear();
         ctx.setClc(PDP8.firstAddrInPage(1), false);
         this.output.punchField(ctx, field);
         this.output.punchOrigin(ctx);
-        this.links.clear();
     }
 
     private outputLinks(ctx: Context) {

@@ -21,12 +21,11 @@ import { Element } from "./Element.js";
 import { BaseNode, NodeType } from "./Node.js";
 
 export type Expression =
-    SymbolGroup | ParenExpr | BinaryOp | Element;
+    ExprGroup | ParenExpr | BinaryOp | Element;
 
-// Symbol<blank>[Expression]
-export interface SymbolGroup extends BaseNode {
+// expr <space> expr ... -> at least two exprs
+export interface ExprGroup extends BaseNode {
     type: NodeType.SymbolGroup;
-    first: Element;
     exprs: Expression[];
 };
 
@@ -40,7 +39,7 @@ export interface ParenExpr extends BaseNode {
 // A+B!C...
 export interface BinaryOp extends BaseNode {
     type: NodeType.BinaryOp;
-    lhs: BinaryOp | Element;
+    lhs: BinaryOp | ParenExpr | Element;
     operator: BinaryOpChr;
-    rhs: Element;
+    rhs: ParenExpr | Element;
 }

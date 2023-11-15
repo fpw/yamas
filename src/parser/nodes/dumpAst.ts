@@ -46,7 +46,7 @@ export function dumpAst(prog: Nodes.Program, write: (line: string) => void, inde
 }
 
 // eslint-disable-next-line max-lines-per-function
-function formatNode(node: Nodes.Node): string {
+export function formatNode(node: Nodes.Node): string {
     let str;
     switch (node.type) {
         case Nodes.NodeType.Origin:
@@ -72,8 +72,7 @@ function formatNode(node: Nodes.Node): string {
         case Nodes.NodeType.CLCValue:
             return "CLC()";
         case Nodes.NodeType.SymbolGroup:
-            str = "Group(";
-            str += `${formatNode(node.first)}, [`;
+            str = "Group([";
             str += node.exprs.map(n => formatNode(n)).join(", ");
             str += "])";
             return str;
@@ -119,7 +118,7 @@ function formatNode(node: Nodes.Node): string {
         case Nodes.NodeType.FixTab:
             return "FixTab()";
         case Nodes.NodeType.ChangeField:
-            return `ChangeField(${formatNode(node.expr)})`;
+            return `ChangeField(${node.expr ? formatNode(node.expr) : ""})`;
         case Nodes.NodeType.ChangePage:
             return `ChangePage(${node.expr ? formatNode(node.expr) : ""})`;
         case Nodes.NodeType.Reloc:

@@ -106,4 +106,55 @@ describe("GIVEN a program with expressions", () => {
             expect(data.memory[0o377]).toEqual(0o0003);
         });
     });
+
+    describe("WHEN an origin uses CLC in a symbol group", () => {
+        const data = assemble(`
+            *220
+            *.-1 177+1      / 217 or 177 = 377, +1 = 400. Parse as BinOp(CLC, -, Group(1 177+1))
+            TAG,
+        `);
+        test("THEN it OR the operands as expected", () => {
+            expect(data.symbols["TAG"]).toEqual(0o0400);
+        });
+    });
+
+    describe("WHEN an operator joins a parentheses expression", () => {
+        const data = assemble(`
+            A=(0+(1+(2
+        `);
+        test("THEN it should generate links and use the operator on them", () => {
+            expect(data.memory[0o375]).toEqual(0o0376);
+            expect(data.memory[0o376]).toEqual(0o0400);
+            expect(data.memory[0o377]).toEqual(0o0002);
+            expect(data.symbols["A"]).toEqual(0o0375);
+        });
+    });
+
+    describe("WHEN an expression generates a link to a symbol that is defined later with a different link", () => {
+        const data = assemble(`
+            /                         Loc   Pass 1              Pass 2
+            JMP I [A                / 200,  link: 177=0         link 177=1
+            LPUSHF                  / 201,  do nothing          use value -> 4576
+            JMP I [B                / 202,  177=0               link 176=2
+            MPUSHF, NOP             / 203,  normal              normal
+            LPUSHF= JMS I [MPUSHF   /       link 176=203        link 175=203
+            A=1
+            B=2
+        `);
+        test("THEN the generated code is invalid", () => {
+            expect(data.memory[0o0175]).equals(0o0203);
+            expect(data.memory[0o0176]).equals(0o0002);
+            expect(data.memory[0o0177]).equals(0o0001);
+
+            expect(data.memory[0o0200]).equals(0o5577);
+
+            // Note: PAL8 claims to assemble this without errors and even generates a listing with
+            // LPUSHF pointing at a correct link here - but that's only because the listing is generated in
+            // *another* pass - the binary is in fact wrong and contains an invalid link!
+            expect(data.memory[0o0201]).equals(0o4576);
+
+            expect(data.memory[0o0202]).equals(0o5576);
+            expect(data.memory[0o0203]).equals(0o7000);
+        });
+    });
 });

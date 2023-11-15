@@ -54,7 +54,7 @@ export class ExprEvaluator {
         switch (expr.type) {
             case NodeType.Element:      return this.evalElement(ctx, expr);
             case NodeType.ParenExpr:    return this.evalParenExpr(ctx, expr);
-            case NodeType.SymbolGroup:  return this.evalSymbolGroup(ctx, expr);
+            case NodeType.SymbolGroup:  return this.evalExpressionGroup(ctx, expr);
             case NodeType.BinaryOp:     return this.evalBinOp(ctx, expr);
         }
     }
@@ -89,13 +89,13 @@ export class ExprEvaluator {
         return sym.value;
     }
 
-    private evalSymbolGroup(ctx: Context, group: Nodes.SymbolGroup): number | null {
+    private evalExpressionGroup(ctx: Context, group: Nodes.ExprGroup): number | null {
         if (this.isMRIExpr(group)) {
             return this.evalMRI(ctx, group);
         }
 
         // not an MRI but spaces in expr: OR all operands
-        let acc = this.tryEval(ctx, group.first);
+        let acc: number | null = 0;
 
         for (const e of group.exprs) {
             let val;
@@ -114,12 +114,13 @@ export class ExprEvaluator {
         return acc;
     }
 
-    private evalMRI(ctx: Context, group: Nodes.SymbolGroup): number | null {
-        if (group.first.node.type != NodeType.Symbol) {
+    private evalMRI(ctx: Context, group: Nodes.ExprGroup): number | null {
+        const first = group.exprs[0];
+        if (first.type != NodeType.Element || first.node.type != NodeType.Symbol) {
             throw new AssemblerError("Tried to evaluate MRI group with non-MRI", group);
         }
 
-        const mri = this.syms.lookup(group.first.node.name);
+        const mri = this.syms.lookup(first.node.name);
         if (mri.type != SymbolType.Param) {
             throw new AssemblerError("MRI group symbol is not an param symbol", group);
         }
@@ -129,14 +130,14 @@ export class ExprEvaluator {
         // -TAD 5 is illegal.
         // Ergo: It's not treated like a non-MRI because it's not allowed to have any parameter.
         // But it's also not a real MRI because we never encode any real destination.
-        if (group.first.unaryOp !== undefined) {
-            if (group.exprs.length > 0) {
-                throw new AssemblerError("MRI expression with parameters is illegal with parameters", group);
+        if (first.unaryOp !== undefined) {
+            if (group.exprs.length > 1) {
+                throw new AssemblerError("MRI expression with unary is illegal with parameters", group);
             }
-            return (group.first.unaryOp.operator == "-" ?  -mri.value : mri.value) & 0o7777;
+            return (first.unaryOp.operator == "-" ?  -mri.value : mri.value) & 0o7777;
         }
 
-        return this.buildMRI(ctx, mri.value, group.exprs);
+        return this.buildMRI(ctx, mri.value, group.exprs.slice(1));
     }
 
     // build an MRI operation from the start symbol and its operands
@@ -155,7 +156,7 @@ export class ExprEvaluator {
                     if (i == 0) {
                         mriVal |= sym.value;
                     } else {
-                        // TODO: Warning
+                        // TODO: Generate warning as it is probably unintentional
                         dstVal |= sym.value;
                     }
                 } else if (sym.type == SymbolType.Label || sym.type == SymbolType.Param) {
@@ -200,9 +201,12 @@ export class ExprEvaluator {
     }
 
     private evalParenExpr(ctx: Context, expr: Nodes.ParenExpr): number | null {
-        const val = this.tryEval(ctx, expr.expr);
+        let val = this.tryEval(ctx, expr.expr);
         if (val === null) {
-            return null;
+            // Note: PAL8 allows this and treats the values as 0
+            // This can lead to different link tables in pass 1 and 2
+            // TODO: Generate warning
+            val = 0;
         }
 
         if (expr.paren == "(") {
@@ -229,6 +233,8 @@ export class ExprEvaluator {
             lhs = this.tryEval(ctx, binOp.lhs);
             if (lhs !== null) {
                 lhs |= acc;
+            } else {
+                lhs = null;
             }
         }
         const rhs = this.tryEval(ctx, binOp.rhs);
@@ -255,13 +261,14 @@ export class ExprEvaluator {
         }
     }
 
-    private isMRIExpr(expr: Nodes.Expression): boolean {
+    private isMRIExpr(expr: Nodes.ExprGroup): boolean {
         // An MRI expression needs to start with an MRI op followed by a space -> group with symbol
-        if (expr.type != NodeType.SymbolGroup || expr.first.node.type != NodeType.Symbol) {
+        const first = expr.exprs[0];
+        if (first.type != NodeType.Element || first.node.type != NodeType.Symbol) {
             return false;
         }
 
-        const sym = this.syms.tryLookup(expr.first.node.name);
+        const sym = this.syms.tryLookup(first.node.name);
         if (!sym || sym.type != SymbolType.Param || !sym.fixed) {
             return false;
         }

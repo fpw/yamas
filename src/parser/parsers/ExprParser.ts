@@ -42,8 +42,8 @@ export class ExprParser {
      * because all of them will be in an expression group instead of a Symbol, a BinOp or something else.
      * @returns a symbol group or an expression that's not a single symbol
      */
-    public parseExpr(gotTok?: Tokens.Token): Nodes.Expression {
-        const exprs: Nodes.Expression[] = this.parseExprParts(gotTok);
+    public parseExpr(gotTok?: Tokens.Token): Nodes.Expression | Nodes.ExprGroup {
+        const exprs = this.parseBaseExprs(gotTok);
 
         if (exprs.length == 1 && exprs[0].type != NodeType.Element) {
             return exprs[0];
@@ -51,11 +51,36 @@ export class ExprParser {
 
         const firstElem = exprs[0];
         const group: Nodes.ExprGroup = {
-            type: NodeType.SymbolGroup,
+            type: NodeType.ExprGroup,
             exprs: exprs,
             extent: calcExtent(firstElem, exprs[exprs.length - 1]),
         };
         return group;
+    }
+
+    private parseBaseExprs(gotTok?: Tokens.Token): Nodes.BaseExpr[] {
+        const exprs: Nodes.BaseExpr[] = [];
+        while (true) {
+            const tok = this.lexer.nextNonBlank(false, gotTok);
+            gotTok = undefined;
+            if (!this.couldBeInExpr(tok) || (tok.type == TokenType.Char && [")", "]"].includes(tok.char))) {
+                this.lexer.unget(tok);
+                if (exprs.length == 0) {
+                    throw new ParserError("Expression expected", tok);
+                }
+                break;
+            }
+            const expr = this.parseBaseExpr(tok);
+            exprs.push(expr);
+
+            gotTok = this.lexer.next();
+            if (gotTok.type != TokenType.Blank) {
+                this.lexer.unget(gotTok);
+                break;
+            }
+        }
+
+        return exprs;
     }
 
     /**
@@ -82,33 +107,14 @@ export class ExprParser {
         }
     }
 
-    private parseExprParts(gotTok?: Tokens.Token): Nodes.Expression[] {
-        const exprs: Nodes.Expression[] = [];
-        while (true) {
-            const tok = this.lexer.nextNonBlank(false, gotTok);
-            gotTok = undefined;
-            if (!this.couldBeInExpr(tok) || (tok.type == TokenType.Char && [")", "]"].includes(tok.char))) {
-                this.lexer.unget(tok);
-                if (exprs.length == 0) {
-                    throw new ParserError("Expression expected", tok);
-                }
-                break;
-            }
-            const expr = this.parseExpressionPart(tok);
-            exprs.push(expr);
-        }
-
-        return exprs;
-    }
-
     /**
-     * Parse a an expression - symbols will be return as such.
+     * Parse an expression - symbols will be returned as such.
      * This function will never return an expression group.
      * On a blank, it will stop parsing and expect the caller to call it again
      * for the next symbol.
      * @returns The next part of an expression
      */
-    private parseExpressionPart(gotTok?: Tokens.Token): Nodes.Expression {
+    private parseBaseExpr(gotTok?: Tokens.Token): Nodes.BaseExpr {
         // check for special cases that are not linked with operators
         const first = this.lexer.nextNonBlank(false, gotTok);
         if (first.type == TokenType.Char) {
@@ -135,14 +141,14 @@ export class ExprParser {
         return this.parseBinOpOrElement(first);
     }
 
-    private parseBinOpOrElement(gotTok?: Tokens.Token): Nodes.BinaryOp | Nodes.Expression {
+    private parseBinOpOrElement(gotTok?: Tokens.Token): Nodes.BinaryOp | Nodes.ParenExpr | Nodes.Element {
         // all expressions are left-associative, so collect parts and fold
         const fragments: BinOpFragment[] = [];
         while (true) {
             const first = this.lexer.nextNonBlank(false, gotTok);
             gotTok = undefined;
             if (first.type == TokenType.Char && (first.char == "(" || first.char == "[")) {
-                const expr = this.parseExpressionPart(first) as Nodes.ParenExpr;
+                const expr = this.parseBaseExpr(first) as Nodes.ParenExpr;
                 fragments.push({ elem: expr });
                 break;
             } else {

@@ -16,30 +16,29 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { BinaryOpChr } from "../../lexer/Token.js";
-import { Element } from "./Element.js";
-import { BaseNode, NodeType } from "./Node.js";
+import { BaseNode, NodeType, Statement, SymbolNode } from "./Node.js";
 
-export type Expression = ExprGroup | BaseExpr;
-export type BaseExpr = ParenExpr | BinaryOp | Element;
-
-// expr <space> expr ... -> at least two exprs
-export interface ExprGroup extends BaseNode {
-    type: NodeType.ExprGroup;
-    exprs: BaseExpr[];
-};
-
-// (9), [TAD]
-export interface ParenExpr extends BaseNode {
-    type: NodeType.ParenExpr;
-    paren: "(" | "[";
-    expr: Expression;
+export interface Instruction extends BaseNode {
+    type: NodeType.Instruction;
+    labels: LabelDef[];
+    statement?: Statement;
+    separator: Comment | StatementSeparator;
 }
 
-// A+B!C...
-export interface BinaryOp extends BaseNode {
-    type: NodeType.BinaryOp;
-    lhs: BinaryOp | ParenExpr | Element;
-    operator: BinaryOpChr;
-    rhs: ParenExpr | Element;
+// BEGIN, ...
+export interface LabelDef extends BaseNode {
+    type: NodeType.Label;
+    sym: SymbolNode;
+}
+
+// ;
+export interface StatementSeparator extends BaseNode {
+    type: NodeType.Separator;
+    separator: ";" | "\n" | "EOF";
+}
+
+// /Comment
+export interface Comment extends BaseNode {
+    type: NodeType.Comment;
+    comment: string;
 }

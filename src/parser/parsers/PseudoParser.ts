@@ -20,6 +20,7 @@ import { calcExtent } from "../../lexer/Cursor.js";
 import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
+import { tokenToString } from "../../lexer/formatToken.js";
 import { normalizeSymbolName } from "../../utils/Strings.js";
 import { ParserOptions } from "../Parser.js";
 import { ParserError } from "../ParserError.js";
@@ -147,7 +148,7 @@ export class PseudoParser {
     private getOptionalParam(startSym: Tokens.SymbolToken): Nodes.Expression | undefined {
         this.lexer.unget(startSym);
         const expr = this.exprParser.parseExpr();
-        if (expr.type != NodeType.SymbolGroup) {
+        if (expr.type != NodeType.ExprGroup) {
             throw new ParserError("Symbol group expected", startSym);
         }
 
@@ -350,14 +351,31 @@ export class PseudoParser {
 
     private parseDublList(dublSym: Tokens.SymbolToken): Nodes.DoubleIntList {
         const list: Nodes.DublListMember[] = [];
+        let lastTok: Tokens.Token | undefined;
+        let gotSep = true;
 
         while (true) {
             const dubl = this.parseDubl();
             if (dubl) {
-                list.push(dubl);
+                list.push(dubl[0]);
+                lastTok = dubl[1];
+                if (dubl[0].type == NodeType.DoubleInt) {
+                    if (!gotSep) {
+                        throw new ParserError(`Separator expected, got ${tokenToString(lastTok)}`, lastTok);
+                    }
+                    gotSep = false;
+                } else {
+                    gotSep = true;
+                }
             } else {
                 break;
             }
+        }
+
+        // make sure that we leave the last separator to finish the statement
+        if (lastTok) {
+            list.pop();
+            this.lexer.unget(lastTok);
         }
 
         return {
@@ -369,14 +387,31 @@ export class PseudoParser {
 
     private parseFltgList(fltgSym: Tokens.SymbolToken): Nodes.FloatList {
         const list: Nodes.FloatListMember[] = [];
+        let lastTok: Tokens.Token | undefined;
+        let gotSep = true;
 
         while (true) {
             const fltg = this.parseFloat();
             if (fltg) {
-                list.push(fltg);
+                list.push(fltg[0]);
+                lastTok = fltg[1];
+                if (fltg[0].type == NodeType.Float) {
+                    if (!gotSep) {
+                        throw new ParserError(`Separator expected, got ${tokenToString(lastTok)}`, lastTok);
+                    }
+                    gotSep = false;
+                } else {
+                    gotSep = true;
+                }
             } else {
                 break;
             }
+        }
+
+        // make sure that we leave the last separator to finish the statement
+        if (lastTok) {
+            list.pop();
+            this.lexer.unget(lastTok);
         }
 
         return {
@@ -386,71 +421,70 @@ export class PseudoParser {
         };
     }
 
-    private parseDubl(): Nodes.DublListMember | undefined {
-        const next = this.lexer.nextNonBlank(false);
-        switch (next.type) {
-            case TokenType.Comment:
-                return this.commonParser.parseComment(next);
-            case TokenType.Separator:
-            case TokenType.EOL:
-                return this.commonParser.parseSeparator(next);
+    private parseDubl(): [Nodes.DublListMember, Tokens.Token] | undefined {
+        const tok = this.lexer.nextNonBlank(false);
+        if (this.commonParser.isStatementEnd(tok)) {
+            const member = this.commonParser.parseStatementEnd(tok);
+            return [member, tok];
+        }
+
+        switch (tok.type) {
             case TokenType.Integer:
-                return { type: NodeType.DoubleInt, value: next.value, extent: next.extent };
+                return [{ type: NodeType.DoubleInt, value: tok.value, extent: tok.extent }, tok];
             case TokenType.Char:
-                if (next.char == "+" || next.char == "-") {
+                if (tok.char == "+" || tok.char == "-") {
                     const nextInt = this.lexer.next();
                     if (nextInt.type != TokenType.Integer) {
                         throw new ParserError("Unexpected unary operand", nextInt);
                     }
-                    const unary = this.commonParser.toUnaryOp(next);
-                    return {
+                    const unary = this.commonParser.toUnaryOp(tok);
+                    return [{
                         type: NodeType.DoubleInt,
                         unaryOp: unary,
                         value: nextInt.value,
                         extent: calcExtent(unary, nextInt),
-                    };
+                    }, tok];
                 } else {
-                    throw new ParserError("Unexpected character in DUBL", next);
+                    throw new ParserError("Unexpected character in DUBL", tok);
                 }
             default:
-                this.lexer.unget(next);
+                this.lexer.unget(tok);
                 return undefined;
         }
     }
 
-    private parseFloat(): Nodes.FloatListMember | undefined {
-        const next = this.lexer.nextNonBlank(false);
-        switch (next.type) {
-            case TokenType.Comment:
-                return this.commonParser.parseComment(next);
-            case TokenType.Separator:
-            case TokenType.EOL:
-                return this.commonParser.parseSeparator(next);
+    private parseFloat(): [Nodes.FloatListMember, Tokens.Token] | undefined {
+        const tok = this.lexer.nextNonBlank(false);
+        if (this.commonParser.isStatementEnd(tok)) {
+            return [this.commonParser.parseStatementEnd(tok), tok];
+        }
+
+        switch (tok.type) {
             case TokenType.Integer:
-                this.lexer.unget(next);
+                this.lexer.unget(tok);
                 const floatTok = this.lexer.nextFloat();
-                return { type: NodeType.Float, value: floatTok.value, extent: floatTok.extent };
+                return [{ type: NodeType.Float, value: floatTok.value, extent: floatTok.extent }, tok];
             case TokenType.Char:
-                if (["-", "+"].includes(next.char)) {
-                    const unary = this.commonParser.toUnaryOp(next);
+                if (["-", "+"].includes(tok.char)) {
+                    const unary = this.commonParser.toUnaryOp(tok);
                     const floatTok = this.lexer.nextFloat();
-                    return {
+                    return [{
                         type: NodeType.Float,
                         unaryOp: unary,
                         value: floatTok.value,
                         extent: calcExtent(unary, floatTok),
-                    };
-                } else if (next.char == ".") {
-                    this.lexer.unget(next);
+                    }, tok];
+                } else if (tok.char == ".") {
+                    this.lexer.unget(tok);
                     const floatTok = this.lexer.nextFloat();
-                    return {
+                    return [{
                         type: NodeType.Float,
                         value: floatTok.value,
                         extent: floatTok.extent,
-                    };
+                    }, tok];
                 }
         }
-        this.lexer.unget(next);
+        this.lexer.unget(tok);
         return undefined;
     }
 }

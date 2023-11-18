@@ -41,8 +41,43 @@ export class StatementParser {
         this.pseudoParser = new PseudoParser(opts, lexer, this.commonParser, this.exprParser);
     }
 
-    public parseStatement(): Nodes.Statement | undefined {
-        const tok = this.lexer.nextNonBlank(false);
+    public parseInstruction(): Nodes.Instruction {
+        const labels: Nodes.LabelDef[] = [];
+        let stmt: Nodes.Statement | undefined;
+        let sep: Nodes.StatementSeparator | Nodes.Comment | undefined;
+
+        while (true) {
+            const tok = this.lexer.nextNonBlank(false);
+            if (this.commonParser.isStatementEnd(tok)) {
+                // separator without statement
+                sep = this.commonParser.parseStatementEnd(tok);
+                break;
+            } else {
+                const curStmt = this.parseStatementOrLabel(tok);
+                if (curStmt.type == NodeType.Label) {
+                    labels.push(curStmt);
+                } else {
+                    stmt = curStmt;
+                    sep = this.commonParser.parseStatementEnd();
+                    break;
+                }
+            }
+        }
+
+        const first = labels[0] ?? stmt ?? sep;
+        const last = sep ?? stmt ?? labels[labels.length - 1];
+
+        return {
+            type: NodeType.Instruction,
+            labels: labels,
+            statement: stmt,
+            separator: sep,
+            extent: calcExtent(first, last),
+        };
+    }
+
+    private parseStatementOrLabel(gotTok?: Tokens.Token): Nodes.Statement | Nodes.LabelDef {
+        const tok = this.lexer.nextNonBlank(false, gotTok);
 
         switch (tok.type) {
             case TokenType.Char:
@@ -62,18 +97,11 @@ export class StatementParser {
                 return this.parseExprStatement(tok);
             case TokenType.Symbol:
                 return this.parseStatementWithSymbol(tok);
-            case TokenType.Comment:
-                return this.commonParser.parseComment(tok);
-            case TokenType.EOL:
-            case TokenType.Separator:
-                return this.commonParser.parseSeparator(tok);
-            case TokenType.EOF:
-                return undefined;
         }
         throw new ParserError(`Statement expected, got ${tokenToString(tok)}`, tok);
     }
 
-    private parseStatementWithSymbol(startSym: Tokens.SymbolToken): Nodes.Statement {
+    private parseStatementWithSymbol(startSym: Tokens.SymbolToken): Nodes.Statement | Nodes.LabelDef {
         const pseudo = this.pseudoParser.tryHandlePseudo(startSym);
         if (pseudo) {
             if (pseudo.type == NodeType.Define) {

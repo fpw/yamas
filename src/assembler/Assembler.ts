@@ -167,15 +167,20 @@ export class Assembler {
 
     private assembleProgram(ctx: Context, prog: Nodes.Program): CodeError[] {
         const errors: CodeError[] = [];
-        for (const stmt of prog.stmts) {
+        for (const inst of prog.instructions) {
             try {
-                const subErrors = this.handleStatement(ctx, stmt);
-                errors.push(...subErrors);
+                for (const labelDef of inst.labels) {
+                    this.syms.defineLabel(labelDef.sym.name, ctx.getClc(true));
+                }
+                if (inst.statement) {
+                    const subErrors = this.handleStatement(ctx, inst.statement);
+                    errors.push(...subErrors);
+                }
             } catch (e) {
                 if (e instanceof CodeError) {
                     errors.push(e);
                 } else if (e instanceof Error) {
-                    errors.push(new AssemblerError(e.message, stmt));
+                    errors.push(new AssemblerError(e.message, inst));
                 }
             }
         }

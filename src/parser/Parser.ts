@@ -16,14 +16,14 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { calcExtent } from "../lexer/Cursor.js";
 import { Lexer } from "../lexer/Lexer.js";
-import { CodeError } from "../utils/CodeError.js";
 import { LexerError } from "../lexer/LexerError.js";
+import { CodeError } from "../utils/CodeError.js";
 import * as Nodes from "./nodes/Node.js";
 import { NodeType } from "./nodes/Node.js";
 import { PseudoParser } from "./parsers/PseudoParser.js";
 import { StatementParser } from "./parsers/StatementParser.js";
-import { calcExtent } from "../lexer/Cursor.js";
 
 export interface ParserOptions {
     // disable given pseudos to use them as custom symbol names
@@ -50,7 +50,7 @@ export class Parser {
         const prog: Nodes.Program = {
             type: NodeType.Program,
             inputName: this.lexer.getInputName(),
-            stmts: [],
+            instructions: [],
             errors: [],
             extent: {
                 cursor: this.lexer.getCursor(),
@@ -60,12 +60,11 @@ export class Parser {
 
         while (true) {
             try {
-                const stmt = this.stmtParser.parseStatement();
-                if (!stmt) {
+                const inst = this.stmtParser.parseInstruction();
+                prog.instructions.push(inst);
+                if (inst.separator.type == NodeType.Separator && inst.separator.separator == "EOF") {
                     break;
                 }
-
-                prog.stmts.push(stmt);
             } catch (e) {
                 if (e instanceof CodeError) {
                     prog.errors.push(e);
@@ -76,7 +75,7 @@ export class Parser {
             }
         };
 
-        prog.extent.width = calcExtent(prog, prog.stmts[prog.stmts.length - 1]).width;
+        prog.extent.width = calcExtent(prog, prog.instructions[prog.instructions.length - 1]).width;
 
         return prog;
     }

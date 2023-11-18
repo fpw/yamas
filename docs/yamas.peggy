@@ -46,20 +46,18 @@
     const macros = new Set();
 }
 
-Program                 = stmts:Statement* _* (EOF .*)?
-                            { return {type: "Program", statements: stmts}; }
+Program                 = instrs:Instruction* _* (EOF .*)?
+                            { return {type: "Program", instructions: instrs}; }
 
-Statement "Statement"   = _* @(
-                            Origin /
-                            Invocation /
-                            Label /
-                            Assign /
-                            PseudoStatement /
-                            ExpressionStmt /
-                            Separator /
-                            Comment /
-                            EOL
-                        )
+Instruction             =
+                            _*
+                            _* labels:(@Label _*)*
+                            _* stmt:(Statement)?
+                            _* sep:StatementSeparator
+                            { return {type: "Instruction", labels, stmt, sep}; }
+
+Statement               = Origin / Assign /  ExpressionStmt / Invocation / PseudoStatement
+StatementSeparator      = Separator / Comment / EOL
 
 Origin                  = "*" expr:Expression
                             { return {type: "Origin", expr: expr}; }
@@ -78,6 +76,7 @@ ExpressionStmt          = expr:Expression
 Separator               = ";"
                             { return {type: "Separator"}; }
 
+// TODO: Check whether an argument can contain a separator (;)
 Invocation              = macro:Macro args:(_* @$[^,\r\n/]+)|.., ","|
                             { return {type: "Invocation", macro: macro, args: args}; }
 
@@ -92,16 +91,18 @@ PseudoStatement         = p:(OriginPseudo /
                           OutputCtrlPseudo)
                         { return {type: "Pseudo", pseudo: p}; }
 
-Expression "Expression" = BinaryOp / SymbolGroup / ParenExpr / Element
+Expression "Expression" = ExprGroup / BaseExpr
+
+BaseExpr                = BinaryOp / ParenExpr / Element
+
+ExprGroup               = head:BaseExpr tail:(_+ @BaseExpr)+
+                            { return {type: "ExprGroup", exprs: [head, ...tail]}; }
 
 // Tested with PAL8: A stray closing paren generates an IC error, but only if it's really stray. Also there can be spaces.
 ParenExpr               = "(" _* expr:Expression _* ")"?
                             { return {type: "Paren", where: "page", expr: expr}; }
                         / "[" _* expr:Expression _* "]"?
                             { return {type: "Paren", where: "zero", expr: expr}; }
-
-SymbolGroup             = sym:Element exprs:(_ @Expression)*
-                            { return {type: "SymbolGroup", symbol: sym, exprs: exprs}; }
 
 BinaryOp                = head:Element tail:BinOpFragment+
                             { return {type: "BinOp", ...leftAssoc(head, tail)}; }
@@ -186,9 +187,9 @@ ZBlock                  = "ZBLOCK" _ p:Param
                             { return {type: "ZBlock", amount: p}; }
 Text                    = "TEXT" _ l:. text:$(c:[^\r\n] &{return c != l;})* (r:. &{return r == l;})?
                             { return {type: "Text", text: text}; }
-Dubl                    = "DUBL" _* list:(@(IntWithUnary  / NeutralListElement) _* )*
+Dubl                    = "DUBL"  _* list:(_* StatementSeparator* _* @IntWithUnary &StatementSeparator)*
                             { return {type: "DoubleIntList", list: list}; }
-Fltg                    = "FLTG" _* list:(@(Float / NeutralListElement) _*)*
+Fltg                    = "FLTG" _* list:(_* StatementSeparator* _* @Float _* &StatementSeparator)*
                             { return {type: "FloatList", list: list}; }
 Device                  = "DEVICE" _ dev:StringContent
                             { return {type: "Device", name: dev}; }
@@ -211,7 +212,6 @@ IntWithUnary            = u:[-+]? i:Integer
 Float                   = [-+]? ([0-9]+ "." [0-9]* / [0-9]* "." [0-9]+ / [0-9]+) ([eE][-+]? [0-9]+)?
                             { return {type: "Float", value: text()}; }
 Param                   = BinaryOp / Element
-NeutralListElement      = Separator / Comment / EOL
 
 // Tested in PAL8: these separators end string literals (except in TEXT)
 StringContent           = $[^\r\n/;]+

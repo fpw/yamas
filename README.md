@@ -64,10 +64,6 @@ This matches the behavior of PAL8.
 This project was also a personal project for me to strengthen skills that I hardly need for my day job,
 such as writing lexers and parsers.
 
-### Why is the grammar not using logical lines consisting of a label, a statement and a comment?
-Some statements can span multiple lines, for example macro and condition bodies. Also, a line can contain multiple statements separated with semicolons.
-For that reason, it was decided to not use logical lines.
-
 ### Why can expressions be null? Also, why not undefined?
 Expressions can be null in pass 1, for example when a symbol is used that is only defined later. This is okay unless the expression changes the CLC.
 For that reason, the assembler differentiates between defined and undefined expressions. Using an undefined expression in an `IFZERO` is not okay

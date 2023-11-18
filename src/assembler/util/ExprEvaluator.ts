@@ -54,7 +54,7 @@ export class ExprEvaluator {
         switch (expr.type) {
             case NodeType.Element:      return this.evalElement(ctx, expr);
             case NodeType.ParenExpr:    return this.evalParenExpr(ctx, expr);
-            case NodeType.SymbolGroup:  return this.evalExpressionGroup(ctx, expr);
+            case NodeType.ExprGroup:    return this.evalExpressionGroup(ctx, expr);
             case NodeType.BinaryOp:     return this.evalBinOp(ctx, expr);
         }
     }

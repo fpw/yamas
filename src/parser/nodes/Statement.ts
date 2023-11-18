@@ -23,20 +23,13 @@ import { PseudoStatement } from "./PseudoStatement.js";
 
 export type Statement =
     PseudoStatement |
-    OriginStatement | LabelDef | AssignStatement |
-    ExpressionStatement | Invocation |
-    Comment | StatementSeparator;
+    OriginStatement | AssignStatement |
+    ExpressionStatement | Invocation;
 
 // *200
 export interface OriginStatement extends BaseNode {
     type: NodeType.Origin;
     val: Expression;
-}
-
-// BEGIN, ...
-export interface LabelDef extends BaseNode {
-    type: NodeType.Label;
-    sym: SymbolNode;
 }
 
 // A=B
@@ -46,28 +39,16 @@ export interface AssignStatement extends BaseNode {
     val: Expression;
 }
 
+// an expression as a data-generating statement
+export interface ExpressionStatement extends BaseNode {
+    type: NodeType.ExpressionStmt;
+    expr: Expression;
+}
+
 // M A1, A2 where M is macro
 export interface Invocation extends BaseNode {
     type: NodeType.Invocation;
     macro: SymbolNode;
     args: string[];
     program: Program;
-}
-
-// ;
-export interface StatementSeparator extends BaseNode {
-    type: NodeType.Separator;
-    separator: ";" | "\n";
-}
-
-// /Comment
-export interface Comment extends BaseNode {
-    type: NodeType.Comment;
-    comment: string;
-}
-
-// an expression as a data-generating statement
-export interface ExpressionStatement extends BaseNode {
-    type: NodeType.ExpressionStmt;
-    expr: Expression;
 }

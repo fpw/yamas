@@ -30,17 +30,25 @@ export function dumpAst(prog: Nodes.Program, write: (line: string) => void, inde
     };
 
     writeIndented(prog.extent, `Program("${prog.inputName}"`, indent);
-    for (const node of prog.stmts) {
-        switch (node.type) {
+    for (const node of prog.instructions) {
+        if (!node.statement) {
+            continue;
+        }
+        const stmt = node.statement;
+        for (const label of node.labels) {
+            writeIndented(label.extent, formatNode(label), indent + 1);
+        }
+        switch (stmt.type) {
             case Nodes.NodeType.Invocation:
-                const args = node.args.join(", ");
-                writeIndented(node.macro.extent, `Invoke(${formatNode(node.macro)}, [${args}], program=`, indent);
-                dumpAst(node.program, write, indent + 1);
-                writeIndented(undefined, ")", indent);
+                const args = stmt.args.join(", ");
+                writeIndented(stmt.macro.extent, `Invoke(${formatNode(stmt.macro)}, [${args}], program=`, indent + 1);
+                dumpAst(stmt.program, write, indent + 2);
+                writeIndented(undefined, ")", indent + 1);
                 break;
             default:
-                writeIndented(node.extent, formatNode(node), indent + 1);
+                writeIndented(stmt.extent, formatNode(stmt), indent + 1);
         }
+        writeIndented(node.separator.extent, formatNode(node.separator), indent + 1);
     }
     writeIndented(undefined, ")", indent);
 }
@@ -71,7 +79,7 @@ export function formatNode(node: Nodes.Node): string {
             return `Symbol("${node.name}")`;
         case Nodes.NodeType.CLCValue:
             return "CLC()";
-        case Nodes.NodeType.SymbolGroup:
+        case Nodes.NodeType.ExprGroup:
             str = "Group([";
             str += node.exprs.map(n => formatNode(n)).join(", ");
             str += "])";
@@ -132,6 +140,7 @@ export function formatNode(node: Nodes.Node): string {
         case Nodes.NodeType.Element:
             return `Element(${node.unaryOp?.operator ?? ""}${formatNode(node.node)})`;
         case Nodes.NodeType.Invocation:
+        case Nodes.NodeType.Instruction:
         case Nodes.NodeType.Program:
             throw Error("Can't handle compound");
     }

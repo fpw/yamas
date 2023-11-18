@@ -39,14 +39,8 @@ export class SymbolAssembler {
     public registerStatements(register: RegisterFunction) {
         register(NodeType.Assignment, this.handleAssignment.bind(this));
         register(NodeType.FixMri, this.handleFixMri.bind(this));
-        register(NodeType.Label, this.handleLabel.bind(this));
         register(NodeType.FixTab, this.handleFixTab.bind(this));
         register(NodeType.Expunge, this.handleExpunge.bind(this));
-    }
-
-    private handleLabel(ctx: Context, stmt: Nodes.LabelDef): StatementEffect {
-        this.syms.defineLabel(stmt.sym.name, ctx.getClc(true));
-        return {};
     }
 
     private handleFixMri(ctx: Context, stmt: Nodes.FixMriStatement): StatementEffect {

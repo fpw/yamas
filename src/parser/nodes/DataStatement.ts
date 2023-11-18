@@ -18,8 +18,7 @@
 
 import { UnaryOp } from "./Element.js";
 import { Expression } from "./Expression.js";
-import { BaseNode, NodeType } from "./Node.js";
-import { Comment, StatementSeparator } from "./Statement.js";
+import { BaseNode, Comment, NodeType, StatementSeparator } from "./Node.js";
 
 export type DataStatement =
     TextStatement | FilenameStatement | DevNameStatement |

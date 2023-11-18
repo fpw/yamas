@@ -21,27 +21,32 @@ import { CodeError } from "../../utils/CodeError.js";
 import { DoubleInt, Float } from "./DataStatement.js";
 import { Element, ElementType } from "./Element.js";
 import { Expression } from "./Expression.js";
+import { Comment, Instruction, LabelDef, StatementSeparator } from "./Instruction.js";
 import { MacroBody } from "./MacroStatement.js";
 import { Statement } from "./Statement.js";
 
+export * from "./Instruction.js";
+export * from "./Statement.js";
 export * from "./DataStatement.js";
-export * from "./Element.js";
 export * from "./Expression.js";
 export * from "./MacroStatement.js";
 export * from "./PseudoStatement.js";
-export * from "./Statement.js";
+export * from "./Element.js";
 
 export enum NodeType {
     // Program
     Program,
 
-    // Statement
+    // Instructions
+    Instruction,
+
+    // Statements
     Origin, Label, Assignment,
     ExpressionStmt, Invocation,
     Separator, Comment,
 
-    // Expression
-    SymbolGroup, ParenExpr, BinaryOp,
+    // Expressions
+    ExprGroup, ParenExpr, BinaryOp,
 
     // Elements
     Element,
@@ -64,8 +69,9 @@ export enum NodeType {
 }
 
 export type Node =
-    Program | Statement | Expression | Element |
-    MacroBody | DoubleInt | Float | ElementType;
+    Program | Instruction | Statement | Expression | Element |
+    MacroBody | DoubleInt | Float | ElementType |
+    LabelDef | StatementSeparator | Comment;
 
 export interface BaseNode {
     type: NodeType;
@@ -75,6 +81,6 @@ export interface BaseNode {
 export interface Program extends BaseNode {
     type: NodeType.Program;
     inputName: string;
-    stmts: Statement[];
+    instructions: Instruction[];
     errors: CodeError[];
 }

@@ -3,7 +3,7 @@ import { replaceNonPrints } from "../../src/utils/Strings.js";
 
 describe("WHEN converting character sets", () => {
     const expectations: [string, number][] = [
-        ["\0", 0o00],
+        ["@", 0o00],
         ["A", 0o01], ["Z", 0o32],
         ["[", 0o33], ["_", 0o37],
         [" ", 0o40], ["/", 0o57],

@@ -16,6 +16,8 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { replaceNonPrints } from "./Strings.js";
+
 export function asciiCharTo7Bit(chr: string, markParity: boolean): number {
     const code = chr.codePointAt(0);
     if (code === undefined || code >= 0x80) {
@@ -27,14 +29,14 @@ export function asciiCharTo7Bit(chr: string, markParity: boolean): number {
 export function asciiCharToDec(chr: string): number {
     const res = chr.charCodeAt(0) & 0o77;
     if (decCharToAscii(res) != chr) {
-        throw Error("Character not in DEC charset");
+        throw Error(`Character ${replaceNonPrints(chr)} not in DEC charset`);
     }
     return res;
 }
 
 export function decCharToAscii(chr: number): string {
     let ascii = chr;
-    if (chr > 0 && chr <= 0o37) {
+    if (chr >= 0 && chr <= 0o37) {
         ascii |= 0o100;
     }
     return String.fromCharCode(ascii);
@@ -84,13 +86,13 @@ export function decStringToAscii(dec: number[]): string {
 
 export function asciiStringToOS8Name(str: string): number[] {
     const [name, ext] = str.split(".");
-    const namePart = name.padEnd(6, "\0");
+    const namePart = name.padEnd(6, "@");
 
     let extPart;
     if (ext) {
-        extPart = ext.padEnd(2, "\0");
+        extPart = ext.padEnd(2, "@");
     } else {
-        extPart = "\0\0";
+        extPart = "@@";
     }
 
     return [

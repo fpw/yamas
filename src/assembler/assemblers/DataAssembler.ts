@@ -98,7 +98,7 @@ export class DataAssembler {
     }
 
     private handleDevice(ctx: Context, name: Nodes.DevNameStatement): StatementEffect {
-        const dev = name.name.padEnd(4, "\0");
+        const dev = name.name.padEnd(4, "@");
         const outStr = CharSets.asciiStringToDec(dev, false);
         const addr = ctx.getClc(false);
         outStr.forEach((w, i) => this.output.punchData(ctx, addr + i, w));

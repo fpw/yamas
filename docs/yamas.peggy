@@ -51,13 +51,14 @@ Program                 = instrs:Instruction* _* (EOF .*)?
 
 Instruction             =
                             _*
-                            _* labels:(@Label _*)*
-                            _* stmt:(Statement)?
-                            _* end:StatementEnd
-                            { return {type: "Instruction", labels, stmt, end}; }
+                            labels:(@Label _*)*
+                            stmt:(@Statement _*)?
+                            comment:Comment?
+                            end:StatementEnd
+                            { return {type: "Instruction", labels, stmt, comment, end}; }
 
 Statement               = Origin / Assign /  ExpressionStmt / Invocation / PseudoStatement
-StatementEnd            = Separator / Comment / EOL
+StatementEnd            = Separator / EOL
 
 Origin                  = "*" expr:Expression
                             { return {type: "Origin", expr: expr}; }
@@ -80,7 +81,7 @@ Separator               = ";"
 Invocation              = macro:Macro args:(_* @$[^,\r\n/]+)|.., ","|
                             { return {type: "Invocation", macro: macro, args: args}; }
 
-Comment                 = "/" text:$([^\r\n]*) EOL?
+Comment                 = "/" text:$([^\r\n]*)
                             { return {type: "Comment", text: text}; }
 
 PseudoStatement         = p:(OriginPseudo /
@@ -91,11 +92,11 @@ PseudoStatement         = p:(OriginPseudo /
                           OutputCtrlPseudo)
                         { return {type: "Pseudo", pseudo: p}; }
 
-Expression "Expression" = ExprGroup / BaseExpr
+Expression "Expression" = ExprGroup / BasicExpr
 
-BaseExpr                = BinaryOp / ParenExpr / Element
+BasicExpr               = BinaryOp / ParenExpr / Element
 
-ExprGroup               = exprs:BaseExpr|2.., _+|
+ExprGroup               = exprs:BasicExpr|2.., _+|
                             { return {type: "ExprGroup", exprs: exprs}; }
 
 // Tested with PAL8: A stray closing paren generates an IC error, but only if it's really stray. Also there can be spaces.
@@ -189,9 +190,9 @@ Text                    = "TEXT" _ l:. text:$(c:[^\r\n] &{return c != l;})* (r:.
                             { return {type: "Text", text: text}; }
 // it's a little tricky to find the end of a DUBL / FLTG statement: thre must be separator after each entry,
 // but the final separator is not part of the list but the statement separator for the entire list statement
-Dubl                    = "DUBL"  _* list:(_* StatementEnd* _* @DoubleInt &StatementEnd)*
+Dubl                    = "DUBL"  _* list:(_* neutralListElement* _* @DoubleInt &neutralListElement)*
                             { return {type: "DoubleIntList", list: list}; }
-Fltg                    = "FLTG" _* list:(_* StatementEnd* _* @Float _* &StatementEnd)*
+Fltg                    = "FLTG" _* list:(_* neutralListElement* _* @Float _* &neutralListElement)*
                             { return {type: "FloatList", list: list}; }
 Device                  = "DEVICE" _ dev:StringContent
                             { return {type: "Device", name: dev}; }
@@ -217,3 +218,5 @@ Param                   = BinaryOp / Element
 
 // Tested in PAL8: these separators end string literals (except in TEXT)
 StringContent           = $[^\r\n/;]+
+
+neutralListElement      = StatementEnd / Comment

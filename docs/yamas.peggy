@@ -53,11 +53,11 @@ Instruction             =
                             _*
                             _* labels:(@Label _*)*
                             _* stmt:(Statement)?
-                            _* sep:StatementSeparator
-                            { return {type: "Instruction", labels, stmt, sep}; }
+                            _* end:StatementEnd
+                            { return {type: "Instruction", labels, stmt, end}; }
 
 Statement               = Origin / Assign /  ExpressionStmt / Invocation / PseudoStatement
-StatementSeparator      = Separator / Comment / EOL
+StatementEnd            = Separator / Comment / EOL
 
 Origin                  = "*" expr:Expression
                             { return {type: "Origin", expr: expr}; }
@@ -95,8 +95,8 @@ Expression "Expression" = ExprGroup / BaseExpr
 
 BaseExpr                = BinaryOp / ParenExpr / Element
 
-ExprGroup               = head:BaseExpr tail:(_+ @BaseExpr)+
-                            { return {type: "ExprGroup", exprs: [head, ...tail]}; }
+ExprGroup               = exprs:BaseExpr|2.., _+|
+                            { return {type: "ExprGroup", exprs: exprs}; }
 
 // Tested with PAL8: A stray closing paren generates an IC error, but only if it's really stray. Also there can be spaces.
 ParenExpr               = "(" _* expr:Expression _* ")"?
@@ -136,7 +136,7 @@ CLC                     = "."
 ASCII                   = "\"" chr:.
                             { return {type: "ASCII", char: chr}; }
 
-_ "Blank"               = (" " / "\t" / "\f")
+_                       = (" " / "\t" / "\f")
                             { return {type: "Blank"}; }
 
 EOL "Newline"           = ("\r\n" / "\r" / "\n")
@@ -187,9 +187,11 @@ ZBlock                  = "ZBLOCK" _ p:Param
                             { return {type: "ZBlock", amount: p}; }
 Text                    = "TEXT" _ l:. text:$(c:[^\r\n] &{return c != l;})* (r:. &{return r == l;})?
                             { return {type: "Text", text: text}; }
-Dubl                    = "DUBL"  _* list:(_* StatementSeparator* _* @IntWithUnary &StatementSeparator)*
+// it's a little tricky to find the end of a DUBL / FLTG statement: thre must be separator after each entry,
+// but the final separator is not part of the list but the statement separator for the entire list statement
+Dubl                    = "DUBL"  _* list:(_* StatementEnd* _* @DoubleInt &StatementEnd)*
                             { return {type: "DoubleIntList", list: list}; }
-Fltg                    = "FLTG" _* list:(_* StatementSeparator* _* @Float _* &StatementSeparator)*
+Fltg                    = "FLTG" _* list:(_* StatementEnd* _* @Float _* &StatementEnd)*
                             { return {type: "FloatList", list: list}; }
 Device                  = "DEVICE" _ dev:StringContent
                             { return {type: "Device", name: dev}; }
@@ -207,7 +209,7 @@ XList                   = "XLIST"
                             { return {type: "XList"}; }
 Eject                   = "EJECT" title:(_ @$[^\r\n/;]*)?
                             { return {type: "Eject", title: title}; }
-IntWithUnary            = u:[-+]? i:Integer
+DoubleInt               = u:[-+]? i:Integer
                              {return {type: "DoubleInt", unary: u, value: i}; }
 Float                   = [-+]? ([0-9]+ "." [0-9]* / [0-9]* "." [0-9]+ / [0-9]+) ([eE][-+]? [0-9]+)?
                             { return {type: "Float", value: text()}; }

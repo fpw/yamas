@@ -107,8 +107,8 @@ export class CommonParser {
             case Tokens.TokenType.EOL:
             case Tokens.TokenType.EOF:
             case Tokens.TokenType.Separator:
-            case Tokens.TokenType.Comment:
                 return true;
+            case Tokens.TokenType.Comment:
             case Tokens.TokenType.Symbol:
             case Tokens.TokenType.Blank:
             case Tokens.TokenType.Integer:
@@ -121,11 +121,9 @@ export class CommonParser {
         }
     }
 
-    public parseStatementEnd(gotTok?: Tokens.Token): Nodes.StatementSeparator | Nodes.Comment {
+    public parseStatementEnd(gotTok?: Tokens.Token): Nodes.StatementSeparator {
         const tok = this.lexer.nextNonBlank(false, gotTok);
-        if (tok.type == TokenType.Comment) {
-            return this.parseComment(tok);
-        } else if (tok.type == TokenType.EOL || tok.type == TokenType.Separator || tok.type == TokenType.EOF) {
+        if (tok.type == TokenType.EOL || tok.type == TokenType.Separator || tok.type == TokenType.EOF) {
             return this.parseSeparator(tok);
         } else {
             throw new ParserError(`End of statement expected, got ${tokenToString(tok)}`, tok);

@@ -338,7 +338,7 @@ export class Lexer {
             throw new LexerError("Expected comment", startCursor);
         }
         const comment = match[1];
-        this.advanceCursor(1 + comment.length, true);
+        this.advanceCursor(match[0].length, true);
 
         return {
             type: TokenType.Comment,

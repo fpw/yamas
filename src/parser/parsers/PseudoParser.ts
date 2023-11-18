@@ -146,23 +146,20 @@ export class PseudoParser {
     }
 
     private getOptionalParam(startSym: Tokens.SymbolToken): Nodes.Expression | undefined {
-        this.lexer.unget(startSym);
-        const expr = this.exprParser.parseExpr();
-        if (expr.type != NodeType.ExprGroup) {
-            throw new ParserError("Symbol group expected", startSym);
-        }
-
-        if (expr.exprs.length == 1) {
-            // no additional parameter
+        const expr = this.exprParser.parseExpr(startSym);
+        if (expr.type == NodeType.ExprGroup) {
+            // PSEUDO <space> PARAM -> group
+            if (expr.exprs.length != 2) {
+                // more than one parameter
+                throw new ParserError("Too many arguments", startSym);
+            }
+            return expr.exprs[1];
+        } else if (expr.type == NodeType.Element) {
+            // only PSEUDO -> no parameter
             return undefined;
+        } else {
+            throw new ParserError("Pseudo with optional parameter expected", startSym);
         }
-
-        if (expr.exprs.length != 2) {
-            // more than one parameter
-            throw new ParserError("Too many arguments", startSym);
-        }
-
-        return expr.exprs[1];
     }
 
     private parsePunchDisable(token: Tokens.SymbolToken): Nodes.PunchCtrlStatement {
@@ -429,6 +426,8 @@ export class PseudoParser {
         }
 
         switch (tok.type) {
+            case TokenType.Comment:
+                return [this.commonParser.parseComment(tok), tok];
             case TokenType.Integer:
                 return [{ type: NodeType.DoubleInt, value: tok.value, extent: tok.extent }, tok];
             case TokenType.Char:
@@ -460,12 +459,14 @@ export class PseudoParser {
         }
 
         switch (tok.type) {
+            case TokenType.Comment:
+                return [this.commonParser.parseComment(tok), tok];
             case TokenType.Integer:
                 this.lexer.unget(tok);
                 const floatTok = this.lexer.nextFloat();
                 return [{ type: NodeType.Float, value: floatTok.value, extent: floatTok.extent }, tok];
             case TokenType.Char:
-                if (["-", "+"].includes(tok.char)) {
+                if (tok.char == "+" || tok.char == "-") {
                     const unary = this.commonParser.toUnaryOp(tok);
                     const floatTok = this.lexer.nextFloat();
                     return [{
@@ -477,11 +478,7 @@ export class PseudoParser {
                 } else if (tok.char == ".") {
                     this.lexer.unget(tok);
                     const floatTok = this.lexer.nextFloat();
-                    return [{
-                        type: NodeType.Float,
-                        value: floatTok.value,
-                        extent: floatTok.extent,
-                    }, tok];
+                    return [{ type: NodeType.Float, value: floatTok.value, extent: floatTok.extent }, tok];
                 }
         }
         this.lexer.unget(tok);

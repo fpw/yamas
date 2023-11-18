@@ -62,7 +62,7 @@ export class Parser {
             try {
                 const inst = this.stmtParser.parseInstruction();
                 prog.instructions.push(inst);
-                if (inst.separator.type == NodeType.Separator && inst.separator.separator == "EOF") {
+                if (inst.end.type == NodeType.Separator && inst.end.separator == "EOF") {
                     break;
                 }
             } catch (e) {

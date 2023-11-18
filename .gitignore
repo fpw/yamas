@@ -6,3 +6,4 @@ testbench/
 *.tsbuildinfo
 /*.bin
 /*.tgz
+*.ast.txt

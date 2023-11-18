@@ -20,6 +20,7 @@ import { HasExtent, calcExtent } from "../../lexer/Cursor.js";
 import { Lexer } from "../../lexer/Lexer.js";
 import * as Tokens from "../../lexer/Token.js";
 import { TokenType } from "../../lexer/Token.js";
+import { tokenToString } from "../../lexer/formatToken.js";
 import { ParserOptions } from "../Parser.js";
 import { ParserError } from "../ParserError.js";
 import * as Nodes from "../nodes/Node.js";
@@ -32,45 +33,33 @@ export class ExprParser {
     public constructor(private opts: ParserOptions, private lexer: Lexer, private commonParser: CommonParser) {
     }
 
-    /**
-     * Parse expression parts separated by blanks, then either return a single
-     * expression or an expression group (e.g. [CLA OSR]).
-     * Note that while Symbols are an Element and thus an expression, this function
-     * will never return a single Symbol. Instead, it will return an expression group
-     * with a symbol and an empty operand array for these situations.
-     * This makes it a lot easier to figure out if the first part of an expression is a pseudo, an MRI etc.
-     * because all of them will be in an expression group instead of a Symbol, a BinOp or something else.
-     * @returns a symbol group or an expression that's not a single symbol
-     */
-    public parseExpr(gotTok?: Tokens.Token): Nodes.Expression | Nodes.ExprGroup {
-        const exprs = this.parseBaseExprs(gotTok);
+    public parseExpr(gotTok?: Tokens.Token): Nodes.Expression {
+        const exprs = this.parseBasicExprs(gotTok);
 
-        if (exprs.length == 1 && exprs[0].type != NodeType.Element) {
+        if (exprs.length == 0) {
+            throw Error("Expression expected");
+        } else if (exprs.length == 1) {
             return exprs[0];
         }
 
-        const firstElem = exprs[0];
         const group: Nodes.ExprGroup = {
             type: NodeType.ExprGroup,
             exprs: exprs,
-            extent: calcExtent(firstElem, exprs[exprs.length - 1]),
+            extent: calcExtent(exprs[0], exprs[exprs.length - 1]),
         };
         return group;
     }
 
-    private parseBaseExprs(gotTok?: Tokens.Token): Nodes.BaseExpr[] {
-        const exprs: Nodes.BaseExpr[] = [];
+    private parseBasicExprs(gotTok?: Tokens.Token): Nodes.BasicExpr[] {
+        const exprs: Nodes.BasicExpr[] = [];
         while (true) {
             const tok = this.lexer.nextNonBlank(false, gotTok);
             gotTok = undefined;
-            if (!this.couldBeInExpr(tok) || (tok.type == TokenType.Char && [")", "]"].includes(tok.char))) {
+            if (!this.couldBeInBasicExpr(tok)) {
                 this.lexer.unget(tok);
-                if (exprs.length == 0) {
-                    throw new ParserError("Expression expected", tok);
-                }
                 break;
             }
-            const expr = this.parseBaseExpr(tok);
+            const expr = this.parseBasicExpr(tok);
             exprs.push(expr);
 
             gotTok = this.lexer.next();
@@ -84,18 +73,23 @@ export class ExprParser {
     }
 
     /**
-     * Checks whether token could appear inside an expression
+     * Checks whether token could appear inside a basic expression
      * @param tok token to examine
      * @returns true if token could be part of an expression
      */
-    private couldBeInExpr(tok: Tokens.Token): boolean {
+    private couldBeInBasicExpr(tok: Tokens.Token): boolean {
         switch (tok.type) {
-            case TokenType.Blank:
             case TokenType.Integer:
             case TokenType.ASCII:
             case TokenType.Symbol:
-            case TokenType.Char:
                 return true;
+            case TokenType.Char:
+                if (tok.char == ")" || tok.char == "]") {
+                    return false;
+                } else {
+                    return true;
+                }
+            case TokenType.Blank:
             case TokenType.Comment:
             case TokenType.String:
             case TokenType.Separator:
@@ -107,49 +101,15 @@ export class ExprParser {
         }
     }
 
-    /**
-     * Parse an expression - symbols will be returned as such.
-     * This function will never return an expression group.
-     * On a blank, it will stop parsing and expect the caller to call it again
-     * for the next symbol.
-     * @returns The next part of an expression
-     */
-    private parseBaseExpr(gotTok?: Tokens.Token): Nodes.BaseExpr {
-        // check for special cases that are not linked with operators
-        const first = this.lexer.nextNonBlank(false, gotTok);
-        if (first.type == TokenType.Char) {
-            if (first.char == "(" || first.char == "[") {
-                const expr = this.parseExpr();
-                const closingParen = this.lexer.nextNonBlank(false);
-                let last: HasExtent = closingParen;
-                const closingMatch = (first.char == "(" ? ")" : "]");
-                if (closingParen.type != TokenType.Char || closingParen.char != closingMatch) {
-                    this.lexer.unget(closingParen); // ignore non-closed parentheses
-                    last = expr;
-                }
-
-                return {
-                    type: NodeType.ParenExpr,
-                    paren: first.char,
-                    expr: expr,
-                    extent: calcExtent(first, last),
-                };
-            }
-        }
-
-        // no special case - must be single element or element with operators
-        return this.parseBinOpOrElement(first);
-    }
-
-    private parseBinOpOrElement(gotTok?: Tokens.Token): Nodes.BinaryOp | Nodes.ParenExpr | Nodes.Element {
+    private parseBasicExpr(gotTok?: Tokens.Token): Nodes.BasicExpr {
         // all expressions are left-associative, so collect parts and fold
         const fragments: BinOpFragment[] = [];
         while (true) {
             const first = this.lexer.nextNonBlank(false, gotTok);
             gotTok = undefined;
             if (first.type == TokenType.Char && (first.char == "(" || first.char == "[")) {
-                const expr = this.parseBaseExpr(first) as Nodes.ParenExpr;
-                fragments.push({ elem: expr });
+                const parenExpr = this.parseParenExpr(first);
+                fragments.push({ elem: parenExpr });
                 break;
             } else {
                 const frag = this.parseElemAndOp(first);
@@ -167,6 +127,29 @@ export class ExprParser {
         return this.foldExpressionParts(fragments);
     }
 
+    private parseParenExpr(gotTok?: Tokens.Token): Nodes.ParenExpr {
+        const first = this.lexer.nextNonBlank(false, gotTok);
+        if (first.type != TokenType.Char || (first.char != "(" && first.char != "[")) {
+            throw new ParserError(`Open parentheses expected, got ${tokenToString(first)}`, first);
+        }
+
+        const expr = this.parseExpr();
+        const closingParen = this.lexer.nextNonBlank(false);
+        let last: HasExtent = closingParen;
+        const closingMatch = (first.char == "(" ? ")" : "]");
+        if (closingParen.type != TokenType.Char || closingParen.char != closingMatch) {
+            this.lexer.unget(closingParen); // ignore non-closed parentheses
+            last = expr;
+        }
+
+        return {
+            type: NodeType.ParenExpr,
+            paren: first.char,
+            expr: expr,
+            extent: calcExtent(first, last),
+        };
+    }
+
     /**
      * Parse the next element of an expression and the next operator.
      * @returns The next element of an expression and the operator behind it, if any.
@@ -175,7 +158,7 @@ export class ExprParser {
         const firstElem = this.commonParser.parseElement(gotTok);
 
         const nextTok = this.lexer.next();
-        if (!this.couldBeInExpr(nextTok)) {
+        if (!this.couldBeInBasicExpr(nextTok)) {
             this.lexer.unget(nextTok);
             return { elem: firstElem };
         }
@@ -190,10 +173,6 @@ export class ExprParser {
                     case "!":
                     case "&":
                         return { elem: firstElem, op: nextTok };
-                    case ")":
-                    case "]":
-                        this.lexer.unget(nextTok);
-                        return { elem: firstElem };
                     default:
                         throw new ParserError(`Unexpected operator in expression: '${nextTok.char}'`, nextTok);
                 }

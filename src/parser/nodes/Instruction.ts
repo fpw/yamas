@@ -22,7 +22,8 @@ export interface Instruction extends BaseNode {
     type: NodeType.Instruction;
     labels: LabelDef[];
     statement?: Statement;
-    separator: Comment | StatementSeparator;
+    comment?: Comment;
+    end: StatementSeparator;
 }
 
 // BEGIN, ...

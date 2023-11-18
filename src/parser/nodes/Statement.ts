@@ -21,10 +21,7 @@ import { Expression } from "./Expression.js";
 import { BaseNode, NodeType, Program } from "./Node.js";
 import { PseudoStatement } from "./PseudoStatement.js";
 
-export type Statement =
-    PseudoStatement |
-    OriginStatement | AssignStatement |
-    ExpressionStatement | Invocation;
+export type Statement = OriginStatement | AssignStatement | ExpressionStatement | Invocation | PseudoStatement;
 
 // *200
 export interface OriginStatement extends BaseNode {

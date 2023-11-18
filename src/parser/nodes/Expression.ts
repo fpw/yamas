@@ -20,13 +20,13 @@ import { BinaryOpChr } from "../../lexer/Token.js";
 import { Element } from "./Element.js";
 import { BaseNode, NodeType } from "./Node.js";
 
-export type Expression = ExprGroup | BaseExpr;
-export type BaseExpr = ParenExpr | BinaryOp | Element;
+export type Expression = ExprGroup | BasicExpr;
+export type BasicExpr = ParenExpr | BinaryOp | Element;
 
 // expr <space> expr ... -> at least two exprs
 export interface ExprGroup extends BaseNode {
     type: NodeType.ExprGroup;
-    exprs: BaseExpr[];
+    exprs: BasicExpr[];
 };
 
 // (9), [TAD]

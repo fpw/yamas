@@ -43,35 +43,35 @@ export class StatementParser {
 
     public parseInstruction(): Nodes.Instruction {
         const labels: Nodes.LabelDef[] = [];
-        let stmt: Nodes.Statement | undefined;
-        let sep: Nodes.StatementSeparator | Nodes.Comment | undefined;
+        let statement: Nodes.Statement | undefined;
+        let comment: Nodes.Comment | undefined;
+        let end: Nodes.StatementSeparator | undefined;
 
         while (true) {
             const tok = this.lexer.nextNonBlank(false);
             if (this.commonParser.isStatementEnd(tok)) {
-                // separator without statement
-                sep = this.commonParser.parseStatementEnd(tok);
+                end = this.commonParser.parseStatementEnd(tok);
                 break;
-            } else {
+            } else if (tok.type == TokenType.Comment) {
+                comment = this.commonParser.parseComment(tok);
+                end = this.commonParser.parseStatementEnd();
+                break;
+            } else if (!statement) {
                 const curStmt = this.parseStatementOrLabel(tok);
                 if (curStmt.type == NodeType.Label) {
                     labels.push(curStmt);
                 } else {
-                    stmt = curStmt;
-                    sep = this.commonParser.parseStatementEnd();
-                    break;
+                    statement = curStmt;
                 }
+            } else {
+                throw new ParserError("Expected instruction with single statement", tok);
             }
         }
-
-        const first = labels[0] ?? stmt ?? sep;
-        const last = sep ?? stmt ?? labels[labels.length - 1];
+        const first = labels[0] ?? statement ?? end;
+        const last = end ?? statement ?? labels[labels.length - 1];
 
         return {
-            type: NodeType.Instruction,
-            labels: labels,
-            statement: stmt,
-            separator: sep,
+            type: NodeType.Instruction, labels, statement, comment, end,
             extent: calcExtent(first, last),
         };
     }
@@ -145,7 +145,7 @@ export class StatementParser {
         };
     }
 
-    private parseLabelDef(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.LabelDef {
+    private parseLabelDef(sym: Tokens.SymbolToken, comma: Tokens.CharToken): Nodes.LabelDef {
         return {
             type: NodeType.Label,
             sym: {
@@ -153,11 +153,11 @@ export class StatementParser {
                 name: sym.name,
                 extent: sym.extent,
             },
-            extent: calcExtent(sym, chr),
+            extent: calcExtent(sym, comma),
         };
     }
 
-    private parseAssignment(sym: Tokens.SymbolToken, chr: Tokens.CharToken): Nodes.AssignStatement {
+    private parseAssignment(sym: Tokens.SymbolToken, eq: Tokens.CharToken): Nodes.AssignStatement {
         const expr = this.exprParser.parseExpr();
 
         return {

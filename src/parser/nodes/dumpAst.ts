@@ -29,28 +29,31 @@ export function dumpAst(prog: Nodes.Program, write: (line: string) => void, inde
         write(indStr + line);
     };
 
-    writeIndented(prog.extent, `Program("${prog.inputName}"`, indent);
+    writeIndented(prog.extent, `Program("${prog.inputName}"`, indent++);
     for (const node of prog.instructions) {
-        if (!node.statement) {
-            continue;
+        if (node.statement) {
+            const stmt = node.statement;
+            for (const label of node.labels) {
+                writeIndented(label.extent, formatNode(label), indent);
+            }
+            switch (stmt.type) {
+                case Nodes.NodeType.Invocation:
+                    const args = stmt.args.join(", ");
+                    writeIndented(stmt.macro.extent,
+                        `Invoke(${formatNode(stmt.macro)}, [${args}], program=`, indent);
+                    dumpAst(stmt.program, write, indent + 1);
+                    writeIndented(undefined, ")", indent);
+                    break;
+                default:
+                    writeIndented(stmt.extent, formatNode(stmt), indent);
+            }
         }
-        const stmt = node.statement;
-        for (const label of node.labels) {
-            writeIndented(label.extent, formatNode(label), indent + 1);
+        if (node.comment) {
+            writeIndented(node.end.extent, formatNode(node.comment), indent);
         }
-        switch (stmt.type) {
-            case Nodes.NodeType.Invocation:
-                const args = stmt.args.join(", ");
-                writeIndented(stmt.macro.extent, `Invoke(${formatNode(stmt.macro)}, [${args}], program=`, indent + 1);
-                dumpAst(stmt.program, write, indent + 2);
-                writeIndented(undefined, ")", indent + 1);
-                break;
-            default:
-                writeIndented(stmt.extent, formatNode(stmt), indent + 1);
-        }
-        writeIndented(node.separator.extent, formatNode(node.separator), indent + 1);
+        writeIndented(node.end.extent, formatNode(node.end), indent);
     }
-    writeIndented(undefined, ")", indent);
+    writeIndented(undefined, ")", --indent);
 }
 
 // eslint-disable-next-line max-lines-per-function

@@ -101,7 +101,7 @@ export class ExprEvaluator {
             let val;
             if (e.type == NodeType.BinaryOp && acc !== null) {
                 // the accumulator input is used for a syntax like CDF 1+1 -> must eval as ((CFD OR 1) + 1)
-                acc = this.evalBinOpAcc(ctx, e, acc);
+                acc = this.evalBinOp(ctx, e, acc);
             } else {
                 val = this.tryEval(ctx, e);
                 if (val === null || acc === null) {
@@ -112,6 +112,21 @@ export class ExprEvaluator {
             }
         }
         return acc;
+    }
+
+    private isMRIExpr(expr: Nodes.ExprGroup): boolean {
+        // An MRI expression needs to start with an MRI op followed by a space -> group with symbol
+        const first = expr.exprs[0];
+        if (first.type != NodeType.Element || first.node.type != NodeType.Symbol) {
+            return false;
+        }
+
+        const sym = this.syms.tryLookup(first.node.name);
+        if (!sym || sym.type != SymbolType.Param || !sym.fixed) {
+            return false;
+        }
+
+        return sym.forcedMri || PDP8.isMRIOp(sym.value);
     }
 
     private evalMRI(ctx: Context, group: Nodes.ExprGroup): number | null {
@@ -219,16 +234,10 @@ export class ExprEvaluator {
         }
     }
 
-    private evalBinOp(ctx: Context, binOp: Nodes.BinaryOp): number | null {
-        const lhs = this.tryEval(ctx, binOp.lhs);
-        const rhs = this.tryEval(ctx, binOp.rhs);
-        return this.calcOp(binOp, lhs, rhs);
-    }
-
-    private evalBinOpAcc(ctx: Context, binOp: Nodes.BinaryOp, acc: number): number | null {
+    private evalBinOp(ctx: Context, binOp: Nodes.BinaryOp, acc = 0): number | null {
         let lhs;
         if (binOp.lhs.type == NodeType.BinaryOp) {
-            lhs = this.evalBinOpAcc(ctx, binOp.lhs, acc);
+            lhs = this.evalBinOp(ctx, binOp.lhs, acc);
         } else {
             lhs = this.tryEval(ctx, binOp.lhs);
             if (lhs !== null) {
@@ -259,20 +268,5 @@ export class ExprEvaluator {
             case "!":   return !this.opts.orDoesShift ? (lhs | rhs) : ((lhs << 6) | rhs) & 0o7777;
             case "&":   return lhs & rhs;
         }
-    }
-
-    private isMRIExpr(expr: Nodes.ExprGroup): boolean {
-        // An MRI expression needs to start with an MRI op followed by a space -> group with symbol
-        const first = expr.exprs[0];
-        if (first.type != NodeType.Element || first.node.type != NodeType.Symbol) {
-            return false;
-        }
-
-        const sym = this.syms.tryLookup(first.node.name);
-        if (!sym || sym.type != SymbolType.Param || !sym.fixed) {
-            return false;
-        }
-
-        return sym.forcedMri || PDP8.isMRIOp(sym.value);
     }
 }

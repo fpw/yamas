@@ -54,7 +54,7 @@ export class BinTapeWriter {
         if (checked) {
             this.checksum += out;
         }
-        this.data.push(byte & 0xFF);
+        this.data.push(out);
     }
 
     public finish(): Uint8Array {

@@ -33,6 +33,7 @@ const cmd = command({
         }),
     },
     handler: (args) => {
+        let allGood = true;
         for (const fileName of readdirSync(args.dir)) {
             if (!fileName.match(/\.(pa|pal)$/)) {
                 continue;
@@ -50,8 +51,13 @@ const cmd = command({
             }
             const opts = createOptions(rawOpts);
             const res = testOne(opts, filePath, bnPath);
+            if (!res) {
+                allGood = false;
+            }
             console.log(`Checked ${basename(filePath)}: ${res ? "good" : "bad"}`);
         }
+        console.log(`All good: ${allGood}`);
+        process.exit(allGood ? 0 : 1);
     }
 });
 

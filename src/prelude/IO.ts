@@ -42,5 +42,26 @@ export const PreludeIO = `
     TSK=6045
     TLS=6046
 
+    / DECTAPE
+    DTRA=6761
+    DTCA=6762
+    DTXA=6764
+    DTLA=6766
+    DTSF=6771
+    DTRB=6772
+    DTLB=6774
+
+    / DF32
+    DCMA=6601
+    DMAR=6603
+    DMAW=6605
+    DCEA=6611
+    DSAC=6612
+    DEAL=6615
+    DEAC=6616
+    DFSE=6621
+    DFSC=6622
+    DMAC=6626
+
     FIXTAB
 `;

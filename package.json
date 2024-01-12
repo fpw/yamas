@@ -32,18 +32,18 @@
     "cmd-ts": "^0.13.0"
   },
   "devDependencies": {
-    "@stylistic/eslint-plugin": "^1.4.0",
-    "@types/node": "^20.9.2",
-    "@typescript-eslint/eslint-plugin": "^6.11.0",
-    "@typescript-eslint/parser": "^6.11.0",
-    "@vitest/coverage-v8": "^0.34.6",
-    "eslint": "^8.54.0",
+    "@stylistic/eslint-plugin": "^1.5.3",
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
+    "@vitest/coverage-v8": "^1.2.0",
+    "eslint": "^8.56.0",
     "peggy": "^3.0.2",
     "peggy-tracks": "^2.0.1",
     "rimraf": "^5.0.5",
-    "tsx": "^4.1.4",
-    "typescript": "^5.2.2",
-    "vitest": "^0.34.6"
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
   },
   "types": "dist/src/index.d.ts"
 }

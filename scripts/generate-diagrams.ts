@@ -24,17 +24,18 @@ import { Diagram } from "peggy-tracks/types/vendor/railroad-diagrams/railroad.js
 const drawList = [
     "Program",
     "Statement", "Origin", "Label", "Assign", "ExpressionStmt", "Separator", "Invocation", "Comment", "PseudoStatement",
-    "Expression", "ParenExpr", "SymbolGroup", "BinaryOp", "BinOpFragment", "BinaryOperator",
+    "Expression", "ParenExpr", "ExprGroup", "BinaryOp", "BinOpFragment", "BinaryOperator",
     "MacroBody", "InnerMacroBody", "Float", "Element", "Integer", "Symbol", "Macro", "SymbolName", "CLC", "ASCII",
     "EOL", "EOF", "OriginPseudo", "Page", "Field", "Reloc", "SymbolTablePseudo", "FixMri", "FixTab", "Expunge",
     "RadixPseudo", "Decimal", "Octal", "MacroPseudo", "Define", "IfDef", "IfNDef", "IfZero", "IfNZro", "DataPseudo",
     "ZBlock", "Text", "Dubl", "Fltg", "Device", "FileName", "OutputCtrlPseudo", "EnPunch", "NoPunch", "Eject", "Param",
-    "NeutralListElement", "StringContent", "IntWithUnary",
+    "StringContent",
 ];
 
 const grammar = readFileSync("docs/yamas.peggy", "utf-8");
 
 for (const entry of drawList) {
+    console.log(entry);
     const diagram = tracks({
         text: grammar,
         start: entry,

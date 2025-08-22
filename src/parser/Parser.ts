@@ -65,7 +65,7 @@ export class Parser {
                 if (inst.end.type == NodeType.Separator && inst.end.separator == "EOF") {
                     break;
                 }
-            } catch (e) {
+            } catch(e) {
                 if (e instanceof CodeError) {
                     prog.errors.push(e);
                 } else if (e instanceof Error) {

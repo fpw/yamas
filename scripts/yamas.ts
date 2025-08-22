@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable max-lines-per-function */
+
 /*
  *   Yamas - Yet Another Macro Assembler (for the PDP-8)
  *   Copyright (C) 2023 Folke Will <folko@solhost.org>
@@ -26,7 +26,7 @@ import { dumpAst } from "../src/parser/nodes/dumpAst.js";
 import { compareBin } from "../src/tapeformats/compareBin.js";
 import { formatCodeError } from "../src/utils/CodeError.js";
 
-// eslint-disable-next-line max-lines-per-function
+
 const cmd = command({
     name: "yamas",
     description: "Yet Another Macro Assembler (for PDP-8)",
@@ -74,6 +74,7 @@ const cmd = command({
         }),
     },
 
+    // eslint-disable-next-line max-lines-per-function
     handler: (args) => {
         if (args.files.length == 0) {
             console.error("No sources given");

@@ -27,7 +27,7 @@ import * as Nodes from "../nodes/Node.js";
 import { NodeType } from "../nodes/Node.js";
 import { CommonParser } from "./CommonParser.js";
 
-type BinOpFragment = { elem: Nodes.Element | Nodes.ParenExpr, op?: Tokens.CharToken };
+interface BinOpFragment { elem: Nodes.Element | Nodes.ParenExpr, op?: Tokens.CharToken }
 
 export class ExprParser {
     public constructor(private opts: ParserOptions, private lexer: Lexer, private commonParser: CommonParser) {

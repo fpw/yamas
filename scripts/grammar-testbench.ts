@@ -77,7 +77,7 @@ function testOne(parser: peggy.Parser, opts: YamasOptions, srcPath: string): boo
     try {
         parser.parse(src, opts);
         return true;
-    } catch (e) {
+    } catch(e) {
         console.error(e);
         return false;
     }

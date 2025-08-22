@@ -110,6 +110,6 @@ export function os8NameToASCII(os8Name: number[]): string {
     if (extPart) {
         return `${namePart}.${extPart}`;
     } else {
-        return `${namePart}`;
+        return namePart;
     }
 }

@@ -31,7 +31,7 @@ export class Lexer {
     private inputData: string;
     private cursor: Cursor;
     private savedCursor?: Cursor;
-    private scanTable: { [id: number]: ((data: string) => Tokens.Token) } = [];
+    private scanTable: Record<number, (data: string) => Tokens.Token> = [];
     private substitutions = new Map<string, string>();
 
     // set if we are inside a text substitution, i.e. a macro argument appearing inside the body
@@ -353,7 +353,7 @@ export class Lexer {
         let body = "";
         let level = 1;
         let inComment = false;
-        for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
+        while (this.cursor.dataIdx < data.length) {
             const c = data[this.cursor.dataIdx];
             if (c == ">") {
                 level--;
@@ -374,6 +374,7 @@ export class Lexer {
                 inComment = false;
             }
             body += c;
+            this.advanceCursor(1);
         }
 
         if (level != 0) {
@@ -384,11 +385,12 @@ export class Lexer {
 
     private skipToLineBreak(data: string): string {
         let res = "";
-        for (; this.cursor.dataIdx < data.length; this.advanceCursor(1)) {
+        while (this.cursor.dataIdx < data.length) {
             res += data[this.cursor.dataIdx];
             if (this.isLineBreak(data[this.cursor.dataIdx])) {
                 break;
             }
+            this.advanceCursor(1);
         }
         return res;
     }

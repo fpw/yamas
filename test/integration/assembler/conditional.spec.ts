@@ -20,12 +20,12 @@ describe("GIVEN a program with conditional statements", () => {
             IFNDEF Y <CC=2 ; CLA>
         `);
         test("THEN they should assemble without errors", () => {
-            expect(data.symbols["A"]).toEqual(1);
-            expect(data.symbols["AA"]).toBeUndefined();
-            expect(data.symbols["B"]).toEqual(2);
-            expect(data.symbols["BB"]).toBeUndefined();
-            expect(data.symbols["C"]).toEqual(2);
-            expect(data.symbols["CC"]).toBeUndefined();
+            expect(data.symbols.A).toEqual(1);
+            expect(data.symbols.AA).toBeUndefined();
+            expect(data.symbols.B).toEqual(2);
+            expect(data.symbols.BB).toBeUndefined();
+            expect(data.symbols.C).toEqual(2);
+            expect(data.symbols.CC).toBeUndefined();
         });
     });
 
@@ -40,8 +40,8 @@ describe("GIVEN a program with conditional statements", () => {
             IFNDEF D<IFNDEF E<F=23>>
         `);
         test("THEN they should work as expected", () => {
-            expect(data.symbols["C"]).toEqual(5);
-            expect(data.symbols["F"]).toEqual(0o23);
+            expect(data.symbols.C).toEqual(5);
+            expect(data.symbols.F).toEqual(0o23);
         });
     });
 
@@ -53,7 +53,7 @@ describe("GIVEN a program with conditional statements", () => {
             IFNZRO A B C <D=2>
         `);
         test("THEN they should be ORed", () => {
-            expect(data.symbols["D"]).toEqual(2);
+            expect(data.symbols.D).toEqual(2);
         });
     });
 
@@ -107,7 +107,7 @@ describe("GIVEN a program with conditional statements", () => {
                 B,
             `);
             test("THEN it should assemble successfully", () => {
-                expect(data.symbols["B"]).toEqual(0o201);
+                expect(data.symbols.B).toEqual(0o201);
             });
         });
     });

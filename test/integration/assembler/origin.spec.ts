@@ -1,6 +1,6 @@
+/* eslint-disable max-lines-per-function */
 import { assemble } from "./TestUtils.js";
 
-// eslint-disable-next-line max-lines-per-function
 describe("GIVEN a program with origin statements", () => {
     describe("WHEN evaluating the origin statement", () => {
         const data = assemble(`
@@ -9,9 +9,9 @@ describe("GIVEN a program with origin statements", () => {
             *100+20+4; C=.
         `);
         test("THEN it should affect the CLC operator", () => {
-            expect(data.symbols["A"]).toEqual(0o200);
-            expect(data.symbols["B"]).toEqual(0o1234);
-            expect(data.symbols["C"]).toEqual(0o124);
+            expect(data.symbols.A).toEqual(0o200);
+            expect(data.symbols.B).toEqual(0o1234);
+            expect(data.symbols.C).toEqual(0o124);
         });
     });
 

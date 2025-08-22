@@ -125,7 +125,7 @@ export class Assembler {
         return this.syms.getSymbols();
     }
 
-    public assembleAll(): ReadonlyArray<CodeError> {
+    public assembleAll(): readonly CodeError[] {
         // protect against being called with parse errors present
         const parseErrors = this.programs.map(p => p.errors).flat();
         if (parseErrors.length > 0) {
@@ -176,7 +176,7 @@ export class Assembler {
                     const subErrors = this.handleStatement(ctx, inst.statement);
                     errors.push(...subErrors);
                 }
-            } catch (e) {
+            } catch(e) {
                 if (e instanceof CodeError) {
                     errors.push(e);
                 } else if (e instanceof Error) {

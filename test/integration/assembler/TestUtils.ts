@@ -8,7 +8,7 @@ import { CodeError } from "../../../src/utils/CodeError.js";
 
 export interface TestData {
     asm: Assembler;
-    errors: ReadonlyArray<CodeError>;
+    errors: readonly CodeError[];
     ast: Program;
     symbols: Record<string, number>;
     memory: number[];

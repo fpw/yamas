@@ -51,7 +51,7 @@ describe("GIVEN a program containing statements", () => {
                 CALLC=JMS I C
             `);
         test("THEN they should support MRIs", () => {
-            expect(data.symbols["CALLC"]).toEqual(0o4602);
+            expect(data.symbols.CALLC).toEqual(0o4602);
             expect(data.memory[0o201]).toEqual(0o4602);
             expect(data.memory[0o203]).toEqual(0o5602);
         });
@@ -64,7 +64,7 @@ describe("GIVEN a program containing statements", () => {
                 CALLX=JMS 1234
             `);
         test("THEN they should be linked correctly", () => {
-            expect(data.symbols["CALLX"]).toEqual(0o4776);
+            expect(data.symbols.CALLX).toEqual(0o4776);
             expect(data.memory[0o200]).toEqual(0o4776);
             expect(data.memory[0o201]).toEqual(0o1777);
             expect(data.memory[0o376]).toEqual(0o1234);
@@ -92,7 +92,7 @@ describe("GIVEN a program containing statements", () => {
             B=3
         `);
         test("THEN they should be defined in pass 2", () => {
-            expect(data.symbols["A"]).toEqual(5);
+            expect(data.symbols.A).toEqual(5);
         });
     });
 
@@ -206,7 +206,7 @@ describe("GIVEN a program containing statements", () => {
             A=(7)
         `);
         test("THEN it should generate a link and assign the address", () => {
-            expect(data.symbols["A"]).toEqual(0o0377);
+            expect(data.symbols.A).toEqual(0o0377);
             expect(data.memory[0o0377]).toEqual(7);
         });
     });

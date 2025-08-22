@@ -11,8 +11,8 @@ describe("GIVEN a program containing pseudo statements", () => {
             B=.
         `);
         test("THEN they should set the CLC properly", () => {
-            expect(data.symbols["A"]).toEqual(0o0000);
-            expect(data.symbols["B"]).toEqual(0o7600);
+            expect(data.symbols.A).toEqual(0o0000);
+            expect(data.symbols.B).toEqual(0o7600);
         });
     });
 
@@ -29,9 +29,9 @@ describe("GIVEN a program containing pseudo statements", () => {
             C=.
         `);
         test("THEN the effect should depend on the CLC", () => {
-            expect(data.symbols["A"]).toEqual(0o200);
-            expect(data.symbols["B"]).toEqual(0o200);
-            expect(data.symbols["C"]).toEqual(0o600);
+            expect(data.symbols.A).toEqual(0o200);
+            expect(data.symbols.B).toEqual(0o200);
+            expect(data.symbols.C).toEqual(0o600);
         });
     });
 
@@ -44,9 +44,9 @@ describe("GIVEN a program containing pseudo statements", () => {
             C=10
         `);
         test("THEN literals should be read in the given radix", () => {
-            expect(data.symbols["A"]).toEqual(0o10);
-            expect(data.symbols["B"]).toEqual(10);
-            expect(data.symbols["C"]).toEqual(0o10);
+            expect(data.symbols.A).toEqual(0o10);
+            expect(data.symbols.B).toEqual(10);
+            expect(data.symbols.C).toEqual(0o10);
         });
     });
 
@@ -67,7 +67,7 @@ describe("GIVEN a program containing pseudo statements", () => {
             IFNDEF A <B=1>
         `);
         test("THEN symbols should be deleted", () => {
-            expect(data.symbols["B"]).toEqual(1);
+            expect(data.symbols.B).toEqual(1);
         });
     });
 
@@ -96,14 +96,14 @@ describe("GIVEN a program containing pseudo statements", () => {
             B=.
        `);
         test("THEN it should generate a null terminator depending on the length", () => {
-            expect(data.symbols["A"]).toEqual(3);
+            expect(data.symbols.A).toEqual(3);
             expect(decStringToAscii([
                 data.memory[0],
                 data.memory[1],
                 data.memory[2]
             ])).toEqual("HELLO");
 
-            expect(data.symbols["B"]).toEqual(7);
+            expect(data.symbols.B).toEqual(7);
             expect(decStringToAscii([
                 data.memory[3],
                 data.memory[4],
@@ -122,7 +122,7 @@ describe("GIVEN a program containing pseudo statements", () => {
             TAG2,
        `);
         test("THEN it should be conditionally generated", () => {
-            expect(data.symbols["TAG2"] - data.symbols["TAG1"]).toEqual(4);
+            expect(data.symbols.TAG2 - data.symbols.TAG1).toEqual(4);
         });
     });
 
@@ -185,7 +185,7 @@ describe("GIVEN a program containing pseudo statements", () => {
        `);
         test("THEN it should generate names according to spec", () => {
             // Spec: DEC-S8-OSSMB-A-D, page 1-7
-            expect(data.symbols["TAG"]).toEqual(0o204);
+            expect(data.symbols.TAG).toEqual(0o204);
 
             expect(data.memory[0o200]).toEqual(0o2011);
             expect(data.memory[0o201]).toEqual(0o2000);
@@ -208,7 +208,7 @@ describe("GIVEN a program containing pseudo statements", () => {
        `);
         test("THEN it should generate names according to spec", () => {
             // Spec: DEC-S8-OSSMB-A-D, page 1-7
-            expect(data.symbols["TAG"]).toEqual(0o202);
+            expect(data.symbols.TAG).toEqual(0o202);
 
             expect(data.memory[0o200]).toEqual(0o0424);
             expect(data.memory[0o201]).toEqual(0o0161);

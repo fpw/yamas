@@ -9,8 +9,8 @@ describe("GIVEN a program with expressions", () => {
             B=10+2^3
         `);
         test("THEN they should be left-associative", () => {
-            expect(data.symbols["A"]).toEqual(7);
-            expect(data.symbols["B"]).toEqual(36);
+            expect(data.symbols.A).toEqual(7);
+            expect(data.symbols.B).toEqual(36);
         });
     });
 
@@ -22,9 +22,9 @@ describe("GIVEN a program with expressions", () => {
             C=2^-4
         `);
         test("THEN they should be correct", () => {
-            expect(data.symbols["A"]).toEqual(10);
-            expect(data.symbols["B"]).toEqual(-23 & 0o7777);
-            expect(data.symbols["C"]).toEqual(-8 & 0o7777);
+            expect(data.symbols.A).toEqual(10);
+            expect(data.symbols.B).toEqual(-23 & 0o7777);
+            expect(data.symbols.C).toEqual(-8 & 0o7777);
         });
     });
 
@@ -33,7 +33,7 @@ describe("GIVEN a program with expressions", () => {
             OUT="A
         `);
         test("THEN it should generate mark parity", () => {
-            expect(data.symbols["OUT"]).toEqual("A".charCodeAt(0) | 0o200);
+            expect(data.symbols.OUT).toEqual("A".charCodeAt(0) | 0o200);
         });
     });
 
@@ -43,8 +43,8 @@ describe("GIVEN a program with expressions", () => {
             B=123%0         / as per PAL8: division by zero is zero
         `);
         test("THEN it should behave as specified", () => {
-            expect(data.symbols["A"]).toEqual(7);
-            expect(data.symbols["B"]).toEqual(0);
+            expect(data.symbols.A).toEqual(7);
+            expect(data.symbols.B).toEqual(0);
         });
     });
 
@@ -65,7 +65,7 @@ describe("GIVEN a program with expressions", () => {
             A=((7))
         `);
         test("THEN it should generate a link to a link", () => {
-            expect(data.symbols["A"]).toEqual(0o0376);
+            expect(data.symbols.A).toEqual(0o0376);
             expect(data.memory[0o0376]).toEqual(0o377);
             expect(data.memory[0o0377]).toEqual(7);
         });
@@ -114,7 +114,7 @@ describe("GIVEN a program with expressions", () => {
             TAG,
         `);
         test("THEN it OR the operands as expected", () => {
-            expect(data.symbols["TAG"]).toEqual(0o0400);
+            expect(data.symbols.TAG).toEqual(0o0400);
         });
     });
 
@@ -126,7 +126,7 @@ describe("GIVEN a program with expressions", () => {
             expect(data.memory[0o375]).toEqual(0o0376);
             expect(data.memory[0o376]).toEqual(0o0400);
             expect(data.memory[0o377]).toEqual(0o0002);
-            expect(data.symbols["A"]).toEqual(0o0375);
+            expect(data.symbols.A).toEqual(0o0375);
         });
     });
 

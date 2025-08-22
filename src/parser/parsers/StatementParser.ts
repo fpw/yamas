@@ -180,7 +180,7 @@ export class StatementParser {
         }
 
         const args: Tokens.MacroBodyToken[] = [];
-        for (let i = 0; i < macro.params.length; i++) {
+        for (const _param of macro.params) {
             const arg = this.lexer.nextMacroArgument();
             args.push(arg);
         }

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function */
+
 import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a program with DUBL statements", () => {
@@ -25,7 +25,7 @@ describe("GIVEN a program with DUBL statements", () => {
 
             expect(data.memory[0o410]).equals(0o7000);
 
-            expect(data.symbols["TAG"]).equals(0o411);
+            expect(data.symbols.TAG).equals(0o411);
         });
     });
 });

@@ -56,6 +56,7 @@ export function dumpAst(prog: Nodes.Program, write: (line: string) => void, inde
     writeIndented(undefined, ")", --indent);
 }
 
+
 // eslint-disable-next-line max-lines-per-function
 export function formatNode(node: Nodes.Node): string {
     let str;

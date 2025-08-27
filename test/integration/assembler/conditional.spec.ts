@@ -112,7 +112,7 @@ describe("GIVEN a program with conditional statements", () => {
         });
     });
 
-    describe("WHEN evaluating conditions with comments containing >", () => {
+    describe("WHEN evaluating conditions with comments containing '>'", () => {
         describe("WHEN IFZERO does not match and contains a comment containing '>'", () => {
             const data = assemble(`
                 NOCHK=0

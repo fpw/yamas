@@ -138,15 +138,15 @@ export class DataAssembler {
                 continue;
             }
 
-            let num = Number.parseFloat(fltg.value);
+            let numStr = fltg.value;
             if (fltg.unaryOp?.operator == "-") {
-                num *= -1;
+                numStr = `-${numStr}`;
             }
 
-            const [e, m1, m2] = toDECFloat(num);
+            const [e, mHi, mLo] = toDECFloat(numStr);
             this.output.punchData(ctx, loc++, e);
-            this.output.punchData(ctx, loc++, m1);
-            this.output.punchData(ctx, loc++, m2);
+            this.output.punchData(ctx, loc++, mHi);
+            this.output.punchData(ctx, loc++, mLo);
         }
         return { incClc: loc - startLoc };
     }

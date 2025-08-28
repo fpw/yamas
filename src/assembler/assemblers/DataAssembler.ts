@@ -19,7 +19,7 @@
 import * as Nodes from "../../parser/nodes/Node.js";
 import { NodeType } from "../../parser/nodes/Node.js";
 import * as CharSets from "../../utils/CharSets.js";
-import { toDECFloat } from "../../utils/Floats.js";
+import { encodeDECFloat } from "../../utils/float/DECFloat.js";
 import { parseIntSafe } from "../../utils/Strings.js";
 import { AssemblerOptions, SubComponents } from "../Assembler.js";
 import { AssemblerError } from "../AssemblerError.js";
@@ -143,7 +143,7 @@ export class DataAssembler {
                 numStr = `-${numStr}`;
             }
 
-            const [e, mHi, mLo] = toDECFloat(numStr);
+            const [e, mHi, mLo] = encodeDECFloat(numStr);
             this.output.punchData(ctx, loc++, e);
             this.output.punchData(ctx, loc++, mHi);
             this.output.punchData(ctx, loc++, mLo);

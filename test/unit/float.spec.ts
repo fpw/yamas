@@ -10,7 +10,7 @@ describe("GIVEN a scientific float string", () => {
         [bigint, bigint],
         [number, number, number]
     ][] = [
-        // Input        ScientificFloat             BinaryFloat     DEC Float
+        // Input        ScientificFloat             DecimalFloat    DEC Float
         ["0",           [1n, 0n, [], 0n],           [0n, 0n],       [0o0000, 0o0000, 0o0000]],
         ["+509.32E-02", [1n, 509n, [3n, 2n], -2n],  [50932n, -4n],  [0o0003, 0o2427, 0o6677]],
         ["-62.97E04",   [-1n, 62n, [9n, 7n], 4n],   [-6297n, 2n],   [0o0024, 0o5462, 0o0740]],

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 
 import { assemble } from "./TestUtils.js";
 
@@ -26,6 +27,17 @@ describe("GIVEN a program with DUBL statements", () => {
             expect(data.memory[0o410]).equals(0o7000);
 
             expect(data.symbols.TAG).equals(0o411);
+        });
+    });
+
+    describe("WHEN DUBL is the last statement", () => {
+        const data = assemble(`
+            *400
+            DUBL    679467
+        `);
+        test("THEN it should work as expected", () => {
+            expect(data.memory[0o400]).equals(0o0245);
+            expect(data.memory[0o401]).equals(0o7053);
         });
     });
 });

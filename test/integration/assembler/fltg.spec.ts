@@ -52,4 +52,16 @@ describe("GIVEN a program with FLTG statements", () => {
             expect(decodeDECFloat(0o7775, 0o3146, 0o3146)).toBeCloseTo(0.1, 6);
         });
     });
+
+    describe("WHEN FLTG is the last instruction", () => {
+        const data = assemble(`
+            *400
+            FLTG    1
+        `);
+        test("THEN it should work as expected", () => {
+            expect(data.memory[0o400]).equals(0o0001);
+            expect(data.memory[0o401]).equals(0o2000);
+            expect(data.memory[0o402]).equals(0o0000);
+        });
+    });
 });

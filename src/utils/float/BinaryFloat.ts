@@ -68,31 +68,31 @@ export function binaryToDecimalFloat(bin: BinaryFloat): DecimalFloat {
 export function decimalToBinaryFloat(dec: DecimalFloat, bits: bigint, extraBits: bigint): BinaryFloat {
     // Working precision: target bits - 1 (for two's complement) + extra precision bits
     const mBits = bits - 1n + extraBits;
+    const sign = dec.mantissa < 0n ? -1n : 1n;
     let res: BinaryFloat = {
-        mantissa: dec.mantissa << extraBits,
+        mantissa: (dec.mantissa * sign) << extraBits,
         precision: mBits,
         binExp: mBits,
     };
 
     // Start with mantissa shifted left by extraBits for additional working precision
-    // Normalize after each step to maintain precision
     res = normalizeBinFloat(res);
     if (dec.decExp > 0n) {
         // Handle positive decimal exponent: multiply by 10^decExp
         for (let i = 0; i < dec.decExp; i++) {
             res.mantissa *= 10n;
-            res = normalizeBinFloat(res);
         }
     } else if (dec.decExp < 0n) {
         // Handle negative decimal exponent: divide by 10^|decExp|
         for (let i = 0; i < -dec.decExp; i++) {
             res.mantissa /= 10n;
+            // keep precision by normalizing after each step
             res = normalizeBinFloat(res);
         }
     }
 
     // Remove the extra precision bits that were added for extra precision
-    res.mantissa >>= extraBits;
+    res.mantissa = (res.mantissa >> extraBits) * sign;
     res.binExp -= extraBits;
     res.precision -= extraBits;
 

@@ -351,7 +351,7 @@ export class PseudoParser {
         let lastTok: Tokens.Token | undefined;
         let gotSep = true;
 
-        while (true) {
+        while (!lastTok || lastTok.type != TokenType.EOF) {
             const dubl = this.parseDubl();
             if (dubl) {
                 list.push(dubl[0]);
@@ -387,7 +387,7 @@ export class PseudoParser {
         let lastTok: Tokens.Token | undefined;
         let gotSep = true;
 
-        while (true) {
+        while (!lastTok || lastTok.type != TokenType.EOF) {
             const fltg = this.parseFloat();
             if (fltg) {
                 list.push(fltg[0]);

@@ -17,17 +17,16 @@
  */
 
 // Intermediate representation: parsed components of scientific notation string
-// Example: "-123.45e-6" -> {integralSign: "-", integral: "123", decimal: "45", expoSign: "-", exponent: "6"}
-// Both integral and exponent have a sign and leading zeros in the string are irrelevant -> parse to bigint
-// Decimal part doesn't have a sign and leading zeros are relevant -> keep as unparsed string
+// Example: "-123.04e-6" -> { sign: -1, integral: -123, decimalDigits: [0, 4], exponent: 6 }
 export interface ScientificFloat {
-    integral: bigint;
-    decimal: string; // leading zeros are relevant, so keeping it a string for now
+    sign: -1n | 1n;
+    integral: bigint; // always positive
+    decimalDigits: bigint[];
     exponent: bigint;
 }
 
 // RegEx to parse scientific notation: optional sign, digits with decimal point, optional exponent
-const SciFloatFormat = /^([-+])?(\d+\.\d*|\d*\.\d+|\d+)(e([-+]?)(\d+))?$/i;
+const SciFloatFormat = /^([-+])?(\d+\.\d*|\d*\.\d+|\d+)(?:e([-+]?)(\d+))?$/i;
 
 /**
  * Parse scientific notation string into structured components
@@ -41,11 +40,12 @@ export function parseScientificFloat(input: string): ScientificFloat {
         throw Error("Invalid float format");
     }
 
-    const [_all, mantissaSign, numberPart, _, exponentSign, exponent] = match;
+    const [_all, mantissaSign, numberPart, exponentSign, exponent] = match;
 
     const float: ScientificFloat = {
+        sign: 1n,
         integral: 0n,
-        decimal: "0",
+        decimalDigits: [],
         exponent: 0n,
     };
 
@@ -54,10 +54,10 @@ export function parseScientificFloat(input: string): ScientificFloat {
         float.integral = BigInt(integral);
     }
     if (mantissaSign == "-") {
-        float.integral *= -1n;
+        float.sign = -1n;
     }
     if (decimal) {
-        float.decimal = decimal;
+        float.decimalDigits = toDigits(decimal);
     }
     if (exponent) {
         float.exponent = BigInt(exponent);
@@ -69,15 +69,20 @@ export function parseScientificFloat(input: string): ScientificFloat {
     return float;
 }
 
+export function toDigits(numStr: string): bigint[] {
+    return numStr.split("").map(d => BigInt(d));
+}
+
 /**
  * Convert a ScientificFloat into a string representation, e.g. -123.456e3
  * @param sciFloat input float
  * @returns string in scientific notation
  */
 export function toScientificString(sciFloat: ScientificFloat): string {
-    let sciStr = `${sciFloat.integral}`;
-    if (sciFloat.decimal != "0") {
-        sciStr += `.${sciFloat.decimal}`;
+    let sciStr = sciFloat.sign < 0n ? "-" : "";
+    sciStr += `${sciFloat.integral}`;
+    if (sciFloat.decimalDigits.length > 0) {
+        sciStr += `.${sciFloat.decimalDigits.join("")}`;
     }
     if (sciFloat.exponent != 0n) {
         sciStr += `e${sciFloat.exponent}`;

@@ -16,7 +16,7 @@
  *   along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { ScientificFloat } from "./ScientificFloat.js";
+import { ScientificFloat, toDigits } from "./ScientificFloat.js";
 
 // Decimal floating point representation: mantissa * 10^decExp
 // Example: 123.45e-6 -> {mantissa: 12345n, decExp: -8n}
@@ -33,15 +33,13 @@ export interface DecimalFloat {
  * @returns decimal representation of float
  */
 export function scientificToDecimal(sci: ScientificFloat): DecimalFloat {
-    const sign = sci.integral < 0n ? -1n : 1n;
     let float: DecimalFloat = {
-        mantissa: sci.integral * sign,
+        mantissa: sci.integral,
         decExp: sci.exponent,
     };
 
     // Convert decimal part to digits and shift into mantissa
-    const digits = sci.decimal.split("").map(d => BigInt(d));
-    for (const digit of digits) {
+    for (const digit of sci.decimalDigits) {
         float.mantissa = float.mantissa * 10n + digit;
         float.decExp--;
     }
@@ -53,7 +51,7 @@ export function scientificToDecimal(sci: ScientificFloat): DecimalFloat {
         float.decExp = 0n;
     }
 
-    float.mantissa *= sign;
+    float.mantissa *= sci.sign;
 
     return float;
 }
@@ -65,8 +63,9 @@ export function decimalToScientific(df: DecimalFloat): ScientificFloat {
 
     if (mantissa === 0n) {
         return {
+            sign,
             integral: 0n,
-            decimal: "0",
+            decimalDigits: [],
             exponent: 0n,
         };
     }
@@ -82,8 +81,9 @@ export function decimalToScientific(df: DecimalFloat): ScientificFloat {
     const decimal = mantStr.slice(1) || "0";
 
     return {
-        integral: BigInt(integral) * sign,
-        decimal,
+        sign,
+        integral: BigInt(integral),
+        decimalDigits: toDigits(decimal),
         exponent,
     };
 }

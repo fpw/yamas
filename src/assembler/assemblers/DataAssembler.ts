@@ -25,7 +25,6 @@ import { AssemblerOptions, SubComponents } from "../Assembler.js";
 import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
 import { ExprEvaluator } from "../util/ExprEvaluator.js";
-import { OutputFilter } from "../util/OutputFilter.js";
 import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 
 /**
@@ -34,12 +33,10 @@ import { RegisterFunction, StatementEffect } from "../util/StatementEffect.js";
 export class DataAssembler {
     private opts: AssemblerOptions;
     private evaluator: ExprEvaluator;
-    private output: OutputFilter;
 
     public constructor(components: SubComponents) {
         this.opts = components.options;
         this.evaluator = components.evaluator;
-        this.output = components.output;
     }
 
     public registerStatements(register: RegisterFunction) {
@@ -57,15 +54,16 @@ export class DataAssembler {
     private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): StatementEffect {
         // we need to evaluate in both passes to generate links in MRI statements in correct order
         const val = this.evaluator.tryEval(ctx, stmt.expr);
+        const output: [number, number][] = [];
 
         // but in pass 2, we really need to access the value
         if (ctx.generateCode) {
             if (val === null) {
                 throw new AssemblerError("Undefined expression", stmt);
             }
-            this.output.punchData(ctx, ctx.getClc(false), val);
+            output.push([ctx.getClc(false), val]);
         }
-        return { incClc: 1 };
+        return { output, incClc: 1 };
     }
 
     private handleRadix(ctx: Context, stmt: Nodes.RadixStatement): StatementEffect {
@@ -75,34 +73,37 @@ export class DataAssembler {
 
     private handleZBlock(ctx: Context, stmt: Nodes.ZBlockStatement): StatementEffect {
         const amount = this.evaluator.safeEval(ctx, stmt.expr);
-        let loc = ctx.getClc(false);
+        const output: [number, number][] = [];
+        const loc = ctx.getClc(false);
         for (let i = 0; i < amount; i++) {
-            this.output.punchData(ctx, loc, 0);
-            loc++;
+            output.push([loc + i, 0]);
         }
-        return { incClc: amount };
+        return { output, incClc: amount };
     }
 
     private handleText(ctx: Context, stmt: Nodes.TextStatement): StatementEffect {
         const outStr = CharSets.asciiStringToDec(stmt.text, !this.opts.noNullTermination);
         const addr = ctx.getClc(false);
-        outStr.forEach((w, i) => this.output.punchData(ctx, addr + i, w));
-        return { incClc: outStr.length };
+        const output: [number, number][] = [];
+        outStr.forEach((w, i) => output.push([addr + i, w]));
+        return { output, incClc: outStr.length };
     }
 
     private handleFileName(ctx: Context, stmt: Nodes.FilenameStatement): StatementEffect {
         const outStr = CharSets.asciiStringToOS8Name(stmt.name);
         const addr = ctx.getClc(false);
-        outStr.forEach((w, i) => this.output.punchData(ctx, addr + i, w));
-        return { incClc: outStr.length };
+        const output: [number, number][] = [];
+        outStr.forEach((w, i) => output.push([addr + i, w]));
+        return { output, incClc: outStr.length };
     }
 
     private handleDevice(ctx: Context, name: Nodes.DevNameStatement): StatementEffect {
         const dev = name.name.padEnd(4, "@");
         const outStr = CharSets.asciiStringToDec(dev, false);
         const addr = ctx.getClc(false);
-        outStr.forEach((w, i) => this.output.punchData(ctx, addr + i, w));
-        return { incClc: outStr.length };
+        const output: [number, number][] = [];
+        outStr.forEach((w, i) => output.push([addr + i, w]));
+        return { output, incClc: outStr.length };
     }
 
     private handleDubl(ctx: Context, stmt: Nodes.DoubleIntList): StatementEffect {
@@ -110,6 +111,7 @@ export class DataAssembler {
             return {};
         }
 
+        const output: [number, number][] = [];
         const startLoc = ctx.getClc(false);
         let loc = ctx.getClc(false);
         for (const dubl of stmt.list) {
@@ -120,10 +122,10 @@ export class DataAssembler {
             if (dubl.unaryOp?.operator === "-") {
                 num = -num;
             }
-            this.output.punchData(ctx, loc++, (num >> 12) & 0o7777);
-            this.output.punchData(ctx, loc++, num & 0o7777);
+            output.push([loc++, (num >> 12) & 0o7777]);
+            output.push([loc++, num & 0o7777]);
         }
-        return { incClc: loc - startLoc };
+        return { output, incClc: loc - startLoc };
     }
 
     private handleFltg(ctx: Context, stmt: Nodes.FloatList): StatementEffect {
@@ -131,6 +133,7 @@ export class DataAssembler {
             return {};
         }
 
+        const output: [number, number][] = [];
         const startLoc = ctx.getClc(false);
         let loc = ctx.getClc(false);
         for (const fltg of stmt.list) {
@@ -144,11 +147,11 @@ export class DataAssembler {
             }
 
             const [e, mHi, mLo] = encodeDECFloat(numStr);
-            this.output.punchData(ctx, loc++, e);
-            this.output.punchData(ctx, loc++, mHi);
-            this.output.punchData(ctx, loc++, mLo);
+            output.push([loc++, e]);
+            output.push([loc++, mHi]);
+            output.push([loc++, mLo]);
         }
-        return { incClc: loc - startLoc };
+        return { output, incClc: loc - startLoc };
     }
 
     private handlePunchControl(ctx: Context, stmt: Nodes.PunchCtrlStatement): StatementEffect {

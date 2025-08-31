@@ -50,7 +50,6 @@ export interface SubComponents {
     options: AssemblerOptions;
     symbols: SymbolTable;
     links: LinkTable;
-    output: OutputFilter;
     evaluator: ExprEvaluator;
 }
 
@@ -83,7 +82,6 @@ export class Assembler {
     private registerStatements(register: RegisterFunction) {
         const components: SubComponents = {
             options: this.opts,
-            output: this.output,
             symbols: this.syms,
             links: this.links,
             evaluator: this.evaluator,
@@ -194,6 +192,10 @@ export class Assembler {
         }
 
         const effect = handler(ctx, stmt);
+
+        for (const [addr, val] of effect.output ?? []) {
+            this.output.punchData(ctx, addr, val);
+        }
 
         if (effect.incClc !== undefined) {
             this.incClc(ctx, effect.incClc);

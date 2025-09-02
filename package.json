@@ -40,11 +40,11 @@
     "typescript": "^5.9.2",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.34.0",
-    "@stylistic/eslint-plugin": "^5.2.3",
+    "@stylistic/eslint-plugin": "^5.3.1",
     "@types/node": "^24.3.0",
-    "@typescript-eslint/parser": "^8.41.0",
+    "@typescript-eslint/parser": "^8.42.0",
     "eslint": "^9.34.0",
-    "typescript-eslint": "^8.41.0",
+    "typescript-eslint": "^8.42.0",
     "vitest": "^3.2.4"
   },
   "types": "dist/src/index.d.ts"

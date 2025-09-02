@@ -23,7 +23,7 @@ export class Context {
     private field_ = 0;
     private reloc_ = 0;
     private punchEnabled_ = true;
-    private readonly generateCode_: boolean;
+    private generateCode_: boolean;
     private clc = PDP8.firstAddrInPage(1);
 
     public constructor(generateCode: boolean) {
@@ -34,32 +34,16 @@ export class Context {
         return this.reloc_;
     }
 
-    public set reloc(newReloc: number) {
-        this.reloc_ = newReloc;
-    }
-
     public get field() {
         return this.field_;
-    }
-
-    public set field(newField: number) {
-        this.field_ = newField;
     }
 
     public get radix() {
         return this.radix_;
     }
 
-    public set radix(r: 8 | 10) {
-        this.radix_ = r;
-    }
-
     public get punchEnabled() {
         return this.punchEnabled_;
-    }
-
-    public set punchEnabled(en: boolean) {
-        this.punchEnabled_ = en;
     }
 
     public get generateCode() {
@@ -74,7 +58,43 @@ export class Context {
         return (this.clc + (doReloc ? this.reloc : 0)) & 0o7777;
     }
 
-    public setClc(clc: number, doReloc: boolean) {
-        this.clc = (clc - (doReloc ? this.reloc : 0)) & 0o7777;
+    public clone(): Context {
+        const newCtx = new Context(this.generateCode_);
+        newCtx.radix_ = this.radix_;
+        newCtx.field_ = this.field_;
+        newCtx.reloc_ = this.reloc_;
+        newCtx.punchEnabled_ = this.punchEnabled_;
+        newCtx.clc = this.clc;
+        return newCtx;
+    }
+
+    public withRadix(newRadix: 8 | 10): Context {
+        const newCtx = this.clone();
+        newCtx.radix_ = newRadix;
+        return newCtx;
+    }
+
+    public withPunchEnable(enable: boolean): Context {
+        const newCtx = this.clone();
+        newCtx.punchEnabled_ = enable;
+        return newCtx;
+    }
+
+    public withCLC(newClc: number, doReloc: boolean): Context {
+        const newCtx = this.clone();
+        newCtx.clc = (newClc - (doReloc ? newCtx.reloc_ : 0)) & 0o7777;
+        return newCtx;
+    }
+
+    public withField(newField: number): Context {
+        const newCtx = this.clone();
+        newCtx.field_ = newField;
+        return newCtx;
+    }
+
+    public withReloc(reloc: number): Context {
+        const newCtx = this.clone();
+        newCtx.reloc_ = reloc;
+        return newCtx;
     }
 }

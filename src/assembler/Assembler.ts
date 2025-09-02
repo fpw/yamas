@@ -32,7 +32,7 @@ import { OriginAssembler } from "./assemblers/OriginAssembler.js";
 import { SymbolAssembler } from "./assemblers/SymbolAssembler.js";
 import { ExprEvaluator } from "./util/ExprEvaluator.js";
 import { OutputFilter } from "./util/OutputFilter.js";
-import { RegisterFunction, StatementHandler } from "./util/StatementEffect.js";
+import { RegisterFunction, StatementEffect, StatementHandler } from "./util/StatementEffect.js";
 
 export interface OutputHandler {
     changeOrigin(clc: number): void;
@@ -151,19 +151,20 @@ export class Assembler {
     private doPass(generateCode: boolean) {
         const errors: CodeError[] = [];
 
-        const ctx = new Context(generateCode);
+        let ctx = new Context(generateCode);
         this.output.punchOrigin(ctx);
 
         for (const prog of this.programs) {
-            const asmErrors = this.assembleProgram(ctx, prog);
+            const [asmErrors, newCtx] = this.assembleProgram(ctx, prog);
             errors.push(...asmErrors);
+            ctx = newCtx;
         }
         this.outputLinks(ctx);
 
         return errors;
     }
 
-    private assembleProgram(ctx: Context, prog: Nodes.Program): CodeError[] {
+    private assembleProgram(ctx: Context, prog: Nodes.Program): [CodeError[], Context] {
         const errors: CodeError[] = [];
         for (const inst of prog.instructions) {
             try {
@@ -171,7 +172,8 @@ export class Assembler {
                     this.syms.defineLabel(labelDef.sym.name, ctx.getClc(true));
                 }
                 if (inst.statement) {
-                    const subErrors = this.handleStatement(ctx, inst.statement);
+                    const [subErrors, newCtx] = this.handleStatement(ctx, inst.statement);
+                    ctx = newCtx;
                     errors.push(...subErrors);
                 }
             } catch(e) {
@@ -182,13 +184,13 @@ export class Assembler {
                 }
             }
         }
-        return errors;
+        return [errors, ctx];
     }
 
-    private handleStatement(ctx: Context, stmt: Nodes.Statement): CodeError[] {
+    private handleStatement(ctx: Context, stmt: Nodes.Statement): [CodeError[], Context] {
         const handler = this.stmtHandlers[stmt.type];
         if (!handler) {
-            return [];
+            return [[], ctx];
         }
 
         const effect = handler(ctx, stmt);
@@ -198,27 +200,46 @@ export class Assembler {
         }
 
         if (effect.incClc !== undefined) {
-            this.incClc(ctx, effect.incClc);
+            ctx = this.incClc(ctx, effect.incClc);
         }
 
         if (effect.changeField !== undefined) {
-            this.changeField(ctx, effect.changeField);
+            ctx = this.changeField(ctx, effect.changeField);
         }
 
         if (effect.relocClc !== undefined) {
-            this.relocClc(ctx, effect.relocClc);
+            ctx = this.relocClc(ctx, effect.relocClc);
         }
 
         if (effect.assembleSubProgram) {
             const subErrors = this.assembleProgram(ctx, effect.assembleSubProgram);
             return subErrors;
         }
-        return [];
+
+        ctx = this.applySimpleEffects(ctx, effect);
+
+        return [[], ctx];
     }
 
-    private relocClc(ctx: Context, newClc: number) {
+    private applySimpleEffects(ctx: Context, effect: StatementEffect): Context {
+        if (effect.setReloc !== undefined) {
+            ctx = ctx.withReloc(effect.setReloc);
+        }
+
+        if (effect.setRadix) {
+            ctx = ctx.withRadix(effect.setRadix);
+        }
+
+        if (effect.setPunchEnable !== undefined) {
+            ctx = ctx.withPunchEnable(effect.setPunchEnable);
+        }
+
+        return ctx;
+    }
+
+    private relocClc(ctx: Context, newClc: number): Context {
         const oldPage = PDP8.calcPageNum(ctx.getClc(true));
-        ctx.setClc(newClc, true);
+        ctx = ctx.withCLC(newClc, true);
         const newPage = PDP8.calcPageNum(ctx.getClc(true));
 
         if (this.opts.forgetLiterals && oldPage != newPage) {
@@ -227,9 +248,10 @@ export class Assembler {
         }
 
         this.output.punchOrigin(ctx);
+        return ctx;
     }
 
-    private incClc(ctx: Context, incClc: number) {
+    private incClc(ctx: Context, incClc: number): Context {
         // we just put something in interval [current CLC, current CLC + incClc)
         // -> check if it overlapped with a link by checking the last written address
         // TODO: Check the other direction, i.e. writing a link first and then an instruction
@@ -241,16 +263,18 @@ export class Assembler {
             throw Error("Link table overflow");
         }
 
-        ctx.setClc(newClc, false);
+        ctx = ctx.withCLC(newClc, false);
+        return ctx;
     }
 
-    private changeField(ctx: Context, field: number) {
-        ctx.field = field;
+    private changeField(ctx: Context, field: number): Context {
         this.outputLinks(ctx);
         this.links.clear();
-        ctx.setClc(PDP8.firstAddrInPage(1), false);
+        ctx = ctx.withField(field);
+        ctx = ctx.withCLC(PDP8.firstAddrInPage(1), false);
         this.output.punchField(ctx, field);
         this.output.punchOrigin(ctx);
+        return ctx;
     }
 
     private outputLinks(ctx: Context) {

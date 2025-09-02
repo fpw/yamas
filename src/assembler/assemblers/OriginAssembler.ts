@@ -85,11 +85,10 @@ export class OriginAssembler {
 
     private handleReloc(ctx: Context, stmt: Nodes.RelocStatement): StatementEffect {
         if (!stmt.expr) {
-            ctx.reloc = 0;
+            return { setReloc: 0 };
         } else {
             const reloc = this.evaluator.safeEval(ctx, stmt.expr);
-            ctx.reloc = reloc - ctx.getClc(false);
+            return { setReloc: reloc - ctx.getClc(false) };
         }
-        return {};
     }
 }

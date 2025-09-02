@@ -37,4 +37,13 @@ export interface StatementEffect {
 
     // assembler and execute a sub-program
     assembleSubProgram?: Nodes.Program;
+
+    // change radix for literal parsing
+    setRadix?: 8 | 10;
+
+    // set enable or disable output punching
+    setPunchEnable?: boolean;
+
+    // set relocation base
+    setReloc?: number;
 }

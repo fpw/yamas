@@ -67,8 +67,7 @@ export class DataAssembler {
     }
 
     private handleRadix(ctx: Context, stmt: Nodes.RadixStatement): StatementEffect {
-        ctx.radix = stmt.radix;
-        return {};
+        return { setRadix: stmt.radix };
     }
 
     private handleZBlock(ctx: Context, stmt: Nodes.ZBlockStatement): StatementEffect {
@@ -155,7 +154,6 @@ export class DataAssembler {
     }
 
     private handlePunchControl(ctx: Context, stmt: Nodes.PunchCtrlStatement): StatementEffect {
-        ctx.punchEnabled = stmt.enable;
-        return {};
+        return { setPunchEnable: stmt.enable };
     }
 }

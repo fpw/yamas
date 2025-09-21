@@ -69,7 +69,7 @@ Expressions can be null in pass 1, for example when a symbol is used that is onl
 For that reason, the assembler differentiates between defined and undefined expressions. Using an undefined expression in an `IFZERO` is not okay
 because the resulting CLC can't be calculated - but using it in something like ``A=JMS X`` is completely fine.
 
-`null` is used instead of `define` so that the linter will spot a missing `case`
+`null` is used instead of `undefined` so that the linter will spot a missing `case`
 in the eval functions after adding a new node type. It would probably be better to
 use a `Maybe` type so that expressions like `if (!val)` are also caught.
 
@@ -84,5 +84,6 @@ See above: The origin statements must be preserved as they appeared in the code.
 [palbart testbench]: http://www.pdp8online.com/ftp/software/palbart/testbench/
 [cmp_tape]: http://www.pdp8online.com/ftp/software/cmp_tape/
 [MACRO-8 (PDF manual)]: http://www.bitsavers.org/pdf/dec/pdp8/software/DEC-08-CMAB-D_MACRO8.pdf
+
 
 

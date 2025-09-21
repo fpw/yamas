@@ -26,6 +26,10 @@ export function calcPageNum(loc: number): number {
     return (loc >> 7) & 31;
 }
 
+export function calcAddrInPage(loc: number): number {
+    return loc & 0o177;
+}
+
 export function firstAddrInPage(pageNum: number): number {
     return pageNum * PageSize;
 }

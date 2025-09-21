@@ -244,7 +244,7 @@ export class Assembler {
 
         if (this.opts.forgetLiterals && oldPage != newPage) {
             this.outputLinks(ctx);
-            this.links.clear();
+            this.links.clear(false);
         }
 
         this.output.punchOrigin(ctx);

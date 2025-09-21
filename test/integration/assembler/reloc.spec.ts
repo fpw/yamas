@@ -1,5 +1,5 @@
 /* eslint-disable max-lines-per-function */
-import { assemble, assembleWithErrors } from "./TestUtils.js";
+import { assemble } from "./TestUtils.js";
 
 describe("GIVEN a program containing reloc statements", () => {
     describe("WHEN assembling an example program with a RELOC", () => {
@@ -65,13 +65,23 @@ describe("GIVEN a program containing reloc statements", () => {
     });
 
     describe("WHEN assembling an example program with a RELOC that causes the link table to move mid-page", () => {
-        const data = assembleWithErrors(`
-            *200
-            RELOC 410
-            TAD (3
+        const data = assemble(`
+            / SIMPLIFIED FROM TSS/8 PUTR.PA
+            *4536
+            RELOC 3402
+            / WE ARE ACTUALLY ON PAGE 18 BUT 14 AFTER RELOC
+            JMS (3616
+            ZBLOCK 70
+            / NOW WE ARE ON PAGE 19 BUT STILL 14 AFTER RELOC -> SAME LINK TABLE AS BEFORE
+            JMS (0360
         `);
-        test("THEN assembling should fail", () => {
-            expect(data.errors.length).toBeGreaterThan(0);
+        test("THEN assembling should succeed", () => {
+            expect(data.memory[0o4536]).toEqual(0o4377);
+            expect(data.memory[0o4627]).toEqual(0o4376);
+
+            // links
+            expect(data.memory[0o4732]).toEqual(0o0360);
+            expect(data.memory[0o4733]).toEqual(0o3616);
         });
     });
 });

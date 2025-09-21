@@ -207,7 +207,7 @@ export class ExprEvaluator {
             return effVal | CUR;
         } else {
             if (mri & IND) {
-                throw Error(`Double indirection on page ${curPage}"`);
+                throw Error(`Double indirection on page ${curPage}`);
             }
             const linkPage = PDP8.calcPageNum(ctx.getClc(false));
             const indAddr = this.linkTable.enter(ctx, linkPage, dst);

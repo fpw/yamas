@@ -19,38 +19,56 @@
 import * as PDP8 from "../utils/PDP8.js";
 import { Context } from "./Context.js";
 
+interface LinkEntry {
+    value: number;
+    reloc: number;
+}
+
 export class LinkTable {
-    // [page][index]
-    private entries: number[][] = [];
+    // [page][offset] = value
+    private entries: LinkEntry[][] = [];
 
     public constructor() {
         this.clear();
     }
 
     public enter(ctx: Context, page: number, value: number): number {
-        let delta = 0;
-        if (page != 0 && ctx.reloc != 0) {
-            if (ctx.reloc % PDP8.PageSize != 0) {
-                throw Error("Relocating link tables to mid-page not supported");
+        let relocPage = 0;
+        if (page != 0) {
+            relocPage = PDP8.calcPageNum(ctx.getClc(true));
+        }
+        let offset = this.tryLookup(relocPage, value);
+        if (offset === undefined) {
+            offset = this.getFreeAddress(relocPage);
+            this.entries[relocPage][offset] = { value, reloc: relocPage != 0 ? ctx.reloc : 0 };
+        }
+        const addr = PDP8.PageSize * relocPage + offset;
+        return addr;
+    }
+
+    private getFreeAddress(page: number): number {
+        let lowestAddr = 0;
+        if (page == 0) {
+            // on page 0, also make sure to not collide with auto-index region
+            lowestAddr = 0o20;
+        }
+
+        for (let offset = PDP8.PageSize - 1; offset >= lowestAddr; offset--) {
+            if (this.entries[page][offset] === undefined) {
+                return offset;
             }
-            const relocPage = PDP8.calcPageNum(ctx.getClc(true));
-            delta = PDP8.firstAddrInPage(relocPage) - PDP8.firstAddrInPage(page);
+        }
+        throw Error(`Link table overflow on page ${page}`);
+    }
+
+    private tryLookup(page: number, value: number): number | undefined {
+        for (let offset = PDP8.PageSize - 1; offset >= 0; offset--) {
+            if (this.entries[page][offset]?.value === value) {
+                return offset;
+            }
         }
 
-        const idx = this.tryLookup(page, value);
-        if (idx !== undefined) {
-            return idx + delta;
-        }
-
-        // on page 0, also make sure it doesn't collide with auto-index region
-        if (page == 0 && this.entries[0].length >= 0o160) {
-            throw Error("No more space on page 0");
-        } else if (this.entries[page].length >= 0o200) {
-            throw Error(`No more space on link page ${page}`);
-        }
-
-        this.entries[page].push(value);
-        return this.indexToAddr(page, this.entries[page].length - 1) + delta;
+        return undefined;
     }
 
     // Check if there's an overlap of link tables with the interval [first, last]
@@ -83,46 +101,30 @@ export class LinkTable {
 
     private hasOverlapWithAddr(addr: number): boolean {
         const page = PDP8.calcPageNum(addr);
-
-        const linkCount = this.entries[page].length;
-        if (linkCount == 0) {
-            return false;
-        }
-
-        // Address of the latest link -> lowest address in use by link table
-        const lowAddr = this.indexToAddr(page, linkCount - 1);
-        if (addr >= lowAddr) {
-            return true;
-        }
-
-        return false;
+        const offset = PDP8.calcAddrInPage(addr);
+        return this.entries[page][offset] !== undefined;
     }
 
-    public clear() {
+    public clear(alsoZero = true) {
         for (let page = 0; page < PDP8.NumPages; page++) {
+            if (page == 0 && !alsoZero) {
+                continue;
+            }
             this.entries[page] = [];
         }
     }
 
     public visit(f: (addr: number, val: number) => void) {
         for (let page = 0; page < PDP8.NumPages; page++) {
-            for (let i = this.entries[page].length - 1; i >= 0; i--) {
-                const addr = this.indexToAddr(page, i);
-                f(addr, this.entries[page][i]);
+            for (let offset = PDP8.PageSize - 1; offset >= 0; offset--) {
+                const entry = this.entries[page][offset];
+                if (entry === undefined) {
+                    continue;
+                }
+                const value = entry.value;
+                const addr = page * PDP8.PageSize + offset - entry.reloc;
+                f(addr, value);
             }
         }
-    }
-
-    private tryLookup(page: number, value: number): number | undefined {
-        for (let i = 0; i < this.entries[page].length; i++) {
-            if (this.entries[page][i] == value) {
-                return this.indexToAddr(page, i);
-            }
-        }
-        return undefined;
-    }
-
-    private indexToAddr(page: number, idx: number): number {
-        return page * PDP8.PageSize + (PDP8.PageSize - 1 - idx);
     }
 }

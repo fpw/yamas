@@ -53,7 +53,7 @@ export class OriginAssembler {
         let newPage: number;
         if (!stmt.expr) {
             // subtracting 1 because the cursor is already at the next statement
-            const curPage = PDP8.calcPageNum(ctx.getClc(true) - 1);
+            const curPage = PDP8.getPageNum(ctx.getClc(true) - 1);
             newPage = curPage + 1;
         } else {
             newPage = this.evaluator.safeEval(ctx, stmt.expr);
@@ -61,7 +61,7 @@ export class OriginAssembler {
                 throw new AssemblerError(`Invalid page ${newPage}`, stmt);
             }
         }
-        const reloc = PDP8.firstAddrInPage(newPage);
+        const reloc = PDP8.getAddrFromPageAndOffset(newPage, 0);
         return { relocClc: reloc };
     }
 

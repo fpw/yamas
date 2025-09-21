@@ -24,7 +24,7 @@ export class Context {
     private reloc_ = 0;
     private punchEnabled_ = true;
     private generateCode_: boolean;
-    private clc = PDP8.firstAddrInPage(1);
+    private clc = PDP8.getAddrFromPageAndOffset(1, 0); // default is start of second page
 
     public constructor(generateCode: boolean) {
         this.generateCode_ = generateCode;

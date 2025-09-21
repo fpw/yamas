@@ -23,7 +23,7 @@ import { CodeError } from "../utils/CodeError.js";
 import * as PDP8 from "../utils/PDP8.js";
 import { AssemblerError } from "./AssemblerError.js";
 import { Context } from "./Context.js";
-import { LinkTable } from "./LinkTable.js";
+import { LiteralTable } from "./LiteralTable.js";
 import { SymbolData } from "./SymbolData.js";
 import { SymbolTable } from "./SymbolTable.js";
 import { DataAssembler } from "./assemblers/DataAssembler.js";
@@ -49,7 +49,7 @@ export interface AssemblerOptions extends ParserOptions {
 export interface SubComponents {
     options: AssemblerOptions;
     symbols: SymbolTable;
-    links: LinkTable;
+    literals: LiteralTable;
     evaluator: ExprEvaluator;
 }
 
@@ -58,7 +58,7 @@ export class Assembler {
     private evaluator: ExprEvaluator;
     private output: OutputFilter;
     private syms = new SymbolTable();
-    private links = new LinkTable();
+    private literals = new LiteralTable();
 
     private programs: Nodes.Program[] = [];
     private stmtHandlers: StatementHandler<Nodes.Statement>[] = [];
@@ -66,7 +66,7 @@ export class Assembler {
     public constructor(options: AssemblerOptions) {
         this.opts = options;
         this.output = new OutputFilter(options);
-        this.evaluator = new ExprEvaluator(options, this.syms, this.links);
+        this.evaluator = new ExprEvaluator(options, this.syms, this.literals);
 
         // register pseudos as such so that we get errors if code redefines them
         Parser.SupportedPseudos
@@ -83,7 +83,7 @@ export class Assembler {
         const components: SubComponents = {
             options: this.opts,
             symbols: this.syms,
-            links: this.links,
+            literals: this.literals,
             evaluator: this.evaluator,
         };
 
@@ -130,16 +130,16 @@ export class Assembler {
             return parseErrors;
         }
 
-        // pass 1: assign all symbols and links that can be evaluated in a single pass
+        // pass 1: assign all symbols and literals that can be evaluated in a single pass
         const pass1Errors = this.doPass(false);
         if (pass1Errors.length > 0) {
             return pass1Errors;
         }
 
-        // pass 2: generate code and assign missing symbols and links on the go
-        // we must clear the link table because it's possible that the previous pass left it
+        // pass 2: generate code and assign missing symbols and literals on the go
+        // we must clear the literal table because it's possible that the previous pass left it
         // in another field, so we'll just fill it again in pass 2
-        this.links.clear();
+        this.literals.clear();
         const pass2Errors = this.doPass(true);
         if (pass2Errors.length > 0) {
             return pass2Errors;
@@ -159,7 +159,7 @@ export class Assembler {
             errors.push(...asmErrors);
             ctx = newCtx;
         }
-        this.outputLinks(ctx);
+        this.outputLiterals(ctx);
 
         return errors;
     }
@@ -238,13 +238,13 @@ export class Assembler {
     }
 
     private relocClc(ctx: Context, newClc: number): Context {
-        const oldPage = PDP8.calcPageNum(ctx.getClc(true));
+        const oldPage = PDP8.getPageNum(ctx.getClc(true));
         ctx = ctx.withCLC(newClc, true);
-        const newPage = PDP8.calcPageNum(ctx.getClc(true));
+        const newPage = PDP8.getPageNum(ctx.getClc(true));
 
         if (this.opts.forgetLiterals && oldPage != newPage) {
-            this.outputLinks(ctx);
-            this.links.clear(false);
+            this.outputLiterals(ctx);
+            this.literals.clearNonZero();
         }
 
         this.output.punchOrigin(ctx);
@@ -253,14 +253,14 @@ export class Assembler {
 
     private incClc(ctx: Context, incClc: number): Context {
         // we just put something in interval [current CLC, current CLC + incClc)
-        // -> check if it overlapped with a link by checking the last written address
-        // TODO: Check the other direction, i.e. writing a link first and then an instruction
+        // -> check if it overlapped with a literal by checking the last written address
+        // TODO: Check the other direction, i.e. writing a literal first and then an instruction
         const firstWrite = ctx.getClc(false);
         const newClc = firstWrite + incClc;
         const lastWrite = newClc - 1;
 
-        if (this.links.checkOverlap(firstWrite, lastWrite)) {
-            throw Error("Link table overflow");
+        if (this.literals.checkOverlap(firstWrite, lastWrite)) {
+            throw Error("Code overwraps with literal table");
         }
 
         ctx = ctx.withCLC(newClc, false);
@@ -268,18 +268,19 @@ export class Assembler {
     }
 
     private changeField(ctx: Context, field: number): Context {
-        this.outputLinks(ctx);
-        this.links.clear();
+        this.outputLiterals(ctx);
+        this.literals.clear();
         ctx = ctx.withField(field);
-        ctx = ctx.withCLC(PDP8.firstAddrInPage(1), false);
+        // default is beginning of second page!
+        ctx = ctx.withCLC(PDP8.getAddrFromPageAndOffset(1, 0), false);
         this.output.punchField(ctx, field);
         this.output.punchOrigin(ctx);
         return ctx;
     }
 
-    private outputLinks(ctx: Context) {
+    private outputLiterals(ctx: Context) {
         let curAddr = ctx.getClc(false);
-        this.links.visit((addr, val) => {
+        this.literals.visitAll((addr, val) => {
             if (curAddr != addr) {
                 curAddr = addr;
                 this.output.punchOrigin(ctx, curAddr);

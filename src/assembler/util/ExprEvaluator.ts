@@ -24,22 +24,22 @@ import { parseIntSafe } from "../../utils/Strings.js";
 import { AssemblerOptions } from "../Assembler.js";
 import { AssemblerError } from "../AssemblerError.js";
 import { Context } from "../Context.js";
-import { LinkTable } from "../LinkTable.js";
+import { LiteralTable } from "../LiteralTable.js";
 import { SymbolType } from "../SymbolData.js";
 import { SymbolTable } from "../SymbolTable.js";
 
 /**
  * Class to evaluate expressions.
  * Note that evaluating an expression can have side effects:
- *  - an expression like (2) needs to evaluate to a link address, so a link must be generated
- *  - likewise, "TAD 1234" is an expression that might need to create a link
+ *  - an expression like (2) needs to evaluate to a literal address, so a literal must be generated
+ *  - likewise, "TAD 1234" is an expression that might need to create a link (an address literal)
  *
  * An expression can contain undefined symbols. tryEval returns null if an expression is undefined
  * while safeEval throws on undefined expressions.
  *
  */
 export class ExprEvaluator {
-    public constructor(private opts: AssemblerOptions, private syms: SymbolTable, private linkTable: LinkTable) {
+    public constructor(private opts: AssemblerOptions, private syms: SymbolTable, private literalTable: LiteralTable) {
     }
 
     public safeEval(ctx: Context, expr: Nodes.Expression): number {
@@ -199,8 +199,8 @@ export class ExprEvaluator {
 
         const effVal = mri | (dst & 0b1111111);
 
-        const curPage = PDP8.calcPageNum(ctx.getClc(true));
-        const dstPage = PDP8.calcPageNum(dst);
+        const curPage = PDP8.getPageNum(ctx.getClc(true));
+        const dstPage = PDP8.getPageNum(dst);
         if (dstPage == 0) {
             return effVal;
         } else if (curPage == dstPage) {
@@ -209,8 +209,7 @@ export class ExprEvaluator {
             if (mri & IND) {
                 throw Error(`Double indirection on page ${curPage}`);
             }
-            const linkPage = PDP8.calcPageNum(ctx.getClc(false));
-            const indAddr = this.linkTable.enter(ctx, linkPage, dst);
+            const indAddr = this.literalTable.enterCurrentPage(ctx.getClc(false), ctx.reloc, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
         }
     }
@@ -219,16 +218,15 @@ export class ExprEvaluator {
         let val = this.tryEval(ctx, expr.expr);
         if (val === null) {
             // Note: PAL8 allows this and treats the values as 0
-            // This can lead to different link tables in pass 1 and 2
+            // This can lead to different literal tables in pass 1 and 2
             // TODO: Generate warning
             val = 0;
         }
 
         if (expr.paren == "(") {
-            const linkPage = PDP8.calcPageNum(ctx.getClc(false));
-            return this.linkTable.enter(ctx, linkPage, val);
+            return this.literalTable.enterCurrentPage(ctx.getClc(false), ctx.reloc, val);
         } else if (expr.paren == "[") {
-            return this.linkTable.enter(ctx, 0, val);
+            return this.literalTable.enterZeroPage(val);
         } else {
             throw new AssemblerError(`Invalid parentheses: "${expr.paren}"`, expr);
         }

@@ -22,16 +22,16 @@ export const FieldSize = NumPages * PageSize;
 export const NumFields = 8;
 export const MemSize = NumFields * FieldSize;
 
-export function calcPageNum(loc: number): number {
+export function getPageNum(loc: number): number {
     return (loc >> 7) & 31;
 }
 
-export function calcAddrInPage(loc: number): number {
+export function getPageOffset(loc: number): number {
     return loc & 0o177;
 }
 
-export function firstAddrInPage(pageNum: number): number {
-    return pageNum * PageSize;
+export function getAddrFromPageAndOffset(page: number, offset: number): number {
+    return (page * PageSize + offset) & 0o7777;
 }
 
 export function isMRIOp(op: number): boolean {

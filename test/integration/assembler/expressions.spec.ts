@@ -64,7 +64,7 @@ describe("GIVEN a program with expressions", () => {
         const data = assemble(`
             A=((7))
         `);
-        test("THEN it should generate a link to a link", () => {
+        test("THEN it should generate a link to a literal", () => {
             expect(data.symbols.A).toEqual(0o0376);
             expect(data.memory[0o0376]).toEqual(0o377);
             expect(data.memory[0o0377]).toEqual(7);

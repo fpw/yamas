@@ -25,7 +25,8 @@ interface LinkEntry {
 }
 
 export class LinkTable {
-    // [page][offset] = value
+    // Entries must be in order, so not using a map
+    // [page][address offset in page] = value
     private entries: LinkEntry[][] = [];
 
     public constructor() {
@@ -33,17 +34,44 @@ export class LinkTable {
     }
 
     public enter(ctx: Context, page: number, value: number): number {
-        let relocPage = 0;
-        if (page != 0) {
-            relocPage = PDP8.calcPageNum(ctx.getClc(true));
+        if (page == 0) {
+            return this.enterZero(value);
+        } else {
+            // the target page depends on the CLC because adding the
+            // reloc can cross a page boundary while adding it to the
+            // beginnging of a page doesn't
+            const relocPage = PDP8.calcPageNum(ctx.getClc(true));
+            return this.enterPage(relocPage, ctx.reloc, value);
         }
-        let offset = this.tryLookup(relocPage, value);
+    }
+
+    private enterZero(value: number): number {
+        let offset = this.tryLookup(0, value);
         if (offset === undefined) {
-            offset = this.getFreeAddress(relocPage);
-            this.entries[relocPage][offset] = { value, reloc: relocPage != 0 ? ctx.reloc : 0 };
+            offset = this.getFreeAddress(0);
+            this.entries[0][offset] = { value, reloc: 0 };
         }
-        const addr = PDP8.PageSize * relocPage + offset;
+        return offset;
+    }
+
+    private enterPage(page: number, reloc: number, value: number): number {
+        let offset = this.tryLookup(page, value);
+        if (offset === undefined) {
+            offset = this.getFreeAddress(page);
+            this.entries[page][offset] = { value, reloc };
+        }
+        const addr = PDP8.PageSize * page + offset;
         return addr;
+    }
+
+    private tryLookup(page: number, value: number): number | undefined {
+        for (let offset = PDP8.PageSize - 1; offset >= 0; offset--) {
+            if (this.entries[page][offset]?.value === value) {
+                return offset;
+            }
+        }
+
+        return undefined;
     }
 
     private getFreeAddress(page: number): number {
@@ -59,16 +87,6 @@ export class LinkTable {
             }
         }
         throw Error(`Link table overflow on page ${page}`);
-    }
-
-    private tryLookup(page: number, value: number): number | undefined {
-        for (let offset = PDP8.PageSize - 1; offset >= 0; offset--) {
-            if (this.entries[page][offset]?.value === value) {
-                return offset;
-            }
-        }
-
-        return undefined;
     }
 
     // Check if there's an overlap of link tables with the interval [first, last]

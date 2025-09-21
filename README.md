@@ -61,8 +61,8 @@ This matches the behavior of PAL8.
 
 ## Implementation FAQ
 ### Why no parser generator?
-This project was also a personal project for me to strengthen skills that I hardly need for my day job,
-such as writing lexers and parsers.
+I need full control of the intermediate stages to use this for a future language server. This needs incremental parsing, fine-grained error handling
+and other features that are easier to implement with custom code.
 
 ### Why can expressions be null? Also, why not undefined?
 Expressions can be null in pass 1, for example when a symbol is used that is only defined later. This is okay unless the expression changes the CLC.
@@ -84,4 +84,5 @@ See above: The origin statements must be preserved as they appeared in the code.
 [palbart testbench]: http://www.pdp8online.com/ftp/software/palbart/testbench/
 [cmp_tape]: http://www.pdp8online.com/ftp/software/cmp_tape/
 [MACRO-8 (PDF manual)]: http://www.bitsavers.org/pdf/dec/pdp8/software/DEC-08-CMAB-D_MACRO8.pdf
+
 

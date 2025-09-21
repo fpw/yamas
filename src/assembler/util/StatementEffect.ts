@@ -23,14 +23,11 @@ export type StatementHandler<T extends Nodes.Node> = (ctx: Context, stmt: T) => 
 export type RegisterFunction =  <T extends Nodes.Statement>(type: T["type"], handler: StatementHandler<T>) => void;
 
 export interface StatementEffect {
-    // punch address = value
-    output?: [number, number][];
-
-    // increase CLC by given amount
-    incClc?: number;
+    // punch values (and implicitly increase CLC by the number of entries)
+    output?: number[];
 
     // set CLC to new value with relocation
-    relocClc?: number;
+    setOrigin?: number;
 
     // change current field
     changeField?: number;

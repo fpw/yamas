@@ -54,16 +54,19 @@ export class DataAssembler {
     private handleExprStmt(ctx: Context, stmt: Nodes.ExpressionStatement): StatementEffect {
         // we need to evaluate in both passes to generate links in MRI statements in correct order
         const val = this.evaluator.tryEval(ctx, stmt.expr);
-        const output: [number, number][] = [];
+        const output: number[] = [];
 
-        // but in pass 2, we really need to access the value
-        if (ctx.generateCode) {
+        if (!ctx.generateCode) {
+            // in pass 1, we can live without the value
+            output.push(val ?? 0);
+        } else {
+            // but in pass 2, we really need to access the value
             if (val === null) {
                 throw new AssemblerError("Undefined expression", stmt);
             }
-            output.push([ctx.getClc(false), val]);
+            output.push(val);
         }
-        return { output, incClc: 1 };
+        return { output };
     }
 
     private handleRadix(ctx: Context, stmt: Nodes.RadixStatement): StatementEffect {
@@ -72,37 +75,24 @@ export class DataAssembler {
 
     private handleZBlock(ctx: Context, stmt: Nodes.ZBlockStatement): StatementEffect {
         const amount = this.evaluator.safeEval(ctx, stmt.expr);
-        const output: [number, number][] = [];
-        const loc = ctx.getClc(false);
-        for (let i = 0; i < amount; i++) {
-            output.push([loc + i, 0]);
-        }
-        return { output, incClc: amount };
+        const output: number[] = new Array<number>(amount).fill(0);
+        return { output };
     }
 
     private handleText(ctx: Context, stmt: Nodes.TextStatement): StatementEffect {
-        const outStr = CharSets.asciiStringToDec(stmt.text, !this.opts.noNullTermination);
-        const addr = ctx.getClc(false);
-        const output: [number, number][] = [];
-        outStr.forEach((w, i) => output.push([addr + i, w]));
-        return { output, incClc: outStr.length };
+        const output = CharSets.asciiStringToDec(stmt.text, !this.opts.noNullTermination);
+        return { output };
     }
 
     private handleFileName(ctx: Context, stmt: Nodes.FilenameStatement): StatementEffect {
-        const outStr = CharSets.asciiStringToOS8Name(stmt.name);
-        const addr = ctx.getClc(false);
-        const output: [number, number][] = [];
-        outStr.forEach((w, i) => output.push([addr + i, w]));
-        return { output, incClc: outStr.length };
+        const output = CharSets.asciiStringToOS8Name(stmt.name);
+        return { output };
     }
 
     private handleDevice(ctx: Context, name: Nodes.DevNameStatement): StatementEffect {
         const dev = name.name.padEnd(4, "@");
-        const outStr = CharSets.asciiStringToDec(dev, false);
-        const addr = ctx.getClc(false);
-        const output: [number, number][] = [];
-        outStr.forEach((w, i) => output.push([addr + i, w]));
-        return { output, incClc: outStr.length };
+        const output = CharSets.asciiStringToDec(dev, false);
+        return { output };
     }
 
     private handleDubl(ctx: Context, stmt: Nodes.DoubleIntList): StatementEffect {
@@ -110,9 +100,7 @@ export class DataAssembler {
             return {};
         }
 
-        const output: [number, number][] = [];
-        const startLoc = ctx.getClc(false);
-        let loc = ctx.getClc(false);
+        const output: number[] = [];
         for (const dubl of stmt.list) {
             if (dubl.type != NodeType.DoubleInt) {
                 continue;
@@ -121,10 +109,10 @@ export class DataAssembler {
             if (dubl.unaryOp?.operator === "-") {
                 num = -num;
             }
-            output.push([loc++, (num >> 12) & 0o7777]);
-            output.push([loc++, num & 0o7777]);
+            output.push((num >> 12) & 0o7777);
+            output.push(num & 0o7777);
         }
-        return { output, incClc: loc - startLoc };
+        return { output };
     }
 
     private handleFltg(ctx: Context, stmt: Nodes.FloatList): StatementEffect {
@@ -132,9 +120,7 @@ export class DataAssembler {
             return {};
         }
 
-        const output: [number, number][] = [];
-        const startLoc = ctx.getClc(false);
-        let loc = ctx.getClc(false);
+        const output: number[] = [];
         for (const fltg of stmt.list) {
             if (fltg.type != NodeType.Float) {
                 continue;
@@ -146,11 +132,11 @@ export class DataAssembler {
             }
 
             const [e, mHi, mLo] = encodeDECFloat(numStr);
-            output.push([loc++, e]);
-            output.push([loc++, mHi]);
-            output.push([loc++, mLo]);
+            output.push(e);
+            output.push(mHi);
+            output.push(mLo);
         }
-        return { output, incClc: loc - startLoc };
+        return { output };
     }
 
     private handlePunchControl(ctx: Context, stmt: Nodes.PunchCtrlStatement): StatementEffect {

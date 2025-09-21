@@ -84,8 +84,10 @@ export class LiteralTable {
         }
     }
 
-    public visitAllEntries(f: (addr: number, val: number) => void) {
-        this.pages.forEach(p => p.visitEntries(f));
+    public *entries(): Iterable<{ addr: number, value: number }> {
+        for (const page of this.pages) {
+            yield* page.pageEntries();
+        }
     }
 }
 
@@ -147,7 +149,7 @@ class LiteralPage {
         return this.entries[offset] !== undefined;
     }
 
-    public visitEntries(f: (addr: number, val: number) => void) {
+    public *pageEntries(): Iterable<{ addr: number, value: number }> {
         for (let offset = TopAddr; offset > this.nextFreeOffset; offset--) {
             const entry = this.entries[offset];
             if (entry === undefined) {
@@ -155,7 +157,7 @@ class LiteralPage {
             }
             const value = entry.value;
             const addr = PDP8.getAddrFromPageAndOffset(this.pageNum, offset - entry.relocationOffset);
-            f(addr, value);
+            yield { addr, value };
         }
     }
 }

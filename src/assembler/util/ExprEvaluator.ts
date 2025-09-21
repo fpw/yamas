@@ -209,7 +209,9 @@ export class ExprEvaluator {
             if (mri & IND) {
                 throw Error(`Double indirection on page ${curPage}`);
             }
-            const indAddr = this.literalTable.findOrAddOnCurrentPage(ctx.getClc(false), ctx.reloc, dst);
+            const clc = ctx.getClc(false);
+            const reloc = ctx.reloc;
+            const indAddr = this.literalTable.findOrAddOnCurrentPage(clc, reloc, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
         }
     }

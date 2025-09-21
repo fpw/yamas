@@ -195,20 +195,16 @@ export class Assembler {
 
         const effect = handler(ctx, stmt);
 
-        for (const [addr, val] of effect.output ?? []) {
-            this.output.punchData(ctx, addr, val);
-        }
-
-        if (effect.incClc !== undefined) {
-            ctx = this.incClc(ctx, effect.incClc);
+        if (effect.output !== undefined) {
+            ctx = this.doOutput(ctx, effect.output);
         }
 
         if (effect.changeField !== undefined) {
             ctx = this.changeField(ctx, effect.changeField);
         }
 
-        if (effect.relocClc !== undefined) {
-            ctx = this.relocClc(ctx, effect.relocClc);
+        if (effect.setOrigin !== undefined) {
+            ctx = this.changeOrigin(ctx, effect.setOrigin);
         }
 
         if (effect.assembleSubProgram) {
@@ -219,6 +215,14 @@ export class Assembler {
         ctx = this.applySimpleEffects(ctx, effect);
 
         return [[], ctx];
+    }
+
+    private doOutput(ctx: Context, output: number[]): Context {
+        let addr = ctx.getClc(false);
+        for (const val of output) {
+            this.output.punchData(ctx, addr++, val);
+        }
+        return this.incClc(ctx, output.length);
     }
 
     private applySimpleEffects(ctx: Context, effect: StatementEffect): Context {
@@ -237,7 +241,23 @@ export class Assembler {
         return ctx;
     }
 
-    private relocClc(ctx: Context, newClc: number): Context {
+    private incClc(ctx: Context, incClc: number): Context {
+        // we just put something in interval [current CLC, current CLC + incClc)
+        // -> check if it overlapped with a literal by checking the last written address
+        // TODO: Check the other direction, i.e. writing an instruction first and then a literal
+        const firstAddr = ctx.getClc(false);
+        const newClc = firstAddr + incClc;
+        const lastAddr = newClc - 1;
+
+        if (this.literals.checkOverlap(firstAddr, lastAddr)) {
+            throw Error("Code overwraps with literal table");
+        }
+
+        ctx = ctx.withCLC(newClc, false);
+        return ctx;
+    }
+
+    private changeOrigin(ctx: Context, newClc: number): Context {
         const oldPage = PDP8.getPageNum(ctx.getClc(true));
         ctx = ctx.withCLC(newClc, true);
         const newPage = PDP8.getPageNum(ctx.getClc(true));
@@ -248,22 +268,6 @@ export class Assembler {
         }
 
         this.output.punchOrigin(ctx);
-        return ctx;
-    }
-
-    private incClc(ctx: Context, incClc: number): Context {
-        // we just put something in interval [current CLC, current CLC + incClc)
-        // -> check if it overlapped with a literal by checking the last written address
-        // TODO: Check the other direction, i.e. writing a literal first and then an instruction
-        const firstWrite = ctx.getClc(false);
-        const newClc = firstWrite + incClc;
-        const lastWrite = newClc - 1;
-
-        if (this.literals.checkOverlap(firstWrite, lastWrite)) {
-            throw Error("Code overwraps with literal table");
-        }
-
-        ctx = ctx.withCLC(newClc, false);
         return ctx;
     }
 
@@ -280,13 +284,13 @@ export class Assembler {
 
     private outputLiterals(ctx: Context) {
         let curAddr = ctx.getClc(false);
-        this.literals.visitAllEntries((addr, val) => {
+        for (const { addr, value } of this.literals.entries()) {
             if (curAddr != addr) {
                 curAddr = addr;
                 this.output.punchOrigin(ctx, curAddr);
             }
-            this.output.punchData(ctx, curAddr, val);
+            this.output.punchData(ctx, curAddr, value);
             curAddr++;
-        });
+        }
     }
 }

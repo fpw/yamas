@@ -46,7 +46,7 @@ export class OriginAssembler {
 
     private handleOrigin(ctx: Context, stmt: Nodes.OriginStatement): StatementEffect {
         const newClc = this.evaluator.safeEval(ctx, stmt.val);
-        return { relocClc: newClc };
+        return { setOrigin: newClc };
     }
 
     private handlePage(ctx: Context, stmt: Nodes.ChangePageStatement): StatementEffect {
@@ -61,8 +61,8 @@ export class OriginAssembler {
                 throw new AssemblerError(`Invalid page ${newPage}`, stmt);
             }
         }
-        const reloc = PDP8.getAddrFromPageAndOffset(newPage, 0);
-        return { relocClc: reloc };
+        const newClc = PDP8.getAddrFromPageAndOffset(newPage, 0);
+        return { setOrigin: newClc };
     }
 
     private handleField(ctx: Context, stmt: Nodes.ChangeFieldStatement): StatementEffect {

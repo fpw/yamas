@@ -280,7 +280,7 @@ export class Assembler {
 
     private outputLiterals(ctx: Context) {
         let curAddr = ctx.getClc(false);
-        this.literals.visitAll((addr, val) => {
+        this.literals.visitAllEntries((addr, val) => {
             if (curAddr != addr) {
                 curAddr = addr;
                 this.output.punchOrigin(ctx, curAddr);

@@ -209,7 +209,7 @@ export class ExprEvaluator {
             if (mri & IND) {
                 throw Error(`Double indirection on page ${curPage}`);
             }
-            const indAddr = this.literalTable.enterCurrentPage(ctx.getClc(false), ctx.reloc, dst);
+            const indAddr = this.literalTable.findOrAddOnCurrentPage(ctx.getClc(false), ctx.reloc, dst);
             return mri | (indAddr & 0b1111111) | IND | CUR;
         }
     }
@@ -224,9 +224,9 @@ export class ExprEvaluator {
         }
 
         if (expr.paren == "(") {
-            return this.literalTable.enterCurrentPage(ctx.getClc(false), ctx.reloc, val);
+            return this.literalTable.findOrAddOnCurrentPage(ctx.getClc(false), ctx.reloc, val);
         } else if (expr.paren == "[") {
-            return this.literalTable.enterZeroPage(val);
+            return this.literalTable.findOrAddOnZeroPage(val);
         } else {
             throw new AssemblerError(`Invalid parentheses: "${expr.paren}"`, expr);
         }
